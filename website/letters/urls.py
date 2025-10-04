@@ -19,7 +19,7 @@ urlpatterns = [
     # Authentication URLs
     path('register/', views.register, name='register'),
     path('login/', auth_views.LoginView.as_view(template_name='letters/login.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='letter_list'), name='logout'),
+    path('logout/', auth_views.LogoutView.as_view(), name='logout'),
 
     # User Profile URLs
     path('profile/', views.profile, name='profile'),
