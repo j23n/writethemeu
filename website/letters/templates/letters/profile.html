@@ -62,15 +62,9 @@
     <h3>{% trans "Letters You've Signed" %} ({{ user_signatures.count }})</h3>
     {% if user_signatures %}
         {% for signature in user_signatures %}
-            <div style="padding: 1rem 0; border-bottom: 1px solid #ecf0f1;">
-                <h4><a href="{% url 'letter_detail' signature.letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ signature.letter.title }}</a></h4>
-                <p style="color: #7f8c8d; font-size: 0.9rem;">
-                    {% trans "To" %} {{ signature.letter.representative.full_name }} | {% trans "Signed on" %} {{ signature.signed_at|date:"SHORT_DATE_FORMAT" }}
-                </p>
-                {% if signature.comment %}
-                    <p style="margin-top: 0.5rem; font-style: italic;">{% trans "Your comment:" %} {{ signature.comment }}</p>
-                {% endif %}
-            </div>
+            {% with letter=signature.letter %}
+                {% include 'letters/partials/letter_card.html' %}
+            {% endwith %}
         {% endfor %}
     {% else %}
         <p style="color: #7f8c8d;">{% trans "You haven't signed any letters yet." %} <a href="{% url 'letter_list' %}">{% trans "Browse letters" %}</a></p>

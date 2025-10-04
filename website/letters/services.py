@@ -24,7 +24,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from .constants import GERMAN_STATE_ALIASES, normalize_german_state
+from .constants import GERMAN_STATE_ALIASES, normalize_german_state, normalize_party_name
 from .models import (
     Committee,
     CommitteeMembership,
@@ -360,7 +360,7 @@ class RepresentativeSyncService:
         mandate_id = str(mandate.get('id'))
         politician_id = politician.get('id')
         first_name, last_name = self._split_name(politician.get('label', ''))
-        party_name = self._extract_party_name(mandate)
+        party_name = normalize_party_name(self._extract_party_name(mandate))
         election_mode = self._derive_election_mode(parliament, electoral)
 
         defaults = {

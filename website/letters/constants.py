@@ -23,6 +23,50 @@ GERMAN_STATE_ALIASES = {
     'Thüringen': ['Thüringen', 'Thuringia', 'TH'],
 }
 
+PARTY_ALIASES = {
+    'spd': 'SPD',
+    'sozialdemokratische partei deutschlands': 'SPD',
+    'cdu': 'CDU',
+    'csu': 'CSU',
+    'cdu/csu': 'CDU/CSU',
+    'afd': 'AfD',
+    'alternative für deutschland': 'AfD',
+    'fdp': 'FDP',
+    'freie demokratische partei': 'FDP',
+    'bsw': 'BSW',
+    'bsw.': 'BSW',
+    'freiebürger': 'BSW',
+    'bündnis 90/die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'bündnis90/die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'bündnis 90 / die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'bündnis90 / die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'bündnis 90/ die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'bündnis 90/ die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'gruene': 'BÜNDNIS 90/DIE GRÜNEN',
+    'grüne': 'BÜNDNIS 90/DIE GRÜNEN',
+    'die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
+    'grüne/bündnis 90': 'BÜNDNIS 90/DIE GRÜNEN',
+    'grüne (bündnis 90/ die grünen)': 'BÜNDNIS 90/DIE GRÜNEN',
+    'die linke': 'DIE LINKE',
+    'linke': 'DIE LINKE',
+    'the left': 'DIE LINKE',
+    'linke.': 'DIE LINKE',
+    'fraktionslos': 'Fraktionslos',
+    'freiewähler': 'FREIE WÄHLER',
+    'freie wähler': 'FREIE WÄHLER',
+    'freie wählergemeinschaft': 'FREIE WÄHLER',
+    'freie wähler / fw': 'FREIE WÄHLER',
+    'fw': 'FREIE WÄHLER',
+    'grüne/efa': 'Grüne/EFA',
+    'greens/efa': 'Grüne/EFA',
+    's&d': 'S&D',
+    'evp': 'EVP',
+    'renew': 'Renew',
+    'renew europe': 'Renew',
+    'bündnis deutschland': 'Bündnis Deutschland',
+    'bündnis deutschland.': 'Bündnis Deutschland',
+}
+
 
 def normalize_german_state(state: Optional[str]) -> Optional[str]:
     """Return canonical German state name if known."""
@@ -43,3 +87,16 @@ def normalize_german_state(state: Optional[str]) -> Optional[str]:
                 return canonical
 
     return state_clean
+
+
+def normalize_party_name(party: Optional[str]) -> Optional[str]:
+    """Return canonical party label when known."""
+    if not party:
+        return party
+
+    cleaned = party.strip()
+    if not cleaned:
+        return cleaned
+
+    canonical = PARTY_ALIASES.get(cleaned.lower())
+    return canonical or cleaned
