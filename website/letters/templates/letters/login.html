@@ -1,0 +1,40 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Login" %} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 500px; margin: 0 auto;">
+    <h2>{% trans "Login" %}</h2>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="id_username">{% trans "Username:" %}</label>
+            {{ form.username }}
+            {% if form.username.errors %}
+                <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.username.errors }}</div>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="id_password">{% trans "Password:" %}</label>
+            {{ form.password }}
+            {% if form.password.errors %}
+                <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.password.errors }}</div>
+            {% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+            <div style="color: #e74c3c; margin-bottom: 1rem;">{{ form.non_field_errors }}</div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary">{% trans "Login" %}</button>
+    </form>
+
+    <p style="margin-top: 1.5rem; text-align: center;">
+        {% trans "Don't have an account?" %} <a href="{% url 'register' %}">{% trans "Register here" %}</a>
+    </p>
+</div>
+{% endblock %}

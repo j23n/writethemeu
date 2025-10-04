@@ -1,0 +1,45 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Berlin Mitte",
+        "state": "Berlin",
+        "wahlkreis_number": "75"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [13.36, 52.50],
+            [13.46, 52.50],
+            [13.46, 52.57],
+            [13.36, 52.57],
+            [13.36, 52.50]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Muenchen Innenstadt",
+        "state": "Bayern",
+        "wahlkreis_number": "220"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [11.53, 48.11],
+            [11.61, 48.11],
+            [11.61, 48.18],
+            [11.53, 48.18],
+            [11.53, 48.11]
+          ]
+        ]
+      }
+    }
+  ]
+}

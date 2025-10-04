@@ -1,0 +1,85 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Profile" %} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{% blocktrans with username=user.username %}{{ username }}'s Profile{% endblocktrans %}</h2>
+
+    <div style="margin-top: 1rem;">
+        <h3>{% trans "Identity Verification" %}</h3>
+        {% if verification %}
+            {% if verification.is_verified %}
+                <div style="background: #d4edda; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                    <strong style="color: #155724;">✓ {% trans "Identity Verified" %}</strong>
+                    <p style="color: #155724; margin-top: 0.5rem;">
+                        {% trans "Your signatures will be marked as verified constituent signatures." %}
+                    </p>
+                    {% if verification.constituency %}
+                        <p style="color: #155724; margin-top: 0.5rem;">
+                            {% trans "Constituency:" %} {{ verification.constituency.name }}
+                        </p>
+                    {% endif %}
+                </div>
+            {% elif verification.status == 'PENDING' %}
+                <div style="background: #fff3cd; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                    <strong style="color: #856404;">⏳ {% trans "Verification Pending" %}</strong>
+                    <p style="color: #856404; margin-top: 0.5rem;">
+                        {% trans "Your verification is being processed." %}
+                    </p>
+                    <a href="{% url 'complete_verification' %}" class="btn btn-secondary" style="margin-top: 0.5rem;">{% trans "Complete Verification (Stub)" %}</a>
+                </div>
+            {% elif verification.status == 'FAILED' %}
+                <div style="background: #f8d7da; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                    <strong style="color: #721c24;">✗ {% trans "Verification Failed" %}</strong>
+                    <p style="color: #721c24; margin-top: 0.5rem;">
+                        {% trans "Please try again or contact support." %}
+                    </p>
+                </div>
+            {% endif %}
+        {% else %}
+            <p style="color: #7f8c8d; margin: 1rem 0;">
+                {% trans "Verify your identity to prove you're a constituent of the representatives you write to. Verified signatures carry more weight!" %}
+            </p>
+            <a href="{% url 'start_verification' %}" class="btn btn-primary">{% trans "Start Verification" %}</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h3>{% trans "Your Letters" %} ({{ user_letters.count }})</h3>
+    {% if user_letters %}
+        {% for letter in user_letters %}
+            <div style="padding: 1rem 0; border-bottom: 1px solid #ecf0f1;">
+                <h4><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h4>
+                <p style="color: #7f8c8d; font-size: 0.9rem;">
+                    {% trans "To" %} {{ letter.representative.full_name }} | {{ letter.published_at|date:"SHORT_DATE_FORMAT" }} |
+                    {% blocktrans count counter=letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}
+                </p>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #7f8c8d;">{% trans "You haven't written any letters yet." %} <a href="{% url 'letter_create' %}">{% trans "Write one now!" %}</a></p>
+    {% endif %}
+</div>
+
+<div class="card">
+    <h3>{% trans "Letters You've Signed" %} ({{ user_signatures.count }})</h3>
+    {% if user_signatures %}
+        {% for signature in user_signatures %}
+            <div style="padding: 1rem 0; border-bottom: 1px solid #ecf0f1;">
+                <h4><a href="{% url 'letter_detail' signature.letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ signature.letter.title }}</a></h4>
+                <p style="color: #7f8c8d; font-size: 0.9rem;">
+                    {% trans "To" %} {{ signature.letter.representative.full_name }} | {% trans "Signed on" %} {{ signature.signed_at|date:"SHORT_DATE_FORMAT" }}
+                </p>
+                {% if signature.comment %}
+                    <p style="margin-top: 0.5rem; font-style: italic;">{% trans "Your comment:" %} {{ signature.comment }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    {% else %}
+        <p style="color: #7f8c8d;">{% trans "You haven't signed any letters yet." %} <a href="{% url 'letter_list' %}">{% trans "Browse letters" %}</a></p>
+    {% endif %}
+</div>
+{% endblock %}

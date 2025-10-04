@@ -1,0 +1,12 @@
+[project]
+name = "writethem-eu"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django>=5.2.6",
+    "requests>=2.31.0",
+    "geopy>=2.4.0",
+    "shapely>=2.1.0",
+]

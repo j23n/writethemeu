@@ -1,0 +1,246 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ representative.full_name }} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Left column: Representative info -->
+    <div class="col-md-8">
+        <!-- Basic Information Card -->
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white">
+                <h2 class="mb-0">{{ representative.full_name }}</h2>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <strong>{% trans "Party:" %}</strong>
+                            <span class="badge bg-secondary">{{ representative.party }}</span>
+                        </p>
+                        <p class="mb-2">
+                            <strong>{% trans "Constituency:" %}</strong>
+                            {{ representative.constituency.name }}
+                        </p>
+                        <p class="mb-2">
+                            <strong>{% trans "Legislative Body:" %}</strong>
+                            {{ representative.constituency.legislative_body }}
+                        </p>
+                        {% if representative.role %}
+                        <p class="mb-2">
+                            <strong>{% trans "Role:" %}</strong> {{ representative.role }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <p class="mb-2">
+                            <strong>{% trans "Term:" %}</strong>
+                            {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}
+                            {% if representative.term_end %}
+                                - {{ representative.term_end|date:"SHORT_DATE_FORMAT" }}
+                            {% else %}
+                                - {% trans "Present" %}
+                            {% endif %}
+                        </p>
+                        <p class="mb-2">
+                            <strong>{% trans "Status:" %}</strong>
+                            {% if representative.is_active %}
+                                <span class="badge bg-success">{% trans "Active" %}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{% trans "Inactive" %}</span>
+                            {% endif %}
+                        </p>
+                        {% if representative.email %}
+                        <p class="mb-2">
+                            <strong>{% trans "Email:" %}</strong>
+                            <a href="mailto:{{ representative.email }}">{{ representative.email }}</a>
+                        </p>
+                        {% endif %}
+                        {% if representative.website %}
+                        <p class="mb-2">
+                            <strong>{% trans "Website:" %}</strong>
+                            <a href="{{ representative.website }}" target="_blank">{{ representative.website }}</a>
+                        </p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Committees Card -->
+        {% if committee_memberships %}
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">📋 {% trans "Committee Memberships" %}</h4>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for membership in committee_memberships %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">{{ membership.committee.name }}</h6>
+                                <p class="mb-1 text-muted small">{{ membership.committee.parliament }}</p>
+                                {% if membership.committee.topic_area %}
+                                <p class="mb-0">
+                                    <span class="badge bg-light text-dark">
+                                        {{ membership.committee.topic_area.name }}
+                                    </span>
+                                </p>
+                                {% endif %}
+                            </div>
+                            <div class="text-end">
+                                <span class="badge {% if membership.role == 'chair' or membership.role == 'deputy_chair' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+                                    {{ membership.get_role_display }}
+                                </span>
+                                {% if membership.is_active %}
+                                <br><small class="text-success">{% trans "Active" %}</small>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Competences Card -->
+        {% if competences %}
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h4 class="mb-0">🎯 {% trans "Policy Competences" %}</h4>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    {% trans "Based on committee memberships, this representative works on the following policy areas:" %}
+                </p>
+                <div>
+                    {% for topic in competences %}
+                    <span class="tag">
+                        {{ topic.name }}
+                        <small class="text-muted">({{ topic.get_primary_level_display }})</small>
+                    </span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Letters Section -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0">📝 {% trans "Open Letters" %} ({{ letters_to_rep.count }})</h4>
+            </div>
+            <div class="card-body">
+                {% if letters_to_rep %}
+                    <div class="list-group">
+                        {% for letter in letters_to_rep %}
+                        <a href="{% url 'letter_detail' letter.pk %}" class="list-group-item list-group-item-action">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ letter.title }}</h6>
+                                <small>{% blocktrans count counter=letter.sig_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}</small>
+                            </div>
+                            <p class="mb-1 small text-muted">
+                                {{ letter.body|truncatewords:30 }}
+                            </p>
+                            <small class="text-muted">
+                                {% trans "by" %} {{ letter.author.username }} - {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}
+                            </small>
+                            {% if letter.tags.exists %}
+                            <div class="mt-2">
+                                {% for tag in letter.tags.all %}
+                                    <span class="badge bg-light text-dark">{{ tag.name }}</span>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">{% trans "No letters have been written to this representative yet." %}</p>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'letter_create' %}" class="btn btn-primary mt-3">{% trans "Write the First Letter" %}</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Right column: External links -->
+    <div class="col-md-4">
+        <!-- External Resources Card -->
+        <div class="card mb-4 sticky-top" style="top: 20px;">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">🔗 {% trans "External Resources" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if abgeordnetenwatch_url %}
+                <div class="mb-3">
+                    <h6>{% trans "Abgeordnetenwatch Profile" %}</h6>
+                    <p class="small text-muted mb-2">
+                        {% trans "View voting record, questions, and detailed profile on Abgeordnetenwatch.de" %}
+                    </p>
+                    <a href="{{ abgeordnetenwatch_url }}" target="_blank" class="btn btn-primary btn-sm w-100">
+                        {% trans "View on Abgeordnetenwatch" %} →
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if wikipedia_url %}
+                <div class="mb-3">
+                    <h6>{% trans "Wikipedia Article (German)" %}</h6>
+                    <p class="small text-muted mb-2">
+                        {% trans "Read more about this representative on Wikipedia" %}
+                    </p>
+                    <a href="{{ wikipedia_url }}" target="_blank" class="btn btn-secondary btn-sm w-100">
+                        {% trans "View on Wikipedia" %} →
+                    </a>
+                </div>
+                {% endif %}
+
+                {% if not abgeordnetenwatch_url and not wikipedia_url %}
+                <p class="text-muted small mb-0">{% trans "No external resources available for this representative." %}</p>
+                {% endif %}
+
+                <hr>
+
+                <div>
+                    <h6>{% trans "Write a Letter" %}</h6>
+                    <p class="small text-muted mb-2">
+                        {% blocktrans with name=representative.full_name %}Start a new open letter to {{ name }}{% endblocktrans %}
+                    </p>
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'letter_create' %}?rep={{ representative.id }}" class="btn btn-success btn-sm w-100">
+                        {% trans "Write Letter" %}
+                    </a>
+                    {% else %}
+                    <a href="{% url 'login' %}?next={% url 'letter_create' %}?rep={{ representative.id }}" class="btn btn-success btn-sm w-100">
+                        {% trans "Login to Write Letter" %}
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Stats Card -->
+        <div class="card">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">📊 {% trans "Quick Stats" %}</h6>
+            </div>
+            <div class="card-body">
+                <p class="mb-2">
+                    <strong>{% trans "Letters Received:" %}</strong> {{ letters_to_rep.count }}
+                </p>
+                <p class="mb-2">
+                    <strong>{% trans "Committee Memberships:" %}</strong> {{ committee_memberships.count }}
+                </p>
+                <p class="mb-0">
+                    <strong>{% trans "Policy Areas:" %}</strong> {{ competences|length }}
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

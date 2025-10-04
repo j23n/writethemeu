@@ -1,0 +1,36 @@
+{% extends 'letters/base.html' %}
+
+{% block title %}Report "{{ letter.title }}" - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Report "{{ letter.title }}"</h2>
+    <p style="color: #7f8c8d; font-size: 0.95rem;">
+        Flag this letter for moderator review if it violates our community guidelines.
+    </p>
+
+    <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 6px;">
+        <p style="margin-bottom: 0.4rem;"><strong>Author:</strong> {{ letter.author.username }}</p>
+        <p style="margin-bottom: 0.4rem;"><strong>To:</strong> {{ letter.representative.full_name }} ({{ letter.representative.party }})</p>
+        <p style="margin-bottom: 0; color: #7f8c8d; font-size: 0.9rem;">Published {{ letter.published_at|date:"M d, Y" }}</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        {{ form.non_field_errors }}
+        <div class="form-group">
+            <label for="id_reason">Reason</label>
+            {{ form.reason }}
+            {{ form.reason.errors }}
+        </div>
+        <div class="form-group">
+            <label for="id_description">Description</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+            <small class="form-text text-muted">Provide as much detail as possible so moderators can review quickly.</small>
+        </div>
+        <button type="submit" class="btn btn-danger">Submit report</button>
+        <a href="{% url 'letter_detail' letter.pk %}" class="btn btn-secondary">Cancel</a>
+    </form>
+</div>
+{% endblock %}

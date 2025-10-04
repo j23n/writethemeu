@@ -1,0 +1,132 @@
+{% load i18n %}
+{% if message %}
+    <div class="alert alert-info">
+        {{ message }}
+    </div>
+{% else %}
+    <div class="suggestions-container">
+        <!-- Topic Area Interpretation -->
+        <div class="card mb-3">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">📋 {% trans "Our Interpretation" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if suggestion_result.primary_topic %}
+                    <p class="mb-2">
+                        <strong>{% trans "Topic:" %}</strong> {{ suggestion_result.primary_topic.name }}
+                        <span class="badge bg-secondary">{{ suggestion_result.primary_topic.get_primary_level_display }}</span>
+                    </p>
+                    <p class="mb-0 text-muted">
+                        {{ suggestion_result.explanation }}
+                    </p>
+                {% else %}
+                    <p class="text-muted">{% trans "No specific policy area detected. Try adding more keywords." %}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Suggested Representatives -->
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">👥 {% trans "Suggested Representatives" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if suggestion_result.representatives %}
+                    <p class="small text-muted mb-2">
+                        {% blocktrans with topic=suggestion_result.primary_topic.name level=suggestion_result.suggested_level %}Based on the topic "{{ topic }}", we suggest contacting representatives from the {{ level }}:{% endblocktrans %}
+                    </p>
+                    <div class="list-group">
+                        {% for rep in suggestion_result.representatives|slice:":5" %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div class="flex-grow-1">
+                                        <strong>{{ rep.full_name }}</strong>
+                                        <br>
+                                        <small class="text-muted">{{ rep.party }} - {{ rep.constituency.name }}</small>
+                                        {% if rep.relevant_committees %}
+                                            <br>
+                                            <small class="text-success">
+                                                ✓ {{ rep.relevant_committees.0.role }} {% trans "of" %} {{ rep.relevant_committees.0.committee.name }}
+                                            </small>
+                                        {% endif %}
+                                        <br>
+                                        <a href="{% url 'representative_detail' rep.id %}" target="_blank" class="small">{% trans "View profile" %} →</a>
+                                    </div>
+                                    <button type="button"
+                                            class="btn btn-sm btn-primary"
+                                            onclick="selectRepresentative({{ rep.id }}, '{{ rep.full_name }}')">
+                                        {% trans "Select" %}
+                                    </button>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">{% trans "No representatives found. Representatives may need to be synced for this governmental level." %}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Keywords -->
+        {% if keywords %}
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🏷️ {% trans "Related Keywords" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% for keyword in keywords %}
+                        <span class="badge bg-light text-dark me-1 mb-1">{{ keyword }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Similar Letters -->
+        {% if similar_letters %}
+            <div class="card">
+                <div class="card-header bg-warning text-dark">
+                    <h5 class="mb-0">📝 {% trans "Similar Letters" %}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">{% trans "Others have written about similar topics:" %}</p>
+                    <div class="list-group">
+                        {% for letter in similar_letters %}
+                            <a href="{% url 'letter_detail' letter.pk %}"
+                               target="_blank"
+                               class="list-group-item list-group-item-action">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ letter.title }}</h6>
+                                    <small>{% blocktrans count counter=letter.similar_signature_count|default:letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}</small>
+                                </div>
+                                <p class="mb-1 small">
+                                    {% trans "To:" %} {{ letter.representative.full_name }} ({{ letter.representative.party }})
+                                </p>
+                                <small class="text-muted">{% trans "by" %} {{ letter.author.username }} - {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}</small>
+                            </a>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+<script>
+function selectRepresentative(repId, repName) {
+    // Set the representative in the form
+    document.getElementById('id_representative').value = repId;
+
+    // Update UI to show selection
+    document.querySelectorAll('.list-group-item-action').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.currentTarget.classList.add('active');
+
+    // Show confirmation
+    const confirmDiv = document.getElementById('selected-rep-confirm');
+    if (confirmDiv) {
+        const selectedText = "{% trans 'Selected:' %}";
+        confirmDiv.innerHTML = `<div class="alert alert-success">✓ ${selectedText} <strong>${repName}</strong></div>`;
+    }
+}
+</script>

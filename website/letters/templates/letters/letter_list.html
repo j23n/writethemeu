@@ -1,0 +1,77 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Browse Letters" %} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card" style="background: #ecf0f1; border-left: 4px solid #3498db;">
+    <h2>{% trans "About This" %}</h2>
+    <p style="margin-bottom: 0.5rem;">{% trans "Make your voice heard, reach out to your representative, participate in democracy." %}</p>
+    <p style="margin-bottom: 0.5rem;">{% trans "Open letters authored and signed by fellow citizens." %}</p>
+    <p style="margin-bottom: 0;">{% trans "Physical letters mailed to representatives when number of verified signatures > 100." %}</p>
+</div>
+
+<div class="card">
+    <h2>{% trans "Browse Open Letters" %}</h2>
+    <form method="get" style="margin-top: 1rem;">
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" name="q" class="form-control" placeholder="{% trans 'Search letters...' %}" value="{{ request.GET.q }}">
+            <button type="submit" class="btn btn-primary">{% trans "Search" %}</button>
+        </div>
+    </form>
+
+    {% if popular_tags %}
+        <div style="margin-top: 1rem;">
+            <strong>{% trans "Popular tags:" %}</strong>
+            {% for tag in popular_tags %}
+                <a href="?tag={{ tag.slug }}" class="tag">{{ tag.name }} ({{ tag.letter_count }})</a>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>
+
+{% if letters %}
+    {% for letter in letters %}
+        <div class="card">
+            <h3><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h3>
+            <p style="color: #7f8c8d; font-size: 0.9rem;">
+                By {{ letter.author.username }} |
+                To <a href="{% url 'representative_detail' letter.representative.id %}">{{ letter.representative.full_name }}</a> ({{ letter.representative.constituency }}) |
+                {{ letter.published_at|date:"M d, Y" }}
+            </p>
+            <p style="margin-top: 0.8rem;">{{ letter.body|truncatewords:50 }}</p>
+
+            {% if letter.tags.all %}
+                <div style="margin-top: 0.5rem;">
+                    {% for tag in letter.tags.all %}
+                        <a href="?tag={{ tag.slug }}" class="tag">{{ tag.name }}</a>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div style="margin-top: 1rem; color: #7f8c8d; font-size: 0.9rem;">
+                {{ letter.signature_count }} signature{{ letter.signature_count|pluralize }}
+                {% if letter.verified_signature_count > 0 %}
+                    ({{ letter.verified_signature_count }} verified)
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+
+    {% if is_paginated %}
+        <div style="text-align: center; margin: 2rem 0;">
+            {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary">Previous</a>
+            {% endif %}
+            <span style="margin: 0 1rem;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary">Next</a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% else %}
+    <div class="card">
+        <p>No letters found. <a href="{% url 'letter_create' %}">Be the first to write one!</a></p>
+    </div>
+{% endif %}
+{% endblock %}
