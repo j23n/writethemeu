@@ -16,9 +16,9 @@
                     <p style="color: #155724; margin-top: 0.5rem;">
                         {% trans "Your signatures will be marked as verified constituent signatures." %}
                     </p>
-                    {% if verification.constituency %}
+                    {% if verification.parliament %}
                         <p style="color: #155724; margin-top: 0.5rem;">
-                            {% trans "Constituency:" %} {{ verification.constituency.name }}
+                            {% trans "Parliament:" %} {{ verification.parliament.name }}
                         </p>
                     {% endif %}
                 </div>
@@ -51,13 +51,7 @@
     <h3>{% trans "Your Letters" %} ({{ user_letters.count }})</h3>
     {% if user_letters %}
         {% for letter in user_letters %}
-            <div style="padding: 1rem 0; border-bottom: 1px solid #ecf0f1;">
-                <h4><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h4>
-                <p style="color: #7f8c8d; font-size: 0.9rem;">
-                    {% trans "To" %} {{ letter.representative.full_name }} | {{ letter.published_at|date:"SHORT_DATE_FORMAT" }} |
-                    {% blocktrans count counter=letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}
-                </p>
-            </div>
+            {% include 'letters/partials/letter_card.html' %}
         {% endfor %}
     {% else %}
         <p style="color: #7f8c8d;">{% trans "You haven't written any letters yet." %} <a href="{% url 'letter_create' %}">{% trans "Write one now!" %}</a></p>

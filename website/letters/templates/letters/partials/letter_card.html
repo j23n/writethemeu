@@ -1,0 +1,25 @@
+{% load i18n %}
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h3>
+    <p style="color: #7f8c8d; font-size: 0.9rem;">
+        {% trans "By" %} {{ letter.author.username }} |
+        {% trans "To" %} <a href="{% url 'representative_detail' letter.representative.id %}">{{ letter.representative.full_name }}</a> ({{ letter.representative.party }}) |
+        {{ letter.representative.parliament.name }} |
+        {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}
+    </p>
+
+    {% if letter.tags.all %}
+        <div style="margin-bottom: 1rem;">
+            {% for tag in letter.tags.all %}
+                <a href="{% url 'letter_list' %}?tag={{ tag.slug }}" class="tag">{{ tag.name }}</a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div style="margin-top: 1rem; color: #7f8c8d; font-size: 0.9rem;">
+        {% blocktrans count counter=letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}
+        {% if letter.verified_signature_count > 0 %}
+            ({% blocktrans count counter=letter.verified_signature_count %}{{ counter }} verified{% plural %}{{ counter }} verified{% endblocktrans %})
+        {% endif %}
+    </div>
+</div>

@@ -20,12 +20,12 @@
                             <span class="badge bg-secondary">{{ representative.party }}</span>
                         </p>
                         <p class="mb-2">
-                            <strong>{% trans "Constituency:" %}</strong>
-                            {{ representative.constituency.name }}
+                            <strong>{% trans "Parliament:" %}</strong>
+                            {{ representative.parliament.name }}
                         </p>
                         <p class="mb-2">
                             <strong>{% trans "Legislative Body:" %}</strong>
-                            {{ representative.constituency.legislative_body }}
+                            {{ representative.parliament.legislative_body }}
                         </p>
                         {% if representative.role %}
                         <p class="mb-2">
@@ -135,29 +135,9 @@
             </div>
             <div class="card-body">
                 {% if letters_to_rep %}
-                    <div class="list-group">
-                        {% for letter in letters_to_rep %}
-                        <a href="{% url 'letter_detail' letter.pk %}" class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ letter.title }}</h6>
-                                <small>{% blocktrans count counter=letter.sig_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}</small>
-                            </div>
-                            <p class="mb-1 small text-muted">
-                                {{ letter.body|truncatewords:30 }}
-                            </p>
-                            <small class="text-muted">
-                                {% trans "by" %} {{ letter.author.username }} - {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}
-                            </small>
-                            {% if letter.tags.exists %}
-                            <div class="mt-2">
-                                {% for tag in letter.tags.all %}
-                                    <span class="badge bg-light text-dark">{{ tag.name }}</span>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
-                        </a>
-                        {% endfor %}
-                    </div>
+                    {% for letter in letters_to_rep %}
+                        {% include 'letters/partials/letter_card.html' %}
+                    {% endfor %}
                 {% else %}
                     <p class="text-muted mb-0">{% trans "No letters have been written to this representative yet." %}</p>
                     {% if user.is_authenticated %}
@@ -221,24 +201,6 @@
                     </a>
                     {% endif %}
                 </div>
-            </div>
-        </div>
-
-        <!-- Quick Stats Card -->
-        <div class="card">
-            <div class="card-header bg-light">
-                <h6 class="mb-0">📊 {% trans "Quick Stats" %}</h6>
-            </div>
-            <div class="card-body">
-                <p class="mb-2">
-                    <strong>{% trans "Letters Received:" %}</strong> {{ letters_to_rep.count }}
-                </p>
-                <p class="mb-2">
-                    <strong>{% trans "Committee Memberships:" %}</strong> {{ committee_memberships.count }}
-                </p>
-                <p class="mb-0">
-                    <strong>{% trans "Policy Areas:" %}</strong> {{ competences|length }}
-                </p>
             </div>
         </div>
     </div>

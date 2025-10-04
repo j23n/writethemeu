@@ -32,30 +32,7 @@
 
 {% if letters %}
     {% for letter in letters %}
-        <div class="card">
-            <h3><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h3>
-            <p style="color: #7f8c8d; font-size: 0.9rem;">
-                By {{ letter.author.username }} |
-                To <a href="{% url 'representative_detail' letter.representative.id %}">{{ letter.representative.full_name }}</a> ({{ letter.representative.constituency }}) |
-                {{ letter.published_at|date:"M d, Y" }}
-            </p>
-            <p style="margin-top: 0.8rem;">{{ letter.body|truncatewords:50 }}</p>
-
-            {% if letter.tags.all %}
-                <div style="margin-top: 0.5rem;">
-                    {% for tag in letter.tags.all %}
-                        <a href="?tag={{ tag.slug }}" class="tag">{{ tag.name }}</a>
-                    {% endfor %}
-                </div>
-            {% endif %}
-
-            <div style="margin-top: 1rem; color: #7f8c8d; font-size: 0.9rem;">
-                {{ letter.signature_count }} signature{{ letter.signature_count|pluralize }}
-                {% if letter.verified_signature_count > 0 %}
-                    ({{ letter.verified_signature_count }} verified)
-                {% endif %}
-            </div>
-        </div>
+        {% include 'letters/partials/letter_card.html' %}
     {% endfor %}
 
     {% if is_paginated %}

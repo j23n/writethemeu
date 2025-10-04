@@ -9,7 +9,7 @@
     <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
         {% trans "By" %} {{ letter.author.username }} |
         {% trans "To" %} <a href="{% url 'representative_detail' letter.representative.id %}"><strong>{{ letter.representative.full_name }}</strong></a> ({{ letter.representative.party }}) |
-        {{ letter.representative.constituency.name }} |
+        {{ letter.representative.parliament.name }} |
         {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}
     </p>
 
