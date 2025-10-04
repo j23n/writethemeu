@@ -78,6 +78,8 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('  Suggested Representatives:'))
             for rep in result['suggested_representatives']:
                 party = f' ({rep.party})' if rep.party else ''
-                self.stdout.write(f'    • {rep.full_name}{party} - {rep.constituency.name}')
+                constituency = rep.primary_constituency
+                constituency_label = constituency.name if constituency else rep.parliament.name
+                self.stdout.write(f'    • {rep.full_name}{party} - {constituency_label}')
         else:
             self.stdout.write(self.style.WARNING('  (No representatives found - run sync_representatives first)'))

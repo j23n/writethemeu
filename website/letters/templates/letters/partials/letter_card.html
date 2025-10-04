@@ -17,9 +17,6 @@
     {% endif %}
 
     <div style="margin-top: 1rem; color: #7f8c8d; font-size: 0.9rem;">
-        {% blocktrans count counter=letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}
-        {% if letter.verified_signature_count > 0 %}
-            ({% blocktrans count counter=letter.verified_signature_count %}{{ counter }} verified{% plural %}{{ counter }} verified{% endblocktrans %})
-        {% endif %}
+        {% blocktrans count counter=letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}{% if letter.verified_signature_count > 0 %} ({% blocktrans count counter=letter.verified_signature_count %}{{ counter }} verified{% plural %}{{ counter }} verified{% endblocktrans %}){% endif %}
     </div>
 </div>

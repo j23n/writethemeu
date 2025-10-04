@@ -72,8 +72,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.WARNING('\nRepresentatives:'))
         if result['representatives']:
             for rep in result['representatives'][:5]:  # Limit to 5
+                constituency = rep.primary_constituency
+                constituency_label = constituency.name if constituency else rep.parliament.name
                 self.stdout.write(
-                    f"  • {rep.full_name} ({rep.party}) - {rep.constituency.name}"
+                    f"  • {rep.full_name} ({rep.party}) - {constituency_label}"
                 )
         else:
             self.stdout.write('  None (no representatives in database yet)')

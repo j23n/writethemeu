@@ -32,9 +32,11 @@
             </div>
             <div class="card-body">
                 {% if suggestion_result.representatives %}
-                    <p class="small text-muted mb-2">
-                        {% blocktrans with topic=suggestion_result.primary_topic.name level=suggestion_result.suggested_level %}Based on the topic "{{ topic }}", we suggest contacting representatives from the {{ level }}:{% endblocktrans %}
-                    </p>
+                    {% if suggestion_result.primary_topic %}
+                        <p class="small text-muted mb-2">
+                            {% blocktrans with topic=suggestion_result.primary_topic.name level=suggestion_result.suggested_level %}Based on the topic "{{ topic }}", we suggest contacting representatives from the {{ level }}:{% endblocktrans %}
+                        </p>
+                    {% endif %}
                     <div class="list-group">
                         {% for rep in suggestion_result.representatives|slice:":5" %}
                             <div class="list-group-item">
@@ -43,6 +45,12 @@
                                         <strong>{{ rep.full_name }}</strong>
                                         <br>
                                         <small class="text-muted">{{ rep.party }} - {{ rep.parliament.name }}</small>
+                                        {% if rep.suggested_constituency %}
+                                            <br>
+                                            <small class="text-muted">
+                                                {% trans "Constituency:" %} {{ rep.suggested_constituency.name }}
+                                            </small>
+                                        {% endif %}
                                         {% if rep.relevant_committees %}
                                             <br>
                                             <small class="text-success">
@@ -54,7 +62,7 @@
                                     </div>
                                     <button type="button"
                                             class="btn btn-sm btn-primary"
-                                            onclick="selectRepresentative({{ rep.id }}, '{{ rep.full_name }}')">
+                                            onclick="selectRepresentative(event, {{ rep.id }}, '{{ rep.full_name|escapejs }}')">
                                         {% trans "Select" %}
                                     </button>
                                 </div>
@@ -67,11 +75,30 @@
             </div>
         </div>
 
+        <!-- Suggested Tags -->
+        {% if suggestion_result.suggested_tags %}
+            <div class="card mb-3">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0">🏷️ {% trans "Suggested Tags" %}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">{% trans "Click a tag to add it to your letter." %}</p>
+                    {% for tag in suggestion_result.suggested_tags %}
+                        <button type="button"
+                                class="btn btn-sm btn-outline-primary me-1 mb-1"
+                                onclick="appendTag('{{ tag.name|escapejs }}')">
+                            #{{ tag.name }}
+                        </button>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
         <!-- Keywords -->
         {% if keywords %}
             <div class="card mb-3">
                 <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">🏷️ {% trans "Related Keywords" %}</h5>
+                    <h5 class="mb-0">🔑 {% trans "Related Keywords" %}</h5>
                 </div>
                 <div class="card-body">
                     {% for keyword in keywords %}
@@ -112,21 +139,46 @@
 {% endif %}
 
 <script>
-function selectRepresentative(repId, repName) {
-    // Set the representative in the form
-    document.getElementById('id_representative').value = repId;
+function selectRepresentative(evt, repId, repName) {
+    const representativeSelect = document.getElementById('id_representative');
+    if (representativeSelect) {
+        representativeSelect.value = repId;
+    }
 
-    // Update UI to show selection
-    document.querySelectorAll('.list-group-item-action').forEach(item => {
-        item.classList.remove('active');
-    });
-    event.currentTarget.classList.add('active');
+    if (evt && evt.currentTarget) {
+        const listItem = evt.currentTarget.closest('.list-group-item');
+        if (listItem) {
+            const listGroup = listItem.parentElement;
+            if (listGroup) {
+                listGroup.querySelectorAll('.list-group-item').forEach(item => {
+                    item.classList.remove('active');
+                });
+            }
+            listItem.classList.add('active');
+        }
+    }
 
-    // Show confirmation
     const confirmDiv = document.getElementById('selected-rep-confirm');
     if (confirmDiv) {
         const selectedText = "{% trans 'Selected:' %}";
         confirmDiv.innerHTML = `<div class="alert alert-success">✓ ${selectedText} <strong>${repName}</strong></div>`;
     }
+}
+
+function appendTag(tagName) {
+    const tagInput = document.getElementById('id_tags');
+    if (!tagInput) {
+        return;
+    }
+
+    const existing = tagInput.value
+        ? tagInput.value.split(',').map(value => value.trim()).filter(Boolean)
+        : [];
+
+    if (!existing.includes(tagName)) {
+        existing.push(tagName);
+    }
+
+    tagInput.value = existing.join(', ');
 }
 </script>

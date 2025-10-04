@@ -80,14 +80,14 @@
             <div class="alert alert-light border">
                 <h5>💡 {% trans "Smart Suggestions" %}</h5>
                 <p class="mb-0 small text-muted">
-                    {% trans "Type your letter title and we'll help you find the right representative and show similar letters." %}
+                    {% trans "Add a title and your PLZ to see tailored representatives, tags, and similar letters." %}
                 </p>
             </div>
 
             <!-- This div will be populated by HTMX -->
             <div id="suggestions-content"
                  hx-post="{% url 'analyze_title' %}"
-                 hx-trigger="keyup changed delay:500ms from:#id_title"
+                 hx-trigger="keyup changed delay:500ms from:#id_title, keyup change delay:500ms from:#id_postal_code"
                  hx-include="#letter-form [name='title'], #letter-form [name='postal_code'], #letter-form [name='csrfmiddlewaretoken']"
                  hx-indicator="#loading-indicator">
 

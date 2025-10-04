@@ -1,7 +1,10 @@
 from django import forms
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
+from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+
+from .constants import normalize_german_state
 from .models import Letter, Representative, Signature, Report, Tag
 
 
@@ -23,7 +26,7 @@ class LetterForm(forms.ModelForm):
         required=False,
         max_length=10,
         label=_('Postal code (PLZ)'),
-        help_text=_('Use your PLZ to narrow down representatives from your constituency.'),
+        help_text=_('Use your PLZ to narrow down representatives from your parliament.'),
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g. 10115')})
     )
 
@@ -59,21 +62,27 @@ class LetterForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        from .services import AddressConstituencyMapper
+        from .services import ConstituencyLocator
 
-        base_queryset = Representative.objects.filter(is_active=True)
+        base_queryset = (
+            Representative.objects.filter(is_active=True)
+            .select_related('parliament', 'parliament_term')
+            .prefetch_related('constituencies')
+        )
         filtered_queryset = base_queryset
 
-        # Ensure postal code starts with verified value when available
+        target_constituencies = []
+        target_state = None
+
         if self.user and hasattr(self.user, 'identity_verification'):
             verification = getattr(self.user, 'identity_verification', None)
             if verification and verification.is_verified:
                 if not self.data and verification.postal_code:
                     self.fields['postal_code'].initial = verification.postal_code
                 if verification.constituency:
-                    filtered_queryset = filtered_queryset.filter(
-                        constituency=verification.constituency
-                    )
+                    target_constituencies.append(verification.constituency)
+                if verification.normalized_state:
+                    target_state = verification.normalized_state
 
         postal_code_value = None
         if self.data:
@@ -82,10 +91,30 @@ class LetterForm(forms.ModelForm):
             postal_code_value = self.initial.get('postal_code')
 
         if postal_code_value:
-            matches = AddressConstituencyMapper.constituencies_from_postal_code(postal_code_value)
-            preferred = AddressConstituencyMapper.select_preferred_constituency(matches)
-            if preferred:
-                filtered_queryset = base_queryset.filter(constituency=preferred)
+            located = ConstituencyLocator.locate(postal_code_value)
+            for constituency in filter(None, (located.local, located.state, located.federal)):
+                target_constituencies.append(constituency)
+                if not target_state:
+                    state_hint = normalize_german_state(constituency.metadata.get('state')) if constituency.metadata else None
+                    if state_hint:
+                        target_state = state_hint
+
+        constituency_filter = Q()
+        for constituency in target_constituencies:
+            constituency_filter |= Q(constituencies=constituency)
+
+        state_filter = Q()
+        if target_state:
+            state_filter |= Q(constituencies__metadata__state=target_state)
+            state_filter |= Q(parliament__region__iexact=target_state)
+
+        combined_filter = constituency_filter | state_filter
+        eu_filter = Q(parliament__level='EU')
+
+        if combined_filter:
+            filtered_queryset = base_queryset.filter(combined_filter | eu_filter).distinct()
+        else:
+            filtered_queryset = base_queryset
 
         self.fields['representative'].queryset = filtered_queryset
 

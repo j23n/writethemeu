@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
-    Constituency,
+    Parliament,
+    ParliamentTerm,
     Representative,
     Tag,
     TopicArea,
@@ -13,21 +14,31 @@ from .models import (
 )
 
 
-@admin.register(Constituency)
-class ConstituencyAdmin(admin.ModelAdmin):
-    list_display = ['name', 'level', 'legislative_body', 'legislative_period_start', 'legislative_period_end']
-    list_filter = ['level', 'legislative_period_start']
+@admin.register(Parliament)
+class ParliamentAdmin(admin.ModelAdmin):
+    list_display = ['name', 'level', 'legislative_body', 'region']
+    list_filter = ['level', 'region']
     search_fields = ['name', 'legislative_body', 'region']
     readonly_fields = ['created_at', 'updated_at']
 
 
+@admin.register(ParliamentTerm)
+class ParliamentTermAdmin(admin.ModelAdmin):
+    list_display = ['name', 'parliament', 'start_date', 'end_date']
+    list_filter = ['parliament__level', 'start_date']
+    search_fields = ['name', 'parliament__name']
+    readonly_fields = ['created_at', 'updated_at']
+    raw_id_fields = ['parliament']
+
+
 @admin.register(Representative)
 class RepresentativeAdmin(admin.ModelAdmin):
-    list_display = ['full_name', 'party', 'constituency', 'is_active', 'term_start', 'term_end']
-    list_filter = ['is_active', 'constituency__level', 'party']
-    search_fields = ['first_name', 'last_name', 'party', 'constituency__name']
+    list_display = ['full_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active', 'term_start', 'term_end']
+    list_filter = ['is_active', 'parliament__level', 'party', 'parliament_term__name', 'election_mode']
+    search_fields = ['first_name', 'last_name', 'party', 'parliament__name', 'parliament_term__name']
     readonly_fields = ['created_at', 'updated_at']
-    raw_id_fields = ['constituency']
+    raw_id_fields = ['parliament', 'parliament_term']
+    filter_horizontal = ['constituencies']
 
 
 @admin.register(Tag)
@@ -71,15 +82,15 @@ class TopicAreaAdmin(admin.ModelAdmin):
 
 @admin.register(Committee)
 class CommitteeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'parliament', 'topic_area', 'member_count', 'created_at']
-    list_filter = ['parliament', 'topic_area']
-    search_fields = ['name', 'description', 'parliament']
+    list_display = ['name', 'parliament_term', 'topic_area', 'member_count', 'created_at']
+    list_filter = ['parliament_term__parliament__level', 'topic_area']
+    search_fields = ['name', 'description', 'parliament_term__parliament__name']
     readonly_fields = ['created_at', 'updated_at', 'member_count']
     raw_id_fields = ['topic_area']
 
     fieldsets = (
         ('Basic Information', {
-            'fields': ('name', 'parliament', 'description')
+            'fields': ('name', 'parliament_term', 'description')
         }),
         ('Topic Mapping', {
             'fields': ('topic_area',),
@@ -99,7 +110,7 @@ class CommitteeAdmin(admin.ModelAdmin):
 @admin.register(CommitteeMembership)
 class CommitteeMembershipAdmin(admin.ModelAdmin):
     list_display = ['representative', 'committee', 'role', 'is_active', 'start_date', 'end_date']
-    list_filter = ['role', 'committee__parliament']
+    list_filter = ['role', 'committee__parliament_term__parliament__name']
     search_fields = ['representative__first_name', 'representative__last_name', 'committee__name']
     readonly_fields = ['created_at', 'updated_at', 'is_active']
     raw_id_fields = ['representative', 'committee']
@@ -121,7 +132,7 @@ class CommitteeMembershipAdmin(admin.ModelAdmin):
 @admin.register(Letter)
 class LetterAdmin(admin.ModelAdmin):
     list_display = ['title', 'author', 'representative', 'status', 'published_at', 'signature_count']
-    list_filter = ['status', 'published_at', 'representative__constituency__level']
+    list_filter = ['status', 'published_at', 'representative__parliament__level']
     search_fields = ['title', 'body', 'author__username', 'representative__last_name']
     readonly_fields = ['created_at', 'updated_at', 'signature_count', 'verified_signature_count']
     raw_id_fields = ['author', 'representative']
@@ -143,11 +154,11 @@ class SignatureAdmin(admin.ModelAdmin):
 
 @admin.register(IdentityVerification)
 class IdentityVerificationAdmin(admin.ModelAdmin):
-    list_display = ['user', 'status', 'provider', 'constituency', 'verified_at', 'expires_at']
-    list_filter = ['status', 'provider', 'verified_at']
-    search_fields = ['user__username', 'city', 'postal_code']
+    list_display = ['user', 'status', 'provider', 'constituency', 'parliament', 'parliament_term', 'verified_at', 'expires_at']
+    list_filter = ['status', 'provider', 'parliament__level', 'verified_at', 'parliament_term__name']
+    search_fields = ['user__username', 'city', 'postal_code', 'state', 'parliament__name', 'parliament_term__name']
     readonly_fields = ['created_at', 'updated_at']
-    raw_id_fields = ['user', 'constituency']
+    raw_id_fields = ['user', 'parliament', 'parliament_term', 'constituency']
 
 
 @admin.register(Report)

@@ -9,7 +9,7 @@ Uses the real Abgeordnetenwatch.de API (CC0 licensed) to sync:
 
 import logging
 from django.core.management.base import BaseCommand
-from letters.services import RepresentativeDataService
+from letters.services import RepresentativeSyncService
 
 logger = logging.getLogger('letters.services')
 
@@ -61,69 +61,11 @@ class Command(BaseCommand):
         if dry_run:
             self.stdout.write(self.style.WARNING('Running in DRY RUN mode - no changes will be saved'))
 
-        if level in ['eu', 'all']:
-            self.sync_eu(dry_run)
-
-        if level in ['federal', 'all']:
-            self.sync_federal(dry_run)
-
-        if level in ['state', 'all']:
-            self.sync_state(state_filter, dry_run)
-
-        self.stdout.write(self.style.SUCCESS('Sync completed successfully'))
-
-    def sync_eu(self, dry_run=False):
-        """Sync European Parliament representatives (MEPs) from Abgeordnetenwatch API"""
-        self.stdout.write(self.style.MIGRATE_HEADING('Syncing EU representatives (European Parliament MEPs from Germany) from Abgeordnetenwatch API...'))
-
         try:
-            stats = RepresentativeDataService.sync_eu_representatives(dry_run=dry_run)
-
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies created: {stats["constituencies_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies updated: {stats["constituencies_updated"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives created: {stats["representatives_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives updated: {stats["representatives_updated"]}'))
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'  Error syncing EU representatives: {e}'))
-
-    def sync_federal(self, dry_run=False):
-        """Sync Bundestag representatives from Abgeordnetenwatch API"""
-        self.stdout.write(self.style.MIGRATE_HEADING('Syncing federal representatives (Bundestag) from Abgeordnetenwatch API...'))
-
-        try:
-            stats = RepresentativeDataService.sync_federal_representatives(dry_run=dry_run)
-
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies created: {stats["constituencies_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies updated: {stats["constituencies_updated"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives created: {stats["representatives_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives updated: {stats["representatives_updated"]}'))
-
-            # Show committee stats if available
-            if 'total_committees_created' in stats:
-                self.stdout.write(self.style.SUCCESS(f'  Committees created: {stats["total_committees_created"]}'))
-                self.stdout.write(self.style.SUCCESS(f'  Committees updated: {stats["total_committees_updated"]}'))
-                self.stdout.write(self.style.SUCCESS(f'  Committee memberships created: {stats["total_memberships_created"]}'))
-                self.stdout.write(self.style.SUCCESS(f'  Committee memberships updated: {stats["total_memberships_updated"]}'))
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'  Error syncing federal representatives: {e}'))
-
-    def sync_state(self, state_filter=None, dry_run=False):
-        """Sync state parliament (Landtag) representatives from Abgeordnetenwatch API"""
-        filter_msg = f' (filtered by: {state_filter})' if state_filter else ''
-        self.stdout.write(self.style.MIGRATE_HEADING(f'Syncing state representatives (Landtag) from Abgeordnetenwatch API{filter_msg}...'))
-
-        try:
-            stats = RepresentativeDataService.sync_state_representatives(
-                state_name=state_filter,
-                dry_run=dry_run
-            )
-
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies created: {stats["constituencies_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Constituencies updated: {stats["constituencies_updated"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives created: {stats["representatives_created"]}'))
-            self.stdout.write(self.style.SUCCESS(f'  Representatives updated: {stats["representatives_updated"]}'))
-
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f'  Error syncing state representatives: {e}'))
+            stats = RepresentativeSyncService.sync(level=level, state=state_filter, dry_run=dry_run)
+            for key, value in stats.items():
+                self.stdout.write(self.style.SUCCESS(f"  {key.replace('_', ' ').title()}: {value}"))
+            self.stdout.write(self.style.SUCCESS('Sync completed successfully'))
+        except Exception as exc:
+            logger.exception("Sync failed")
+            raise

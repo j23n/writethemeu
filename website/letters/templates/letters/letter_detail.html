@@ -25,23 +25,11 @@
 </div>
 
 <div class="card">
-    <h3>{% blocktrans count counter=letter.signature_count %}Signatures ({{ counter }}){% endblocktrans %}</h3>
+    <h3>{% blocktrans count counter=letter.signature_count %}Signatures ({{ counter }}){% plural %}Signatures ({{ counter }}){% endblocktrans %}</h3>
     <p style="color: #7f8c8d; font-size: 0.9rem; margin-bottom: 1rem;">
-        {% blocktrans count counter=constituent_signature_count %}
-            <strong>{{ counter }}</strong> constituent of {{ constituency }}
-        {% plural %}
-            <strong>{{ counter }}</strong> constituents of {{ constituency }}
-        {% endblocktrans %} ·
-        {% blocktrans count counter=other_verified_signature_count %}
-            <strong>{{ counter }}</strong> other verified
-        {% plural %}
-            <strong>{{ counter }}</strong> other verified
-        {% endblocktrans %} ·
-        {% blocktrans count counter=unverified_signature_count %}
-            <strong>{{ counter }}</strong> unverified
-        {% plural %}
-            <strong>{{ counter }}</strong> unverified
-        {% endblocktrans %}
+        <strong>{% blocktrans count counter=constituent_signature_count with constituency_name=constituency %}{{ counter }} constituent of {{ constituency_name }}{% plural %}{{ counter }} constituents of {{ constituency_name }}{% endblocktrans %}</strong> ·
+        <strong>{% blocktrans count counter=other_verified_signature_count %}{{ counter }} other verified{% plural %}{{ counter }} other verified{% endblocktrans %}</strong> ·
+        <strong>{% blocktrans count counter=unverified_signature_count %}{{ counter }} unverified{% plural %}{{ counter }} unverified{% endblocktrans %}</strong>
     </p>
 
     {% if user.is_authenticated %}

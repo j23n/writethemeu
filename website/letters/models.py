@@ -6,8 +6,8 @@ from django.utils.translation import gettext_lazy as _
 from .constants import normalize_german_state
 
 
-class Constituency(models.Model):
-    """Represents a political constituency in Germany"""
+class Parliament(models.Model):
+    """Represents a political parliament (Bundestag, Landtag, council, etc.)."""
 
     LEVEL_CHOICES = [
         ('EU', _('European Union')),
@@ -16,88 +16,176 @@ class Constituency(models.Model):
         ('LOCAL', _('Local')),
     ]
 
-    name = models.CharField(max_length=255, help_text="Name of the constituency")
+    name = models.CharField(max_length=255, help_text=_('Name of the parliament'))
     level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
     legislative_body = models.CharField(
         max_length=255,
-        help_text="e.g., 'Bundestag', 'Bayerischer Landtag', 'Gemeinderat München'"
-    )
-    legislative_period_start = models.DateField(help_text="When current period began")
-    legislative_period_end = models.DateField(
-        null=True,
-        blank=True,
-        help_text="When current period ends (null for ongoing)"
+        help_text=_("e.g., 'Bundestag', 'Bayerischer Landtag', 'Gemeinderat München'")
     )
     region = models.CharField(
         max_length=100,
-        help_text="Geographic identifier (state code, municipality code, etc.)"
+        help_text=_('Geographic identifier (state code, municipality code, etc.)')
     )
-    parent_constituency = models.ForeignKey(
+    parent = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='sub_constituencies',
-        help_text="For hierarchical relationships (e.g., local within state)"
+        related_name='children',
+        help_text=_('For hierarchical relationships (e.g., local within state)')
     )
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional API-specific data"
-    )
+    metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name_plural = "Constituencies"
         ordering = ['level', 'name']
-        indexes = [
-            models.Index(fields=['level', 'region']),
-        ]
+        verbose_name = _('Parliament')
+        verbose_name_plural = _('Parliaments')
+        indexes = [models.Index(fields=['level', 'region'])]
 
     def __str__(self):
         return f"{self.name} ({self.get_level_display()})"
 
 
-class Representative(models.Model):
-    """Represents a political representative"""
+class ParliamentTerm(models.Model):
+    """Specific legislative term for a parliament (e.g., 20. Bundestag)."""
 
-    constituency = models.ForeignKey(
-        Constituency,
+    parliament = models.ForeignKey(
+        Parliament,
         on_delete=models.CASCADE,
+        related_name='terms'
+    )
+    name = models.CharField(max_length=255)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['parliament__level', 'parliament__name', 'name']
+        indexes = [models.Index(fields=['parliament', 'name'])]
+
+    def __str__(self):
+        return f"{self.name} ({self.parliament.name})"
+
+
+class ElectoralDistrict(models.Model):
+    """Individual electoral district used to define constituencies."""
+
+    DISTRICT_LEVEL_CHOICES = [
+        ('FEDERAL', _('Federal district')),
+        ('STATE', _('State district')),
+        ('REGIONAL', _('Regional district')),
+    ]
+
+    parliament = models.ForeignKey(
+        Parliament,
+        on_delete=models.CASCADE,
+        related_name='electoral_districts'
+    )
+    name = models.CharField(max_length=255)
+    code = models.CharField(max_length=50, blank=True)
+    external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    level = models.CharField(max_length=20, choices=DISTRICT_LEVEL_CHOICES)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['parliament__level', 'name']
+        indexes = [
+            models.Index(fields=['parliament', 'code']),
+            models.Index(fields=['parliament', 'level']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.code})" if self.code else self.name
+
+
+class Constituency(models.Model):
+    """Set of voters represented together (direct seat or list-based)."""
+
+    SCOPE_CHOICES = [
+        ('FEDERAL_DISTRICT', _('Federal electoral district')),
+        ('FEDERAL_STATE_LIST', _('Bundestag state list')),
+        ('FEDERAL_LIST', _('Bundestag federal list')),
+        ('STATE_DISTRICT', _('State electoral district')),
+        ('STATE_REGIONAL_LIST', _('State regional list')),
+        ('STATE_LIST', _('State wide list')),
+        ('EU_AT_LARGE', _('EU at large')),
+    ]
+
+    parliament_term = models.ForeignKey(
+        ParliamentTerm,
+        on_delete=models.CASCADE,
+        related_name='constituencies'
+    )
+    name = models.CharField(max_length=255)
+    external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
+    scope = models.CharField(max_length=30, choices=SCOPE_CHOICES)
+    districts = models.ManyToManyField(
+        ElectoralDistrict,
+        blank=True,
+        related_name='constituencies'
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['parliament_term__parliament__level', 'name']
+        unique_together = [('parliament_term', 'name', 'scope')]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_scope_display()})"
+
+
+class Representative(models.Model):
+    """Represents a political representative."""
+
+    ELECTION_MODE_CHOICES = [
+        ('DIRECT', _('Direct mandate')),
+        ('STATE_LIST', _('State list mandate')),
+        ('STATE_REGIONAL_LIST', _('State regional list mandate')),
+        ('FEDERAL_LIST', _('Federal list mandate')),
+        ('EU_LIST', _('EU list mandate')),
+    ]
+
+    parliament_term = models.ForeignKey(
+        ParliamentTerm,
+        on_delete=models.CASCADE,
+        related_name='representatives'
+    )
+    parliament = models.ForeignKey(
+        Parliament,
+        on_delete=models.CASCADE,
+        related_name='representatives'
+    )
+    election_mode = models.CharField(max_length=25, choices=ELECTION_MODE_CHOICES)
+    external_id = models.CharField(max_length=100, unique=True)
+    constituencies = models.ManyToManyField(
+        Constituency,
+        blank=True,
         related_name='representatives'
     )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     party = models.CharField(max_length=100, blank=True)
-    role = models.CharField(
-        max_length=100,
-        blank=True,
-        help_text="e.g., 'Member of Parliament', 'Minister', etc."
-    )
+    role = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=50, blank=True)
     website = models.URLField(blank=True)
-
-    focus_areas = models.TextField(
-        blank=True,
-        help_text="Comma-separated list of policy focus areas (e.g., 'climate policy, energy transition, transport'). Can be populated from Wikipedia, speeches, or self-reported data."
-    )
-
-    term_start = models.DateField(help_text="When this representative's term started")
-    term_end = models.DateField(
-        null=True,
-        blank=True,
-        help_text="When this representative's term ends"
-    )
+    focus_areas = models.TextField(blank=True)
+    term_start = models.DateField(null=True, blank=True)
+    term_end = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
-
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional API-specific data"
-    )
+    metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -105,7 +193,7 @@ class Representative(models.Model):
     class Meta:
         ordering = ['last_name', 'first_name']
         indexes = [
-            models.Index(fields=['is_active', 'constituency']),
+            models.Index(fields=['is_active', 'parliament_term']),
             models.Index(fields=['last_name', 'first_name']),
         ]
 
@@ -116,47 +204,69 @@ class Representative(models.Model):
     def full_name(self):
         return f"{self.first_name} {self.last_name}"
 
+    @property
+    def primary_constituency(self):
+        """Return the first linked constituency (cached per instance)."""
+        constituencies = getattr(self, '_constituency_cache', None)
+        if constituencies is None:
+            constituencies = list(self.constituencies.all())
+            self._constituency_cache = constituencies
+        return constituencies[0] if constituencies else None
+
     def get_focus_areas_list(self):
-        """Return focus areas as a list"""
         if not self.focus_areas:
             return []
         return [area.strip() for area in self.focus_areas.split(',') if area.strip()]
-
-    @property
-    def constituency_scope(self) -> str:
-        return (self.metadata or {}).get('constituency_scope', 'district')
-
-    @property
-    def list_state_normalized(self) -> str | None:
-        return (self.metadata or {}).get('list_state_normalized')
 
     def qualifies_as_constituent(self, verification: 'IdentityVerification') -> bool:
         if not verification or not verification.is_verified:
             return False
 
-        scope = self.constituency_scope
+        constituencies = getattr(self, '_constituency_cache', None)
+        if constituencies is None:
+            constituencies = list(self.constituencies.all())
+            self._constituency_cache = constituencies
 
-        if scope == 'federal':
-            # Bundesliste: any verified German resident counts
-            country = (verification.verification_data or {}).get('country', 'Germany')
-            return bool(country)  # Assume verification ensures Germany residency
+        if self.parliament.level == 'EU':
+            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
 
-        if scope == 'state':
-            rep_state = self.list_state_normalized
-            user_state = verification.normalized_state
-            if rep_state and user_state:
-                return rep_state.lower() == user_state.lower()
-            return False
+        if verification.constituency and any(c.id == verification.constituency_id for c in constituencies):
+            return True
 
-        # Default: constituency-based match
-        return (
-            verification.constituency_id is not None and
-            self.constituency_id == verification.constituency_id
-        )
+        normalized_state = verification.normalized_state
+
+        if self.election_mode == 'FEDERAL_LIST':
+            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
+
+        if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
+            rep_states = {
+                normalize_german_state(c.metadata.get('state'))
+                for c in constituencies
+                if c.metadata.get('state')
+            }
+            if normalized_state and normalized_state in rep_states:
+                return True
+
+        if self.election_mode == 'DIRECT' and normalized_state:
+            direct_states = {
+                normalize_german_state(c.metadata.get('state'))
+                for c in constituencies
+                if c.metadata.get('state')
+            }
+            if normalized_state in direct_states:
+                return True
+
+        if verification.parliament_id and verification.parliament_id == self.parliament_id:
+            if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
+                return normalized_state is not None
+            if self.election_mode == 'FEDERAL_LIST':
+                return True
+
+        return False
 
 
 class Tag(models.Model):
-    """Keywords/tags for categorizing letters"""
+    """Keywords/tags for categorizing letters."""
 
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(max_length=50, unique=True)
@@ -171,10 +281,7 @@ class Tag(models.Model):
 
 
 class TopicArea(models.Model):
-    """
-    Taxonomy mapping policy topics to governmental levels.
-    Based on German constitutional division of powers (Grundgesetz).
-    """
+    """Policy taxonomy used for committee/topic matching."""
 
     LEVEL_CHOICES = [
         ('EU', 'European Union'),
@@ -191,48 +298,19 @@ class TopicArea(models.Model):
         ('LOCAL', 'Local (Municipal)'),
     ]
 
-    name = models.CharField(
-        max_length=255,
-        unique=True,
-        help_text="Policy area name (e.g., 'Defense', 'Education', 'Local Transportation')"
-    )
-
+    name = models.CharField(max_length=255, unique=True)
     slug = models.SlugField(max_length=255, unique=True)
-
-    description = models.TextField(
-        blank=True,
-        help_text="Description of this policy area and what it covers"
-    )
-
-    primary_level = models.CharField(
-        max_length=20,
-        choices=LEVEL_CHOICES,
-        help_text="Primary governmental level responsible for this topic"
-    )
-
-    competency_type = models.CharField(
-        max_length=20,
-        choices=COMPETENCY_TYPE_CHOICES,
-        help_text="Type of competency based on Grundgesetz"
-    )
-
-    keywords = models.TextField(
-        help_text="Comma-separated keywords for matching user queries (e.g., 'train, railway, Deutsche Bahn, intercity')"
-    )
-
-    legal_basis = models.CharField(
-        max_length=255,
-        blank=True,
-        help_text="Constitutional basis (e.g., 'Art. 73 GG', 'Art. 74(22) GG', 'Kulturhoheit')"
-    )
-
+    description = models.TextField(blank=True)
+    primary_level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
+    competency_type = models.CharField(max_length=20, choices=COMPETENCY_TYPE_CHOICES)
+    keywords = models.TextField()
+    legal_basis = models.CharField(max_length=255, blank=True)
     parent_topic = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='subtopics',
-        help_text="Parent topic for hierarchical organization"
+        related_name='subtopics'
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -251,66 +329,54 @@ class TopicArea(models.Model):
         return f"{self.name} ({self.get_primary_level_display()})"
 
     def get_keywords_list(self):
-        """Return keywords as a list"""
         return [k.strip() for k in self.keywords.split(',') if k.strip()]
 
 
 class Committee(models.Model):
-    """
-    Parliamentary committees (Ausschüsse) at various governmental levels.
-    Committees are policy-focused groups where representatives work on specific topics.
-    """
+    """Parliamentary committees (Ausschüsse)."""
 
-    name = models.CharField(
-        max_length=255,
-        help_text="Committee name (e.g., 'Ausschuss für Umwelt und Verbraucherschutz')"
+    name = models.CharField(max_length=255)
+    external_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    parliament_term = models.ForeignKey(
+        ParliamentTerm,
+        on_delete=models.CASCADE,
+        related_name='committees'
     )
-
-    parliament = models.CharField(
-        max_length=100,
-        help_text="Parliament this committee belongs to (e.g., 'Bundestag', 'EU-Parlament', 'Bayern')"
-    )
-
-    description = models.TextField(
-        blank=True,
-        help_text="Description of the committee's responsibilities"
-    )
-
+    description = models.TextField(blank=True)
+    keywords = models.TextField(blank=True, help_text='Comma-separated keywords extracted from name and description')
     topic_area = models.ForeignKey(
         TopicArea,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='committees',
-        help_text="Related TopicArea in our taxonomy"
+        related_name='committees'
     )
-
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional API data (api_id, abgeordnetenwatch_url, etc.)"
-    )
+    metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['parliament', 'name']
-        unique_together = [['name', 'parliament']]
+        ordering = ['parliament_term__parliament__name', 'name']
+        unique_together = [('parliament_term', 'name')]
         indexes = [
-            models.Index(fields=['parliament']),
+            models.Index(fields=['parliament_term']),
             models.Index(fields=['topic_area']),
+            models.Index(fields=['external_id']),
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.parliament})"
+        return f"{self.name} ({self.parliament_term})"
+
+    def get_keywords_list(self):
+        """Return keywords as a list."""
+        if not self.keywords:
+            return []
+        return [k.strip() for k in self.keywords.split(',') if k.strip()]
 
 
 class CommitteeMembership(models.Model):
-    """
-    Links representatives to the committees they serve on.
-    Tracks role (member, alternate, chair) and time period.
-    """
+    """Links representatives to the committees they serve on."""
 
     ROLE_CHOICES = [
         ('member', 'Member'),
@@ -325,49 +391,23 @@ class CommitteeMembership(models.Model):
         on_delete=models.CASCADE,
         related_name='committee_memberships'
     )
-
     committee = models.ForeignKey(
         Committee,
         on_delete=models.CASCADE,
         related_name='memberships'
     )
-
-    role = models.CharField(
-        max_length=50,
-        choices=ROLE_CHOICES,
-        help_text="Role in the committee"
-    )
-
-    additional_roles = models.JSONField(
-        default=list,
-        blank=True,
-        help_text="Additional roles (from API committee_roles_additional field)"
-    )
-
-    start_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="When membership started"
-    )
-
-    end_date = models.DateField(
-        null=True,
-        blank=True,
-        help_text="When membership ended (null for active)"
-    )
-
-    metadata = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional API data"
-    )
+    role = models.CharField(max_length=50, choices=ROLE_CHOICES)
+    additional_roles = models.JSONField(default=list, blank=True)
+    start_date = models.DateField(null=True, blank=True)
+    end_date = models.DateField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['representative', 'committee']
-        unique_together = [['representative', 'committee']]
+        unique_together = [('representative', 'committee')]
         indexes = [
             models.Index(fields=['representative']),
             models.Index(fields=['committee']),
@@ -379,12 +419,11 @@ class CommitteeMembership(models.Model):
 
     @property
     def is_active(self):
-        """Check if membership is currently active"""
         return self.end_date is None
 
 
 class Letter(models.Model):
-    """Open letters written by users to representatives"""
+    """Open letters written by users to representatives."""
 
     STATUS_CHOICES = [
         ('DRAFT', _('Draft')),
@@ -395,20 +434,10 @@ class Letter(models.Model):
 
     title = models.CharField(max_length=255)
     body = models.TextField()
-    author = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='letters'
-    )
-    representative = models.ForeignKey(
-        Representative,
-        on_delete=models.CASCADE,
-        related_name='letters'
-    )
+    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='letters')
+    representative = models.ForeignKey(Representative, on_delete=models.CASCADE, related_name='letters')
     tags = models.ManyToManyField(Tag, blank=True, related_name='letters')
-
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PUBLISHED')
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     published_at = models.DateTimeField(default=timezone.now)
@@ -436,10 +465,7 @@ class Letter(models.Model):
     def signature_breakdown(self):
         """Return tuple of (constituent, other_verified, unverified) signature counts."""
         now = timezone.now()
-
-        signatures = list(
-            self.signatures.select_related('user', 'user__identity_verification')
-        )
+        signatures = self.signatures.select_related('user', 'user__identity_verification')
 
         total_verified = 0
         constituent_count = 0
@@ -455,43 +481,28 @@ class Letter(models.Model):
                 constituent_count += 1
 
         other_verified = total_verified - constituent_count
-        unverified = len(signatures) - total_verified
-
+        unverified = signatures.count() - total_verified
         return constituent_count, other_verified, unverified
 
 
 class Signature(models.Model):
-    """Represents a user's signature on a letter"""
+    """Represents a user's signature on a letter."""
 
-    user = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name='signatures'
-    )
-    letter = models.ForeignKey(
-        Letter,
-        on_delete=models.CASCADE,
-        related_name='signatures'
-    )
-
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='signatures')
+    letter = models.ForeignKey(Letter, on_delete=models.CASCADE, related_name='signatures')
     signed_at = models.DateTimeField(auto_now_add=True)
-
-    # Optional comment when signing
     comment = models.TextField(blank=True)
 
     class Meta:
         unique_together = ['user', 'letter']
         ordering = ['-signed_at']
-        indexes = [
-            models.Index(fields=['letter', '-signed_at']),
-        ]
+        indexes = [models.Index(fields=['letter', '-signed_at'])]
 
     def __str__(self):
         return f"{self.user.username} signed '{self.letter.title}'"
 
     @property
     def is_verified(self):
-        """Check if the user has a verified identity"""
         try:
             return self.user.identity_verification.is_verified
         except IdentityVerification.DoesNotExist:
@@ -499,7 +510,6 @@ class Signature(models.Model):
 
     @property
     def verification(self):
-        """Return the related IdentityVerification or None if missing."""
         try:
             return self.user.identity_verification
         except IdentityVerification.DoesNotExist:
@@ -507,31 +517,26 @@ class Signature(models.Model):
 
     @property
     def is_verified_constituent(self):
-        """True when the signer is a verified constituent of the letter's representative."""
         verification = self.verification
         return self.letter.representative.qualifies_as_constituent(verification)
 
     @property
     def is_verified_non_constituent(self):
-        """True when the signer is verified but lives in a different constituency."""
         verification = self.verification
         return bool(verification and verification.is_verified and not self.is_verified_constituent)
 
     @property
     def display_name(self):
-        """Return display name with PPI redaction for public view"""
         verification = getattr(self.user, 'identity_verification', None)
         if verification and verification.is_verified:
-            # Show first name and last initial for verified users
             if self.user.first_name and self.user.last_name:
                 return f"{self.user.first_name} {self.user.last_name[0]}."
             return self.user.username
-        # Show only username for unverified users
         return self.user.username
 
 
 class IdentityVerification(models.Model):
-    """Tracks identity verification status for users"""
+    """Tracks identity verification status for users."""
 
     VERIFICATION_STATUS_CHOICES = [
         ('PENDING', 'Pending'),
@@ -540,58 +545,43 @@ class IdentityVerification(models.Model):
         ('EXPIRED', 'Expired'),
     ]
 
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name='identity_verification'
-    )
-
-    # Verification provider (stubbed for now)
-    provider = models.CharField(
-        max_length=100,
-        default='stub_provider',
-        help_text="Identity verification provider"
-    )
-
-    status = models.CharField(
-        max_length=20,
-        choices=VERIFICATION_STATUS_CHOICES,
-        default='PENDING'
-    )
-
-    # Address information from verification
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='identity_verification')
+    provider = models.CharField(max_length=100, default='stub_provider')
+    status = models.CharField(max_length=20, choices=VERIFICATION_STATUS_CHOICES, default='PENDING')
     street_address = models.CharField(max_length=255, blank=True)
     postal_code = models.CharField(max_length=20, blank=True)
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
-
-    # Mapped constituency
+    country = models.CharField(max_length=32, blank=True, default='DE')
+    parliament = models.ForeignKey(
+        Parliament,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_residents'
+    )
+    parliament_term = models.ForeignKey(
+        ParliamentTerm,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='verified_residents'
+    )
     constituency = models.ForeignKey(
         Constituency,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name='verified_residents',
-        help_text="Constituency determined from address"
+        related_name='verified_residents'
     )
-
-    # Verification metadata
-    verification_data = models.JSONField(
-        default=dict,
-        blank=True,
-        help_text="Additional verification provider data"
-    )
-
+    verification_data = models.JSONField(default=dict, blank=True)
     verified_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        indexes = [
-            models.Index(fields=['status', 'user']),
-        ]
+        indexes = [models.Index(fields=['status', 'user'])]
 
     def __str__(self):
         return f"{self.user.username} - {self.get_status_display()}"
@@ -606,9 +596,26 @@ class IdentityVerification(models.Model):
     def normalized_state(self):
         return normalize_german_state(self.state)
 
+    def link_constituency(self, constituency: Constituency) -> None:
+        """Attach the verification to a specific constituency and its term."""
+        self.constituency = constituency
+        if constituency:
+            self.parliament_term = constituency.parliament_term
+            self.parliament = constituency.parliament_term.parliament
+        elif self.parliament_term:
+            self.parliament = self.parliament_term.parliament
+
+    def save(self, *args, **kwargs):
+        if self.constituency:
+            self.parliament_term = self.constituency.parliament_term
+            self.parliament = self.constituency.parliament_term.parliament
+        elif self.parliament_term:
+            self.parliament = self.parliament_term.parliament
+        super().save(*args, **kwargs)
+
 
 class Report(models.Model):
-    """Reports flagging letters for moderation"""
+    """Reports flagging letters for moderation."""
 
     REASON_CHOICES = [
         ('SPAM', 'Spam'),
@@ -624,26 +631,19 @@ class Report(models.Model):
         ('ACTION_TAKEN', 'Action Taken'),
     ]
 
-    letter = models.ForeignKey(
-        Letter,
-        on_delete=models.CASCADE,
-        related_name='reports'
-    )
+    letter = models.ForeignKey(Letter, on_delete=models.CASCADE, related_name='reports')
     reporter = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
         related_name='reports_made',
         null=True,
         blank=True,
-        help_text="User who made the report (null for anonymous)"
+        help_text='User who made the report (null for anonymous)'
     )
-
     reason = models.CharField(max_length=20, choices=REASON_CHOICES)
-    description = models.TextField(help_text="Details of the report")
-
+    description = models.TextField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING')
     moderator_notes = models.TextField(blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
     reviewed_by = models.ForeignKey(

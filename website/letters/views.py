@@ -22,7 +22,7 @@ from .forms import (
     LetterSearchForm,
     UserRegisterForm
 )
-from .services import IdentityVerificationService, AddressConstituencyMapper, ConstituencySuggestionService
+from .services import IdentityVerificationService, ConstituencySuggestionService
 
 
 # Letter Views
@@ -36,7 +36,7 @@ class LetterListView(ListView):
 
     def get_queryset(self):
         queryset = Letter.objects.filter(status='PUBLISHED').select_related(
-            'author', 'representative', 'representative__constituency'
+            'author', 'representative', 'representative__parliament'
         ).prefetch_related('tags').annotate(
             signature_count_annotated=Count('signatures')
         )
@@ -80,7 +80,7 @@ class LetterDetailView(DetailView):
 
     def get_queryset(self):
         return Letter.objects.filter(status='PUBLISHED').select_related(
-            'author', 'representative', 'representative__constituency'
+            'author', 'representative', 'representative__parliament'
         ).prefetch_related('tags')
 
     def get_context_data(self, **kwargs):
@@ -103,6 +103,8 @@ class LetterDetailView(DetailView):
         context['other_verified_signature_count'] = other_verified_count
         context['unverified_signature_count'] = unverified_count
         context['total_verified_signature_count'] = constituent_count + other_verified_count
+        primary_constituency = letter.representative.primary_constituency
+        context['constituency'] = primary_constituency.name if primary_constituency else letter.representative.parliament.name
 
         # Check if current user has signed
         if self.request.user.is_authenticated:
@@ -363,12 +365,12 @@ def analyze_letter_title(request):
         .distinct()[:5]
     )
 
-    # Extract keywords from matched topics
-    keywords = []
-    if suggestion_result['matched_topics']:
-        for topic in suggestion_result['matched_topics'][:2]:  # Top 2 topics
-            keywords.extend(topic.get_keywords_list()[:5])
-    keywords = list(set(keywords))[:10]  # Unique, max 10
+    topic_keywords = []
+    for topic in suggestion_result.get('matched_topics', [])[:2]:
+        topic_keywords.extend(topic.get_keywords_list()[:5])
+
+    keywords = suggestion_result.get('keywords', [])
+    keywords = list(dict.fromkeys(keywords + topic_keywords + search_terms))[:10]
 
     context = {
         'title': title,
@@ -418,9 +420,29 @@ class RepresentativeDetailView(DetailView):
         context['competences'] = sorted(competences, key=lambda x: x.name)
 
         # Get abgeordnetenwatch profile link
-        context['abgeordnetenwatch_url'] = rep.metadata.get('abgeordnetenwatch_url', '')
+        abgeordnetenwatch_url = rep.metadata.get('abgeordnetenwatch_url')
+        if not abgeordnetenwatch_url:
+            abgeordnetenwatch_url = (
+                rep.metadata.get('mandate', {})
+                .get('politician', {})
+                .get('abgeordnetenwatch_url')
+            )
+        context['abgeordnetenwatch_url'] = abgeordnetenwatch_url or ''
 
         # Get Wikipedia link (from metadata if available)
-        context['wikipedia_url'] = rep.metadata.get('wikipedia_url', '')
+        wikipedia_url = rep.metadata.get('wikipedia_url')
+        if not wikipedia_url:
+            links = (
+                rep.metadata.get('mandate', {})
+                .get('politician', {})
+                .get('links', [])
+            )
+            for link in links:
+                label = (link.get('label') or '').lower()
+                url = link.get('url') or link.get('href')
+                if 'wikipedia' in label and url:
+                    wikipedia_url = url
+                    break
+        context['wikipedia_url'] = wikipedia_url or ''
 
         return context
