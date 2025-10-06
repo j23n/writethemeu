@@ -302,14 +302,15 @@ class TopicArea(models.Model):
         ('FEDERAL', 'Federal (Bund)'),
         ('STATE', 'State (Land)'),
         ('LOCAL', 'Local (Kommune)'),
-        ('MIXED', 'Mixed Competency'),
     ]
 
     COMPETENCY_TYPE_CHOICES = [
-        ('EXCLUSIVE', 'Exclusive Federal'),
-        ('CONCURRENT', 'Concurrent Federal/State'),
-        ('STATE', 'State (Länder)'),
-        ('LOCAL', 'Local (Municipal)'),
+        ('EXCLUSIVE', 'Ausschließliche Gesetzgebung'),
+        ('CONCURRENT', 'Konkurrierende Gesetzgebung'),
+        ('DEVIATION', 'Abweichungsgesetzgebung'),
+        ('JOINT', 'Gemeinschaftsaufgaben'),
+        ('RESIDUAL', 'Länderkompetenz'),
+        ('SHARED', 'Geteilte Zuständigkeit'),
     ]
 
     name = models.CharField(max_length=255, unique=True)
@@ -318,7 +319,8 @@ class TopicArea(models.Model):
     primary_level = models.CharField(max_length=20, choices=LEVEL_CHOICES)
     competency_type = models.CharField(max_length=20, choices=COMPETENCY_TYPE_CHOICES)
     keywords = models.TextField()
-    legal_basis = models.CharField(max_length=255, blank=True)
+    legal_basis = models.CharField(max_length=255)
+    legal_basis_url = models.URLField()
     parent_topic = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,

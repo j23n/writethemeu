@@ -19,7 +19,7 @@
                 {% if suggestion_result.primary_topic %}
                     <p class="mb-2">
                         <strong>{% trans "Topic:" %}</strong> {{ suggestion_result.primary_topic.name }}
-                        <span class="badge bg-secondary">{{ suggestion_result.primary_topic.get_primary_level_display }}</span>
+                        <span class="badge bg-secondary">{{ suggestion_result.primary_topic.get_competency_type_display }}</span>
                     </p>
                     <p class="mb-0 text-muted">
                         {{ suggestion_result.explanation }}

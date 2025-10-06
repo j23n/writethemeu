@@ -1,4 +1,5 @@
 import re
+from collections import OrderedDict
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -6,7 +7,7 @@ from django.contrib.auth import login
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
-from django.views.generic import ListView, DetailView, CreateView
+from django.views.generic import ListView, DetailView, CreateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.http import HttpResponseRedirect, JsonResponse
@@ -270,6 +271,175 @@ def profile(request):
     }
 
     return render(request, 'letters/profile.html', context)
+
+
+class CompetencyOverviewView(TemplateView):
+    """Public primer explaining German competency distribution and listing topic areas."""
+
+    template_name = 'letters/competency_overview.html'
+
+    LEVEL_LABELS = OrderedDict([
+        ('EU', 'Europäische Union'),
+        ('FEDERAL', 'Bund'),
+        ('STATE', 'Länder'),
+        ('LOCAL', 'Kommunen'),
+    ])
+
+    COMPETENCY_LABELS = {
+        'EXCLUSIVE': 'Ausschließliche Kompetenz',
+        'CONCURRENT': 'Konkurrierende Kompetenz',
+        'STATE': 'Landeskompetenz',
+        'LOCAL': 'Kommunale Kompetenz',
+        'SHARED': 'Geteilte Kompetenz',
+    }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        topics = TopicArea.objects.all().order_by('primary_level', 'name')
+        simple_topics = []
+        for level_code, level_label in self.LEVEL_LABELS.items():
+            level_topics = [topic for topic in topics if topic.primary_level == level_code]
+            if not level_topics:
+                continue
+            simple_topics.append({
+                'label': level_label,
+                'topics': level_topics,
+            })
+
+        competency_overview = [
+            {
+                'title': 'Bund',
+                'description': 'Der Bund kümmert sich um Themen, die das ganze Land betreffen – etwa Sicherheits-, Außen- oder Sozialpolitik.',
+                'examples': [
+                    {
+                        'question': 'Wer entscheidet über die Höhe der gesetzlichen Rente?',
+                        'answer': 'Bundestag und Bundesregierung. Sozialversicherungen sind bundesweit geregelt.'
+                    },
+                    {
+                        'question': 'Wer beschließt ein neues Tempolimit auf Autobahnen?',
+                        'answer': 'Der Bund. Bundesstraßen und Autobahnen liegen in seiner Verantwortung.'
+                    },
+                    {
+                        'question': 'Wer darf Soldat:innen in einen Auslandseinsatz schicken?',
+                        'answer': 'Nur der Bundestag. Auslandseinsätze der Bundeswehr müssen dort beschlossen werden.'
+                    },
+                ],
+            },
+            {
+                'title': 'Länder',
+                'description': 'Die Bundesländer gestalten Bildung, Kultur und Polizei eigenständig – deshalb unterscheidet sich manches von Land zu Land.',
+                'examples': [
+                    {
+                        'question': 'Wer entscheidet, wann die Sommerferien beginnen?',
+                        'answer': 'Jedes Bundesland legt den Ferienplan selbst fest.'
+                    },
+                    {
+                        'question': 'Wer bestimmt, welche Fächer im Abitur geprüft werden?',
+                        'answer': 'Die Kultusministerien der Länder setzen Lehrpläne und Prüfungsordnungen.'
+                    },
+                    {
+                        'question': 'Wer regelt die Aufgaben der Landespolizei?',
+                        'answer': 'Das jeweilige Landesparlament – Polizeigesetze sind Ländersache.'
+                    },
+                ],
+            },
+            {
+                'title': 'Kommunen',
+                'description': 'Gemeinden und Städte gestalten das direkte Lebensumfeld – von Straßen bis zur Kinderbetreuung.',
+                'examples': [
+                    {
+                        'question': 'Wer entscheidet, ob eine Schlaglochstraße saniert wird?',
+                        'answer': 'Der Stadtrat bzw. Gemeinderat. Kommunen planen und finanzieren ihre Straßen.'
+                    },
+                    {
+                        'question': 'Wer baut einen neuen Kindergarten?',
+                        'answer': 'Die Kommune vor Ort. Sie organisiert Gebäude, Personal und Plätze.'
+                    },
+                    {
+                        'question': 'Wer legt den örtlichen Busfahrplan fest?',
+                        'answer': 'Kommunale Verkehrsverbünde und Stadträte gestalten den Nahverkehr.'
+                    },
+                ],
+            },
+            {
+                'title': 'Europäische Union',
+                'description': 'Die EU setzt gemeinsame Standards, wenn alle Mitgliedstaaten betroffen sind – etwa beim Binnenmarkt oder beim Klimaschutz.',
+                'examples': [
+                    {
+                        'question': 'Wer sorgt dafür, dass EU-weit Roaming-Gebühren weggefallen sind?',
+                        'answer': 'Das Europäische Parlament und der EU-Ministerrat. Sie haben die entsprechenden Regeln beschlossen.'
+                    },
+                    {
+                        'question': 'Wer verhandelt Handelsabkommen wie das mit Kanada?',
+                        'answer': 'Die Europäische Kommission im Auftrag der EU-Mitgliedstaaten.'
+                    },
+                    {
+                        'question': 'Wer legt europaweite CO₂-Grenzwerte für Autos fest?',
+                        'answer': 'EU-Institutionen setzen gemeinsame Umweltstandards, die dann in jedem Mitgliedstaat gelten.'
+                    },
+                ],
+            },
+        ]
+
+        competency_matrix = [
+            {
+                'primary_level': 'Bund',
+                'competency_type': 'Ausschließliche Kompetenz',
+                'description': 'Nur der Bund entscheidet. Die Länder dürfen hier keine eigenen Gesetze erlassen.',
+                'legal_basis': 'Art. 71, 73 GG',
+                'examples': 'Außenpolitik, Verteidigung, Währung, Luftverkehr',
+            },
+            {
+                'primary_level': 'Bund',
+                'competency_type': 'Konkurrierende Kompetenz',
+                'description': 'Bund hat Vorrang. Länder können nur tätig werden, wenn der Bund es nicht geregelt hat.',
+                'legal_basis': 'Art. 72, 74 GG',
+                'examples': 'Strafrecht, Arbeitsrecht, Umweltschutz, Straßenverkehr',
+            },
+            {
+                'primary_level': 'Länder',
+                'competency_type': 'Ausschließliche Kompetenz',
+                'description': 'Alles, was nicht dem Bund zusteht, regeln die Länder eigenständig.',
+                'legal_basis': 'Art. 70 GG',
+                'examples': 'Schulbildung, Kultur, Polizei, Hochschulen, Rundfunk',
+            },
+            {
+                'primary_level': 'Länder',
+                'competency_type': 'Konkurrierende Kompetenz',
+                'description': 'Länder können Gesetze erlassen, solange der Bund nicht aktiv geworden ist.',
+                'legal_basis': 'Art. 72 Abs. 1 GG',
+                'examples': 'Naturschutz (mit Abweichungsmöglichkeit), Jagdwesen',
+            },
+            {
+                'primary_level': 'Kommunen',
+                'competency_type': 'Ausschließliche Kompetenz',
+                'description': 'Kommunale Selbstverwaltung: Vor Ort wird entschieden, wie Infrastruktur und Service aussehen.',
+                'legal_basis': 'Art. 28 Abs. 2 GG',
+                'examples': 'Stadtwerke, Bauleitplanung, lokale Ordnung, Kindergärten',
+            },
+            {
+                'primary_level': 'Europäische Union',
+                'competency_type': 'Ausschließliche Kompetenz',
+                'description': 'Nur die EU darf tätig werden; Mitgliedstaaten handeln nur auf EU-Mandat.',
+                'legal_basis': 'AEUV Art. 3',
+                'examples': 'Binnenmarkt, Handelspolitik, Zollunion, Wettbewerb',
+            },
+            {
+                'primary_level': 'Europäische Union',
+                'competency_type': 'Geteilte Kompetenz',
+                'description': 'EU und Mitgliedstaaten entscheiden gemeinsam – wer zuerst regelt, hat Vorrang.',
+                'legal_basis': 'AEUV Art. 4',
+                'examples': 'Umweltpolitik, Agrarpolitik, Verbraucherschutz',
+            },
+        ]
+
+        context.update({
+            'topics_by_level': simple_topics,
+            'competency_overview': competency_overview,
+            'competency_matrix': competency_matrix,
+        })
+        return context
 
 
 @login_required

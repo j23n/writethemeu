@@ -122,6 +122,7 @@
             <h1>WriteThem.eu</h1>
             <nav>
                 <a href="{% url 'letter_list' %}">{% trans "Letters" %}</a>
+                <a href="{% url 'competency_overview' %}">Kompetenzen</a>
                 {% if user.is_authenticated %}
                     <a href="{% url 'letter_create' %}">{% trans "Write Letter" %}</a>
                     <a href="{% url 'profile' %}">{% trans "Profile" %}</a>

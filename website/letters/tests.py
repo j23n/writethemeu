@@ -7,6 +7,8 @@ from django.utils import timezone
 
 from .forms import LetterForm
 from .models import (
+    Committee,
+    CommitteeMembership,
     Constituency,
     IdentityVerification,
     Letter,
@@ -69,6 +71,12 @@ class ParliamentFixtureMixin:
             scope='FEDERAL_DISTRICT',
             metadata={'state': 'Berlin'},
         )
+        self.constituency_hamburg_list = Constituency.objects.create(
+            parliament_term=self.term,
+            name='Landesliste Hamburg',
+            scope='FEDERAL_STATE_LIST',
+            metadata={'state': 'Hamburg'},
+        )
 
         self.state_parliament = Parliament.objects.create(
             name='Bayerischer Landtag',
@@ -89,6 +97,36 @@ class ParliamentFixtureMixin:
             scope='STATE_DISTRICT',
             metadata={'state': 'Bayern'},
         )
+        self.state_constituency_list = Constituency.objects.create(
+            parliament_term=self.state_term,
+            name='Bayern Landesliste',
+            scope='STATE_LIST',
+            metadata={'state': 'Bayern'},
+        )
+
+        self.state_rep_direct = Representative.objects.create(
+            parliament=self.state_parliament,
+            parliament_term=self.state_term,
+            election_mode='DIRECT',
+            external_id='state-direct-base',
+            first_name='Sabine',
+            last_name='Schmidt',
+            party='CSU',
+            term_start=date(2018, 10, 14),
+        )
+        self.state_rep_direct.constituencies.add(self.state_constituency_direct)
+
+        self.state_rep_list = Representative.objects.create(
+            parliament=self.state_parliament,
+            parliament_term=self.state_term,
+            election_mode='STATE_LIST',
+            external_id='state-list-base',
+            first_name='Thomas',
+            last_name='Thal',
+            party='CSU',
+            term_start=date(2018, 10, 14),
+        )
+        self.state_rep_list.constituencies.add(self.state_constituency_list)
 
         self.direct_rep = Representative.objects.create(
             parliament=self.parliament,
@@ -125,6 +163,18 @@ class ParliamentFixtureMixin:
             term_start=date(2021, 10, 26),
         )
         self.list_rep.constituencies.add(self.constituency_state)
+
+        self.federal_expert_rep = Representative.objects.create(
+            parliament=self.parliament,
+            parliament_term=self.term,
+            election_mode='STATE_LIST',
+            external_id='rep-expert-1',
+            first_name='Sarah',
+            last_name='Schneider',
+            party='SPD',
+            term_start=date(2021, 10, 26),
+        )
+        self.federal_expert_rep.constituencies.add(self.constituency_hamburg_list)
 
 
 class LetterCreationTests(ParliamentFixtureMixin, TestCase):
@@ -251,6 +301,38 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
             competency_type='STATE',
             keywords='universität, universitäten, hochschule, hochschulen'
         )
+        self.social_topic = TopicArea.objects.create(
+            name='Sozialversicherung',
+            slug='sozialversicherung',
+            description='Gesetzliche Sozialversicherung, Rente, Pflege, Krankenversicherung',
+            primary_level='FEDERAL',
+            competency_type='EXCLUSIVE',
+            keywords='sozialversicherung, rente, pflegeversicherung'
+        )
+
+        self.federal_committee = Committee.objects.create(
+            name='Ausschuss für Arbeit und Soziales',
+            parliament_term=self.term,
+        )
+        self.federal_committee.topic_areas.add(self.social_topic)
+        CommitteeMembership.objects.create(
+            representative=self.federal_expert_rep,
+            committee=self.federal_committee,
+            role='member'
+        )
+        self.federal_expert_rep.topic_areas.add(self.social_topic)
+
+        self.state_committee = Committee.objects.create(
+            name='Wissenschaftsausschuss',
+            parliament_term=self.state_term,
+        )
+        self.state_committee.topic_areas.add(self.uni_topic)
+        CommitteeMembership.objects.create(
+            representative=self.state_rep_list,
+            committee=self.state_committee,
+            role='member'
+        )
+        self.state_rep_list.topic_areas.add(self.uni_topic)
 
     def test_suggestions_use_postal_code_and_keywords(self):
         result = ConstituencySuggestionService.suggest_from_concern(
@@ -338,3 +420,68 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
         direct_ids = {rep.id for rep in result['direct_representatives']}
         self.assertEqual(direct_ids, {state_rep_direct.id, state_rep_list.id})
         self.assertNotIn(self.direct_rep.id, suggested_ids)
+
+    def test_federal_topic_prefers_federal_representatives(self):
+        self.social_topic.representatives.add(self.direct_rep, self.list_rep)
+
+        result = ConstituencySuggestionService.suggest_from_concern(
+            'Sozialversicherung reformieren',
+            user_location={'constituencies': [self.constituency_direct.id, self.constituency_state.id]},
+        )
+
+        suggested_ids = {rep.id for rep in result['representatives']}
+        self.assertIn(self.direct_rep.id, suggested_ids)
+        self.assertIn(self.list_rep.id, suggested_ids)
+        self.assertIn(self.social_topic, result['matched_topics'])
+        direct_ids = {rep.id for rep in result['direct_representatives']}
+        self.assertEqual(direct_ids, {self.direct_rep.id, self.list_rep.id})
+        self.assertNotIn(self.state_rep_direct.id, suggested_ids)
+        self.assertNotIn(self.state_rep_list.id, suggested_ids)
+        expert_ids = {rep.id for rep in result['expert_representatives']}
+        self.assertIn(self.federal_expert_rep.id, expert_ids)
+        self.assertNotIn(self.state_rep_direct.id, expert_ids)
+
+    def test_federal_topic_view_endpoint_filters_state_reps(self):
+        self.social_topic.representatives.add(self.direct_rep, self.list_rep)
+        IdentityVerificationService.self_declare(
+            self.user,
+            federal_constituency=self.constituency_direct,
+            state_constituency=self.state_constituency_direct,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('analyze_title'),
+            {'title': 'Sozialversicherung reformieren'},
+            HTTP_HX_REQUEST='true'
+        )
+
+        content = response.content.decode('utf-8')
+        self.assertIn(self.direct_rep.last_name, content)
+        self.assertIn(self.list_rep.last_name, content)
+        self.assertNotIn(self.state_rep_direct.last_name, content)
+        self.assertNotIn(self.state_rep_list.last_name, content)
+        self.assertIn(self.federal_expert_rep.last_name, content)
+
+
+class CompetencyPageTests(TestCase):
+    """Ensure the competency overview renders topics for visitors."""
+
+    def setUp(self):
+        TopicArea.objects.all().delete()
+        self.topic = TopicArea.objects.create(
+            name='Testthema',
+            slug='testthema',
+            description='Ein Beispielthema für die Kompetenzseite.',
+            primary_level='FEDERAL',
+            competency_type='EXCLUSIVE',
+            keywords='test, thema',
+            legal_basis='Art. 73 GG',
+            legal_basis_url='https://www.gesetze-im-internet.de/gg/art_73.html',
+        )
+
+    def test_competency_page_renders(self):
+        response = self.client.get(reverse('competency_overview'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Kompetenzen verstehen')
+        self.assertContains(response, self.topic.name)

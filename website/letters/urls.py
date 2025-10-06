@@ -10,6 +10,8 @@ urlpatterns = [
     path('letter/<int:pk>/sign/', views.sign_letter, name='sign_letter'),
     path('letter/<int:pk>/report/', views.report_letter, name='report_letter'),
 
+    path('kompetenzen/', views.CompetencyOverviewView.as_view(), name='competency_overview'),
+
     # Representative URLs
     path('representative/<int:pk>/', views.RepresentativeDetailView.as_view(), name='representative_detail'),
     path('committee/<int:pk>/', views.CommitteeDetailView.as_view(), name='committee_detail'),

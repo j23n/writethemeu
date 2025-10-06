@@ -1,0 +1,87 @@
+{% extends 'letters/base.html' %}
+
+{% block title %}Kompetenzen - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+    <h2>Kompetenzen verstehen</h2>
+    <p>
+        In Deutschland regeln mehrere Ebenen gemeinsam, wie unser Alltag funktioniert: Die Europäische Union setzt Rahmen,
+        der Bund erlässt Gesetze für das ganze Land, die Bundesländer gestalten Bildung und Polizei, und Kommunen kümmern sich
+        um Straßen, Müllabfuhr oder Kitas. Damit du weißt, wer für dein Anliegen zuständig ist, findest du hier Beispiele in Frageform.
+    </p>
+    <p>
+        Stell dir vor, du willst etwas ansprechen oder verändern: An wen wendest du dich? Die folgenden Abschnitte geben dir
+        eine Orientierung.
+    </p>
+    {% for section in competency_overview %}
+        <div class="mt-4">
+            <h3>{{ section.title }}</h3>
+            <p>{{ section.description }}</p>
+            <ul class="list-unstyled mb-0">
+                {% for example in section.examples %}
+                    <li class="mb-3">
+                        <strong>{{ example.question }}</strong><br>
+                        {{ example.answer }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endfor %}
+</div>
+
+<div class="card mb-4">
+    <h3>Kompetenzmatrix im Überblick</h3>
+    <p class="text-muted">So teilen sich Ebene und Zuständigkeit auf – mit Alltagssituationen, an denen du es erkennst.</p>
+    <div class="table-responsive">
+        <table class="table table-striped table-bordered align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Ebene</th>
+                    <th>Kompetenztyp</th>
+                    <th>Was bedeutet das?</th>
+                    <th>Beispiele</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in competency_matrix %}
+                    <tr>
+                        <td>{{ row.primary_level }}</td>
+                        <td>{{ row.competency_type }}</td>
+                        <td>{{ row.description }}</td>
+                        <td>{{ row.examples }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% for group in topics_by_level %}
+    <div class="card mb-4">
+        <h3>{{ group.label }}</h3>
+        {% for topic in group.topics %}
+            <div class="mb-4">
+                <h4 class="h5 mb-1">{{ topic.name }}</h4>
+                {% if topic.description %}
+                    <p class="mb-1">{{ topic.description }}</p>
+                {% endif %}
+                <p class="mb-1 text-muted">
+                    <strong>Zuständigkeit:</strong> {{ group.label }} · {{ topic.get_competency_type_display }}
+                </p>
+                <p class="mb-1">
+                    <strong>Rechtsgrundlage:</strong>
+                    {% if topic.legal_basis_url %}
+                        <a href="{{ topic.legal_basis_url }}" target="_blank" rel="noopener">{{ topic.legal_basis }}</a>
+                    {% else %}
+                        {{ topic.legal_basis }}
+                    {% endif %}
+                </p>
+                {% if topic.keywords %}
+                    <p class="mb-0"><strong>Stichworte:</strong> {{ topic.get_keywords_list|join:', ' }}</p>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+{% endfor %}
+{% endblock %}
