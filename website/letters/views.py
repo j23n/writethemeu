@@ -390,34 +390,37 @@ class RepresentativeDetailView(DetailView):
     template_name = 'letters/representative_detail.html'
     context_object_name = 'representative'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'parliament', 'parliament_term'
+        ).prefetch_related(
+            'topic_areas',
+            'committee_memberships__committee__parliament_term__parliament',
+            'committee_memberships__committee__topic_areas'
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         rep = self.object
 
         # Get letters to this representative
-        letters_to_rep = Letter.objects.filter(
-            representative=rep,
-            status='PUBLISHED'
-        ).select_related('author').prefetch_related('tags').annotate(
-            sig_count=Count('signatures')
-        ).order_by('-published_at')
+        letters_to_rep = (
+            Letter.objects.filter(representative=rep, status='PUBLISHED')
+            .select_related('author')
+            .prefetch_related('tags')
+            .annotate(sig_count=Count('signatures'))
+            .order_by('-published_at')
+        )
 
         context['letters_to_rep'] = letters_to_rep
 
         # Get committee memberships
         committee_memberships = rep.committee_memberships.select_related(
-            'committee', 'committee__topic_area'
-        ).order_by('-role', 'committee__name')
+            'committee__parliament_term__parliament'
+        ).prefetch_related('committee__topic_areas').order_by('committee__name')
 
-        context['committee_memberships'] = committee_memberships
-
-        # Get competences from committees via topic areas
-        competences = set()
-        for membership in committee_memberships:
-            if membership.committee.topic_area:
-                competences.add(membership.committee.topic_area)
-
-        context['competences'] = sorted(competences, key=lambda x: x.name)
+        context['committee_memberships'] = list(committee_memberships)
+        context['topic_areas'] = rep.topic_areas.order_by('name')
 
         # Get abgeordnetenwatch profile link
         abgeordnetenwatch_url = rep.metadata.get('abgeordnetenwatch_url')
@@ -445,4 +448,29 @@ class RepresentativeDetailView(DetailView):
                     break
         context['wikipedia_url'] = wikipedia_url or ''
 
+        return context
+
+
+class CommitteeDetailView(DetailView):
+    """Public view to show committee details and its members."""
+    model = Committee
+    template_name = 'letters/committee_detail.html'
+    context_object_name = 'committee'
+
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'parliament_term__parliament'
+        ).prefetch_related('topic_areas')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        committee = self.object
+        memberships = committee.memberships.select_related(
+            'representative__parliament',
+            'representative__parliament_term'
+        ).prefetch_related(
+            'representative__topic_areas',
+            'representative__constituencies'
+        ).order_by('representative__last_name', 'representative__first_name')
+        context['memberships'] = memberships
         return context

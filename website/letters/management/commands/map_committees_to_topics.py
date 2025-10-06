@@ -31,7 +31,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('DRY RUN MODE - no changes will be saved'))
 
         # Get all committees without topic mappings
-        unmapped_committees = Committee.objects.filter(topic_area__isnull=True)
+        unmapped_committees = Committee.objects.filter(topic_areas__isnull=True).distinct()
         self.stdout.write(f'Found {unmapped_committees.count()} unmapped committees')
 
         topic_areas = TopicArea.objects.all()
@@ -45,13 +45,13 @@ class Command(BaseCommand):
 
             # Show top suggestion
             top_match = suggestions[0]
-            self.stdout.write(f'\n{committee.name} ({committee.parliament})')
+            parliament_name = committee.parliament_term.parliament.name
+            self.stdout.write(f'\n{committee.name} ({parliament_name})')
             self.stdout.write(f'  → {top_match["topic"].name} (score: {top_match["score"]}, matched: {", ".join(top_match["matched_keywords"][:3])})')
 
             # Auto-apply if score is high enough
             if auto_apply and top_match['score'] >= 3 and not dry_run:
-                committee.topic_area = top_match['topic']
-                committee.save()
+                committee.topic_areas.set([top_match['topic']])
                 mappings_applied += 1
                 self.stdout.write(self.style.SUCCESS('    ✓ Applied'))
             elif top_match['score'] >= 3:

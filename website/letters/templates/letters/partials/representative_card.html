@@ -1,4 +1,7 @@
 {% load i18n %}
+{% with show_contact=show_contact|default:True %}
+{% with show_profile_link=show_profile_link|default:True %}
+{% with topics=topic_areas|default:representative.topic_areas.all %}
 <div class="d-flex align-items-start gap-3 representative-card">
     {% if representative.photo_url %}
         <img src="{{ representative.photo_url }}"
@@ -25,16 +28,34 @@
                 · {% trans "Since" %} {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}
             {% endif %}
         </p>
-        <p class="mb-2 small">
-            {% if representative.email %}
-                <strong>{% trans "Email" %}:</strong> <a href="mailto:{{ representative.email }}">{{ representative.email }}</a><br>
-            {% endif %}
-            {% if representative.website %}
-                <strong>{% trans "Website" %}:</strong> <a href="{{ representative.website }}" target="_blank" rel="noopener">{{ representative.website }}</a>
-            {% endif %}
-        </p>
-        <a href="{% url 'representative_detail' representative.id %}" class="small">
-            {% trans "View profile" %} →
-        </a>
+        {% if topics %}
+            <p class="mb-2 small">
+                <strong>{% trans "Focus" %}:</strong>
+                {% for topic in topics|slice:":3" %}
+                    <span class="badge bg-light text-dark border me-1">{{ topic.name }}</span>
+                {% endfor %}
+                {% if topics|length > 3 %}
+                    <span class="text-muted">+{{ topics|length|add:'-3' }}</span>
+                {% endif %}
+            </p>
+        {% endif %}
+        {% if show_contact %}
+            <p class="mb-2 small">
+                {% if representative.email %}
+                    <strong>{% trans "Email" %}:</strong> <a href="mailto:{{ representative.email }}">{{ representative.email }}</a><br>
+                {% endif %}
+                {% if representative.website %}
+                    <strong>{% trans "Website" %}:</strong> <a href="{{ representative.website }}" target="_blank" rel="noopener">{{ representative.website }}</a>
+                {% endif %}
+            </p>
+        {% endif %}
+        {% if show_profile_link %}
+            <a href="{% url 'representative_detail' representative.id %}" class="small">
+                {% trans "View profile" %} →
+            </a>
+        {% endif %}
     </div>
 </div>
+{% endwith %}
+{% endwith %}
+{% endwith %}

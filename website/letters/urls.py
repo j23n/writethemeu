@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Representative URLs
     path('representative/<int:pk>/', views.RepresentativeDetailView.as_view(), name='representative_detail'),
+    path('committee/<int:pk>/', views.CommitteeDetailView.as_view(), name='committee_detail'),
 
     # HTMX endpoints
     path('api/analyze-title/', views.analyze_letter_title, name='analyze_title'),

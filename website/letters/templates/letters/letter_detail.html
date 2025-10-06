@@ -11,7 +11,7 @@
     </p>
 
     <div class="mb-3">
-        {% include 'letters/partials/representative_card.html' with representative=letter.representative constituency=letter.representative.primary_constituency %}
+        {% include 'letters/partials/representative_card.html' with representative=letter.representative constituency=letter.representative.primary_constituency show_contact=False %}
     </div>
 
     {% if letter.tags.all %}

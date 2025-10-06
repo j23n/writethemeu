@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+
 from .models import (
     Parliament,
     ParliamentTerm,
@@ -31,14 +34,55 @@ class ParliamentTermAdmin(admin.ModelAdmin):
     raw_id_fields = ['parliament']
 
 
+class CommitteeMembershipInlineForRepresentative(admin.TabularInline):
+    model = CommitteeMembership
+    fk_name = 'representative'
+    raw_id_fields = ['committee']
+    extra = 0
+
+
+class CommitteeMembershipInlineForCommittee(admin.TabularInline):
+    model = CommitteeMembership
+    fk_name = 'committee'
+    raw_id_fields = ['representative']
+    extra = 0
+
+
 @admin.register(Representative)
 class RepresentativeAdmin(admin.ModelAdmin):
     list_display = ['full_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active', 'term_start', 'term_end']
     list_filter = ['is_active', 'parliament__level', 'party', 'parliament_term__name', 'election_mode']
     search_fields = ['first_name', 'last_name', 'party', 'parliament__name', 'parliament_term__name']
-    readonly_fields = ['created_at', 'updated_at', 'photo_updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'photo_updated_at', 'photo_preview']
     raw_id_fields = ['parliament', 'parliament_term']
-    filter_horizontal = ['constituencies']
+    filter_horizontal = ['constituencies', 'topic_areas']
+    inlines = [CommitteeMembershipInlineForRepresentative]
+
+    fieldsets = (
+        (None, {
+            'fields': ('first_name', 'last_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active')
+        }),
+        (_('Mandate Details'), {
+            'fields': ('term_start', 'term_end', 'role', 'email', 'phone', 'website')
+        }),
+        (_('Focus Areas'), {
+            'fields': ('focus_areas', 'topic_areas', 'constituencies')
+        }),
+        (_('Photo'), {
+            'fields': ('photo_preview', 'photo_path', 'photo_updated_at'),
+            'classes': ('collapse',)
+        }),
+        (_('Metadata'), {
+            'fields': ('metadata', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def photo_preview(self, obj):
+        if obj.photo_url:
+            return mark_safe(f'<img src="{obj.photo_url}" style="max-height: 200px;" />')
+        return _('No photo')
+    photo_preview.short_description = _('Photo')
 
 
 @admin.register(Tag)
@@ -82,22 +126,23 @@ class TopicAreaAdmin(admin.ModelAdmin):
 
 @admin.register(Committee)
 class CommitteeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'parliament_term', 'topic_area', 'member_count', 'created_at']
-    list_filter = ['parliament_term__parliament__level', 'topic_area']
-    search_fields = ['name', 'description', 'parliament_term__parliament__name']
+    list_display = ['name', 'parliament_term', 'topic_area_list', 'member_count', 'created_at']
+    list_filter = ['parliament_term__parliament__level', 'topic_areas']
+    search_fields = ['name', 'description', 'parliament_term__parliament__name', 'topic_areas__name']
     readonly_fields = ['created_at', 'updated_at', 'member_count']
-    raw_id_fields = ['topic_area']
+    filter_horizontal = ['topic_areas']
+    inlines = [CommitteeMembershipInlineForCommittee]
 
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'parliament_term', 'description')
         }),
         ('Topic Mapping', {
-            'fields': ('topic_area',),
-            'description': 'Link this committee to a TopicArea in our taxonomy'
+            'fields': ('topic_areas',),
+            'description': 'Link this committee to TopicAreas in our taxonomy'
         }),
         ('Metadata', {
-            'fields': ('metadata', 'created_at', 'updated_at', 'member_count'),
+            'fields': ('keywords', 'metadata', 'created_at', 'updated_at', 'member_count'),
             'classes': ('collapse',)
         }),
     )
@@ -105,6 +150,11 @@ class CommitteeAdmin(admin.ModelAdmin):
     def member_count(self, obj):
         return obj.memberships.count()
     member_count.short_description = 'Members'
+
+    def topic_area_list(self, obj):
+        names = obj.topic_areas.values_list('name', flat=True)
+        return ', '.join(names) or '-'
+    topic_area_list.short_description = _('Topic Areas')
 
 
 @admin.register(CommitteeMembership)

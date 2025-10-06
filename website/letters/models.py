@@ -184,6 +184,11 @@ class Representative(models.Model):
     focus_areas = models.TextField(blank=True)
     photo_path = models.CharField(max_length=255, blank=True)
     photo_updated_at = models.DateTimeField(null=True, blank=True)
+    topic_areas = models.ManyToManyField(
+        'letters.TopicArea',
+        blank=True,
+        related_name='representatives'
+    )
     term_start = models.DateField(null=True, blank=True)
     term_end = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -353,10 +358,8 @@ class Committee(models.Model):
     )
     description = models.TextField(blank=True)
     keywords = models.TextField(blank=True, help_text='Comma-separated keywords extracted from name and description')
-    topic_area = models.ForeignKey(
+    topic_areas = models.ManyToManyField(
         TopicArea,
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
         related_name='committees'
     )
@@ -370,7 +373,6 @@ class Committee(models.Model):
         unique_together = [('parliament_term', 'name')]
         indexes = [
             models.Index(fields=['parliament_term']),
-            models.Index(fields=['topic_area']),
             models.Index(fields=['external_id']),
         ]
 

@@ -1,0 +1,81 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{{ committee.name }} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h2 class="mb-0">{{ committee.name }}</h2>
+            </div>
+            <div class="card-body">
+                <p class="mb-2 text-muted small">
+                    {{ committee.parliament_term.parliament.name }} · {{ committee.parliament_term.name }}
+                </p>
+                {% if committee.description %}
+                    <p class="mb-3">{{ committee.description }}</p>
+                {% endif %}
+                {% if committee.topic_areas.all %}
+                    <div class="mb-2">
+                        <strong>{% trans "Related Topics" %}:</strong>
+                        {% for topic in committee.topic_areas.all %}
+                            <span class="badge bg-light text-dark border me-1">{{ topic.name }}</span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                {% if committee.keywords %}
+                    <p class="small text-muted">{{ committee.keywords }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">👥 {% trans "Members" %}</h4>
+                <span class="badge bg-light text-dark">{{ memberships|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if memberships %}
+                    <div class="list-group">
+                        {% for membership in memberships %}
+                            <div class="list-group-item">
+                                {% include 'letters/partials/representative_card.html' with representative=membership.representative constituency=membership.representative.primary_constituency show_contact=False %}
+                                <p class="text-muted small mt-2 mb-0">
+                                    <strong>{% trans "Role" %}:</strong> {{ membership.get_role_display }}
+                                    {% if membership.is_active %}
+                                        · <span class="text-success">{% trans "Active" %}</span>
+                                    {% endif %}
+                                    {% if membership.start_date %}
+                                        · {% trans "Since" %} {{ membership.start_date|date:"SHORT_DATE_FORMAT" }}
+                                    {% endif %}
+                                </p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">{% trans "No members recorded for this committee." %}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4 sticky-top" style="top: 20px;">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0">{% trans "Committee Info" %}</h5>
+            </div>
+            <div class="card-body small text-muted">
+                <p><strong>{% trans "Parliament" %}:</strong> {{ committee.parliament_term.parliament.name }}</p>
+                <p><strong>{% trans "Term" %}:</strong> {{ committee.parliament_term.name }}</p>
+                {% if committee.metadata.abgeordnetenwatch_url %}
+                    <a href="{{ committee.metadata.abgeordnetenwatch_url }}" target="_blank" class="btn btn-primary btn-sm w-100 mb-2">
+                        {% trans "View on Abgeordnetenwatch" %} →
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

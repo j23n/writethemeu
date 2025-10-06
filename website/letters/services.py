@@ -779,6 +779,8 @@ class RepresentativeSyncService:
             except Exception as e:
                 logger.error("Failed to fetch memberships for committee %s: %s", committee_id, e)
 
+        self._update_representative_topics(term)
+
     def _import_committee(self, committee_data: Dict, term: ParliamentTerm) -> Optional[Committee]:
         """Import a single committee from API data."""
         try:
@@ -827,6 +829,22 @@ class RepresentativeSyncService:
             else:
                 self.stats['committees_updated'] += 1
                 logger.debug("Updated committee: %s", name)
+
+            topic_objs: List[TopicArea] = []
+            for topic in topics:
+                if isinstance(topic, dict):
+                    label = (topic.get('label') or '').strip()
+                else:
+                    label = str(topic).strip()
+                if not label:
+                    continue
+                topic_obj = TopicArea.objects.filter(name__iexact=label).first()
+                if topic_obj:
+                    topic_objs.append(topic_obj)
+            if topic_objs:
+                committee.topic_areas.set(topic_objs)
+            elif created:
+                committee.topic_areas.clear()
 
             return committee
 
@@ -945,6 +963,22 @@ class RepresentativeSyncService:
         except Exception as e:
             logger.error("Failed to import committee membership %s: %s", membership_data.get('id'), e)
             return None
+
+    def _update_representative_topics(self, term: ParliamentTerm) -> None:
+        """Update representative topic areas based on committee assignments."""
+        reps = term.representatives.prefetch_related(
+            'committee_memberships__committee__topic_areas'
+        )
+        for rep in reps:
+            topic_ids: Set[int] = set()
+            for membership in rep.committee_memberships.all():
+                topic_ids.update(
+                    membership.committee.topic_areas.values_list('id', flat=True)
+                )
+            if topic_ids:
+                rep.topic_areas.set(topic_ids)
+            else:
+                rep.topic_areas.clear()
 
     @staticmethod
     def _map_committee_role(api_role: str) -> str:
@@ -1252,7 +1286,9 @@ class ConstituencySuggestionService:
             'parliament', 'parliament_term'
         ).prefetch_related(
             'constituencies',
-            'committee_memberships__committee'
+            'topic_areas',
+            'committee_memberships__committee',
+            'committee_memberships__committee__topic_areas'
         )
 
         location_filter = Q()
@@ -1364,11 +1400,14 @@ class ConstituencySuggestionService:
             for membership in rep.committee_memberships.all():
                 if membership.committee.keywords:
                     committee_keywords.extend(membership.committee.get_keywords_list())
-                    # Check if this committee is relevant
-                    for term in search_terms:
-                        if term in ' '.join(membership.committee.get_keywords_list()).lower():
-                            relevant_committees.append(membership)
-                            break
+                committee_keywords.extend(
+                    membership.committee.topic_areas.values_list('name', flat=True)
+                )
+                # Check if this committee is relevant
+                for term in search_terms:
+                    if term in ' '.join(membership.committee.get_keywords_list()).lower():
+                        relevant_committees.append(membership)
+                        break
 
             committee_blob = ' '.join(committee_keywords).lower()
             for term in search_terms:
@@ -1410,7 +1449,9 @@ class ConstituencySuggestionService:
             'parliament', 'parliament_term'
         ).prefetch_related(
             'constituencies',
-            'committee_memberships__committee'
+            'topic_areas',
+            'committee_memberships__committee',
+            'committee_memberships__committee__topic_areas'
         )
 
         location_filter = Q()
@@ -1429,7 +1470,12 @@ class ConstituencySuggestionService:
             inferred_level = cls._infer_level(primary_topic, location, tokens)
             if inferred_level:
                 fallback_qs = fallback_qs.filter(parliament__level__iexact=inferred_level)
-            fallback_qs = fallback_qs.select_related('parliament', 'parliament_term').prefetch_related('constituencies')
+            fallback_qs = fallback_qs.select_related('parliament', 'parliament_term').prefetch_related(
+                'constituencies',
+                'topic_areas',
+                'committee_memberships__committee',
+                'committee_memberships__committee__topic_areas'
+            )
             candidates = list(fallback_qs[:50])
 
         if not candidates:
