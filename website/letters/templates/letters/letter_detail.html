@@ -1,5 +1,5 @@
 {% extends 'letters/base.html' %}
-{% load i18n %}
+{% load i18n markdown_extras %}
 
 {% block title %}{{ letter.title }} - WriteThem.eu{% endblock %}
 
@@ -22,7 +22,7 @@
         </div>
     {% endif %}
 
-    <div style="white-space: pre-wrap; line-height: 1.8; margin-top: 1.5rem;">{{ letter.body }}</div>
+    <div class="letter-body mt-4">{{ letter.body|markdownify }}</div>
 </div>
 
 <div class="card">

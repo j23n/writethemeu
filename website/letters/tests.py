@@ -20,6 +20,7 @@ from .models import (
     TopicArea,
 )
 from .services import ConstituencySuggestionService, IdentityVerificationService
+from .templatetags import markdown_extras
 
 
 class ParliamentFixtureMixin:
@@ -485,3 +486,22 @@ class CompetencyPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Kompetenzen verstehen')
         self.assertContains(response, self.topic.name)
+
+
+class MarkdownFilterTests(TestCase):
+    """Ensure Markdown rendering converts safely and strips disallowed markup."""
+
+    def test_markdown_bold_rendering(self):
+        rendered = markdown_extras.markdownify('**Hallo Welt**')
+        self.assertIn('<strong>Hallo Welt</strong>', rendered)
+
+    def test_markdown_strips_scripts(self):
+        rendered = markdown_extras.markdownify('Test <script>alert(1)</script>')
+        self.assertIn('Test', rendered)
+        self.assertNotIn('<script>', rendered)
+
+    def test_markdown_ordered_list(self):
+        rendered = markdown_extras.markdownify('1. Eins\n2. Zwei')
+        self.assertIn('<ol', rendered)
+        self.assertIn('<li>Eins</li>', rendered)
+        self.assertIn('<li>Zwei</li>', rendered)

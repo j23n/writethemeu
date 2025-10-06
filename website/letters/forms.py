@@ -38,7 +38,7 @@ class LetterForm(forms.ModelForm):
         }
         help_texts = {
             'title': _('Describe your concern briefly'),
-            'body': _('Write your letter here'),
+            'body': _('Write your letter here. Markdown formatting (e.g. **bold**, _italic_) is supported.'),
         }
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('Letter title')}),
