@@ -153,13 +153,25 @@ class LocationContext:
         return ids
 
     def filtered_constituencies(self, parliament_ids: Optional[Set[int]]) -> List[Constituency]:
-        if not parliament_ids:
-            return list(self.constituencies)
-        return [
-            constituency
-            for constituency in self.constituencies
-            if constituency.parliament_term.parliament_id in parliament_ids
-        ]
+        if parliament_ids:
+            matches = [
+                constituency
+                for constituency in self.constituencies
+                if constituency.parliament_term.parliament_id in parliament_ids
+            ]
+            if matches:
+                return matches
+
+        if self.state:
+            state_matches = [
+                constituency
+                for constituency in self.constituencies
+                if normalize_german_state((constituency.metadata or {}).get('state')) == self.state
+            ]
+            if state_matches:
+                return state_matches
+            return []
+        return list(self.constituencies)
 
 
 class ConstituencyLocator:
@@ -1326,26 +1338,37 @@ class ConstituencySuggestionService:
             parliament_ids.update(federal_matches)
 
         for topic in topics:
-            if topic.primary_level == 'EU':
+            level = topic.primary_level
+            competency = topic.competency_type
+
+            if level == 'EU' and competency == 'EXCLUSIVE':
                 eu_ids = Parliament.objects.filter(level='EU').values_list('id', flat=True)
                 parliament_ids.update(eu_ids)
+                continue
 
-            if topic.primary_level == 'STATE' or topic.competency_type == 'STATE':
-                add_state_parliaments()
-
-            if topic.primary_level == 'FEDERAL' or topic.competency_type == 'EXCLUSIVE':
+            if level == 'EU' and competency == 'SHARED':
+                eu_ids = Parliament.objects.filter(level='EU').values_list('id', flat=True)
+                parliament_ids.update(eu_ids)
                 add_federal_parliaments()
+                continue
 
-            if topic.competency_type == 'CONCURRENT' or topic.primary_level == 'MIXED':
+            if level == 'FEDERAL' and competency == 'EXCLUSIVE':
+                add_federal_parliaments()
+                continue
+
+            if level == 'FEDERAL' and competency in {'CONCURRENT', 'JOINT'}:
+                add_federal_parliaments()
+                add_state_parliaments()
+                continue
+
+            if level == 'FEDERAL' and competency == 'DEVIATION':
                 add_state_parliaments()
                 add_federal_parliaments()
+                continue
 
-            for committee in topic.committees.all():
-                if committee.parliament_term_id:
-                    parliament_ids.add(committee.parliament_term.parliament_id)
-
-            topic_parliament_ids = topic.representatives.values_list('parliament_id', flat=True)
-            parliament_ids.update(topic_parliament_ids)
+            if level == 'STATE' and competency in {'STATE', 'RESIDUAL'}:
+                add_state_parliaments()
+                continue
 
         if not parliament_ids:
             parliament_ids.update(location_parliament_ids)
@@ -1357,9 +1380,6 @@ class ConstituencySuggestionService:
             intersection = parliament_ids & location_parliament_ids
             if intersection:
                 parliament_ids = intersection
-
-        if not parliament_ids and state_code:
-            add_state_parliaments()
 
         return parliament_ids
 
@@ -1465,7 +1485,12 @@ class ConstituencySuggestionService:
             base_qs = base_qs.filter(parliament_id__in=parliament_ids)
 
         relevant_constituencies = location.filtered_constituencies(parliament_ids)
-        constituencies = relevant_constituencies or location.constituencies
+        if relevant_constituencies:
+            constituencies = relevant_constituencies
+        elif parliament_ids:
+            constituencies = []
+        else:
+            constituencies = location.constituencies
 
         location_filter = Q()
         if constituencies:
@@ -1563,7 +1588,7 @@ class ConstituencySuggestionService:
             relevant_constituencies = location.filtered_constituencies(parliament_ids)
             if relevant_constituencies:
                 location_filter |= Q(constituencies__in=relevant_constituencies)
-            elif location.has_constituencies:
+            elif location.has_constituencies and not parliament_ids:
                 location_filter |= Q(constituencies__in=location.constituencies)
             if location.state:
                 location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)

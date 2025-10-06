@@ -302,6 +302,7 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
             competency_type='STATE',
             keywords='universität, universitäten, hochschule, hochschulen'
         )
+        self.uni_topic.representatives.add(self.direct_rep)
         self.social_topic = TopicArea.objects.create(
             name='Sozialversicherung',
             slug='sozialversicherung',
@@ -407,11 +408,71 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
         )
         state_rep_list.constituencies.add(bavaria_list_constituency)
 
-        self.uni_topic.representatives.add(state_rep_direct, state_rep_list)
+        other_state_parliament = Parliament.objects.create(
+            name='Landtag Nordrhein-Westfalen',
+            level='STATE',
+            legislative_body='Landtag NRW',
+            region='Nordrhein-Westfalen',
+            metadata={'source': 'test'},
+        )
+        other_state_term = ParliamentTerm.objects.create(
+            parliament=other_state_parliament,
+            name='18. Wahlperiode NRW',
+            start_date=date(2022, 5, 31),
+            metadata={'source': 'test'},
+        )
+        other_state_constituency = Constituency.objects.create(
+            parliament_term=other_state_term,
+            name='Düsseldorf II',
+            scope='STATE_DISTRICT',
+            metadata={'state': 'Nordrhein-Westfalen'},
+        )
+        other_state_list_constituency = Constituency.objects.create(
+            parliament_term=other_state_term,
+            name='Landesliste NRW',
+            scope='STATE_LIST',
+            metadata={'state': 'Nordrhein-Westfalen'},
+        )
+        other_state_direct = Representative.objects.create(
+            parliament=other_state_parliament,
+            parliament_term=other_state_term,
+            election_mode='DIRECT',
+            external_id='state-direct-nrw',
+            first_name='Klara',
+            last_name='Kruse',
+            party='SPD',
+            term_start=date(2022, 5, 31),
+        )
+        other_state_direct.constituencies.add(other_state_constituency)
+        other_state_list = Representative.objects.create(
+            parliament=other_state_parliament,
+            parliament_term=other_state_term,
+            election_mode='STATE_LIST',
+            external_id='state-list-nrw',
+            first_name='Lars',
+            last_name='Lemke',
+            party='CDU',
+            term_start=date(2022, 5, 31),
+        )
+        other_state_list.constituencies.add(other_state_list_constituency)
+
+        self.uni_topic.representatives.add(
+            state_rep_direct,
+            state_rep_list,
+            other_state_direct,
+            other_state_list,
+        )
 
         result = ConstituencySuggestionService.suggest_from_concern(
             'Universitäten sind richtig toll',
-            user_location={'constituencies': [bavaria_constituency.id, bavaria_list_constituency.id]},
+            user_location={
+                'constituencies': [
+                    bavaria_constituency.id,
+                    bavaria_list_constituency.id,
+                    other_state_constituency.id,
+                ],
+                'state': 'Bayern',
+            },
         )
 
         suggested_ids = {rep.id for rep in result['representatives']}
@@ -421,6 +482,10 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
         direct_ids = {rep.id for rep in result['direct_representatives']}
         self.assertEqual(direct_ids, {state_rep_direct.id, state_rep_list.id})
         self.assertNotIn(self.direct_rep.id, suggested_ids)
+        self.assertNotIn(other_state_direct.id, suggested_ids)
+        self.assertNotIn(other_state_list.id, suggested_ids)
+        expert_ids = {rep.id for rep in result['expert_representatives']}
+        self.assertNotIn(self.direct_rep.id, expert_ids)
 
     def test_federal_topic_prefers_federal_representatives(self):
         self.social_topic.representatives.add(self.direct_rep, self.list_rep)
