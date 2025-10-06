@@ -20,7 +20,8 @@ from .forms import (
     SignatureForm,
     ReportForm,
     LetterSearchForm,
-    UserRegisterForm
+    UserRegisterForm,
+    SelfDeclaredConstituencyForm
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
 
@@ -135,11 +136,6 @@ class LetterCreateView(LoginRequiredMixin, CreateView):
         if rep_id:
             initial['representative'] = rep_id
 
-        # Pre-fill postal code from verification
-        verification = getattr(self.request.user, 'identity_verification', None)
-        if verification and verification.is_verified and verification.postal_code:
-            initial.setdefault('postal_code', verification.postal_code)
-
         return kwargs
 
     def form_valid(self, form):
@@ -250,10 +246,27 @@ def profile(request):
     except IdentityVerification.DoesNotExist:
         verification = None
 
+    if request.method == 'POST':
+        constituency_form = SelfDeclaredConstituencyForm(request.POST, user=user)
+        if constituency_form.is_valid():
+            IdentityVerificationService.self_declare(
+                user=user,
+                federal_constituency=constituency_form.cleaned_data['federal_constituency'],
+                state_constituency=constituency_form.cleaned_data['state_constituency'],
+            )
+            messages.success(
+                request,
+                _('Your constituency information has been updated.')
+            )
+            return redirect('profile')
+    else:
+        constituency_form = SelfDeclaredConstituencyForm(user=user)
+
     context = {
         'user_letters': user_letters,
         'user_signatures': user_signatures,
         'verification': verification,
+        'constituency_form': constituency_form,
     }
 
     return render(request, 'letters/profile.html', context)
@@ -324,7 +337,6 @@ def analyze_letter_title(request):
     - Similar letters
     """
     title = request.POST.get('title', '').strip()
-    postal_code = request.POST.get('postal_code', '').strip()
 
     if not title or len(title) < 10:
         return render(request, 'letters/partials/suggestions.html', {
@@ -332,15 +344,16 @@ def analyze_letter_title(request):
         })
 
     user_location = {}
-    if postal_code:
-        user_location['postal_code'] = postal_code
-
     if request.user.is_authenticated and hasattr(request.user, 'identity_verification'):
         verification = getattr(request.user, 'identity_verification', None)
         if verification and verification.is_verified:
-            if verification.city:
-                user_location.setdefault('city', verification.city)
-            if verification.state:
+            constituencies = verification.get_constituencies()
+            if constituencies:
+                user_location['constituencies'] = constituencies
+            constituency_states = verification.get_constituency_states()
+            if constituency_states:
+                user_location.setdefault('state', next(iter(constituency_states)))
+            elif verification.state:
                 user_location.setdefault('state', verification.state)
 
     # Analyze with ConstituencySuggestionService
@@ -377,6 +390,7 @@ def analyze_letter_title(request):
         'suggestion_result': suggestion_result,
         'similar_letters': similar_letters,
         'keywords': keywords,
+        'location_available': bool(user_location),
     }
 
     return render(request, 'letters/partials/suggestions.html', context)

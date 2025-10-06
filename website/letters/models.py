@@ -1,3 +1,5 @@
+from typing import List, Optional, Set
+
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -244,36 +246,34 @@ class Representative(models.Model):
         if self.parliament.level == 'EU':
             return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
 
-        if verification.constituency and any(c.id == verification.constituency_id for c in constituencies):
+        verification_constituencies = verification.get_constituencies()
+        verification_constituency_ids = {c.id for c in verification_constituencies}
+
+        if verification_constituency_ids and any(c.id in verification_constituency_ids for c in constituencies):
             return True
 
         normalized_state = verification.normalized_state
+        verification_states = verification.get_constituency_states()
+
+        rep_states = {
+            normalize_german_state(c.metadata.get('state'))
+            for c in constituencies
+            if c.metadata and c.metadata.get('state')
+        }
 
         if self.election_mode == 'FEDERAL_LIST':
             return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
 
         if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
-            rep_states = {
-                normalize_german_state(c.metadata.get('state'))
-                for c in constituencies
-                if c.metadata.get('state')
-            }
+            if verification_states & rep_states:
+                return True
             if normalized_state and normalized_state in rep_states:
                 return True
 
-        if self.election_mode == 'DIRECT' and normalized_state:
-            direct_states = {
-                normalize_german_state(c.metadata.get('state'))
-                for c in constituencies
-                if c.metadata.get('state')
-            }
-            if normalized_state in direct_states:
+        if self.election_mode == 'DIRECT':
+            if verification_states & rep_states:
                 return True
-
-        if verification.parliament_id and verification.parliament_id == self.parliament_id:
-            if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
-                return normalized_state is not None
-            if self.election_mode == 'FEDERAL_LIST':
+            if normalized_state and normalized_state in rep_states:
                 return True
 
         return False
@@ -551,9 +551,15 @@ class IdentityVerification(models.Model):
 
     VERIFICATION_STATUS_CHOICES = [
         ('PENDING', 'Pending'),
-        ('VERIFIED', 'Verified'),
+        ('VERIFIED', 'Verified (third party)'),
+        ('SELF_DECLARED', 'Self-declared'),
         ('FAILED', 'Failed'),
         ('EXPIRED', 'Expired'),
+    ]
+
+    VERIFICATION_TYPE_CHOICES = [
+        ('THIRD_PARTY', 'Third-party Provider'),
+        ('SELF_DECLARED', 'Self-declared'),
     ]
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='identity_verification')
@@ -585,7 +591,26 @@ class IdentityVerification(models.Model):
         blank=True,
         related_name='verified_residents'
     )
+    federal_constituency = models.ForeignKey(
+        Constituency,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='federal_verified_residents'
+    )
+    state_constituency = models.ForeignKey(
+        Constituency,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='state_verified_residents'
+    )
     verification_data = models.JSONField(default=dict, blank=True)
+    verification_type = models.CharField(
+        max_length=20,
+        choices=VERIFICATION_TYPE_CHOICES,
+        default='THIRD_PARTY'
+    )
     verified_at = models.DateTimeField(null=True, blank=True)
     expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -599,30 +624,81 @@ class IdentityVerification(models.Model):
 
     @property
     def is_verified(self):
-        return self.status == 'VERIFIED' and (
+        if self.status not in {'VERIFIED', 'SELF_DECLARED'}:
+            return False
+        return (
             self.expires_at is None or self.expires_at > timezone.now()
         )
+
+    @property
+    def is_self_declared(self) -> bool:
+        return self.status == 'SELF_DECLARED'
+
+    @property
+    def is_third_party(self) -> bool:
+        return self.verification_type == 'THIRD_PARTY' and self.status == 'VERIFIED'
 
     @property
     def normalized_state(self):
         return normalize_german_state(self.state)
 
-    def link_constituency(self, constituency: Constituency) -> None:
-        """Attach the verification to a specific constituency and its term."""
-        self.constituency = constituency
-        if constituency:
+    def link_constituency(self, constituency: Constituency, scope: Optional[str] = None) -> None:
+        """Attach the verification to a specific constituency and infer parliament links."""
+        if not constituency:
+            return
+
+        scope = scope or constituency.scope
+
+        if scope in {'FEDERAL_DISTRICT', 'STATE_DISTRICT'}:
+            self.constituency = constituency
+        elif not self.constituency:
+            self.constituency = constituency
+
+        if scope and scope.startswith('FEDERAL'):
+            self.federal_constituency = constituency
+        if scope and scope.startswith('STATE'):
+            self.state_constituency = constituency
+
+        self._update_parliament_links()
+
+    def _update_parliament_links(self) -> None:
+        for constituency in self.get_constituencies():
             self.parliament_term = constituency.parliament_term
             self.parliament = constituency.parliament_term.parliament
-        elif self.parliament_term:
+            return
+        if self.parliament_term:
             self.parliament = self.parliament_term.parliament
 
     def save(self, *args, **kwargs):
-        if self.constituency:
-            self.parliament_term = self.constituency.parliament_term
-            self.parliament = self.constituency.parliament_term.parliament
-        elif self.parliament_term:
-            self.parliament = self.parliament_term.parliament
+        self._update_parliament_links()
         super().save(*args, **kwargs)
+
+    def get_constituencies(self) -> List[Constituency]:
+        """Return distinct constituencies linked to this verification."""
+        constituencies: List[Constituency] = []
+        seen: Set[int] = set()
+        for attr in ('constituency', 'federal_constituency', 'state_constituency'):
+            constituency = getattr(self, attr, None)
+            if constituency and constituency.id not in seen:
+                constituencies.append(constituency)
+                seen.add(constituency.id)
+        return constituencies
+
+    def constituency_ids(self) -> List[int]:
+        return [c.id for c in self.get_constituencies()]
+
+    def get_constituency_states(self) -> Set[str]:
+        states: Set[str] = set()
+        normalized = self.normalized_state
+        if normalized:
+            states.add(normalized)
+        for constituency in self.get_constituencies():
+            metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
+            if metadata_state:
+                normalized_state = normalize_german_state(metadata_state)
+                if normalized_state:
+                    states.add(normalized_state)
+        return states
 
 
 class Report(models.Model):

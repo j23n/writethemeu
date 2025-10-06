@@ -4,14 +4,24 @@
 {% block title %}{% trans "Write a Letter" %} - WriteThem.eu{% endblock %}
 
 {% block content %}
-<div class="row">
-    <!-- Left column: Form -->
-    <div class="col-md-6">
-        <div class="card">
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card mb-4">
             <h2>{% trans "Write an Open Letter" %}</h2>
             <p style="color: #7f8c8d; margin-bottom: 1.5rem;">
-                {% trans "Write an open letter to a German political representative. Your letter will be published publicly and others can sign it." %}
+                {% trans "Write an open letter to a political representative. Your letter will be published publicly so others can read and sign it." %}
             </p>
+
+            <div class="alert alert-info" role="note">
+                <h5 class="mb-2">{% trans "Before you write" %}</h5>
+                <ul class="mb-0 ps-3">
+                    <li>{% trans "Be thoughtful but feel free to be critical." %}</li>
+                    <li>{% trans "Representatives are humans too—stay respectful." %}</li>
+                    <li>{% trans "Keep your arguments clear and concise." %}</li>
+                    <li>{% trans "No insults or hate speech." %}</li>
+                    <li>{% trans "Stay within the bounds of the Grundgesetz when making demands." %}</li>
+                </ul>
+            </div>
 
             <form method="post" id="letter-form">
                 {% csrf_token %}
@@ -23,23 +33,9 @@
                         <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.title.errors }}</div>
                     {% endif %}
                     <small class="form-text text-muted">
-                        {% trans "Describe your concern. We'll suggest the right representatives based on your title." %}
+                        {% trans "Describe your concern in a sentence; we'll use it to suggest representatives." %}
                     </small>
                 </div>
-
-                <div class="form-group">
-                    <label for="id_postal_code">{% trans "Your postal code (PLZ):" %}</label>
-                    {{ form.postal_code }}
-                    {% if form.postal_code.errors %}
-                        <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.postal_code.errors }}</div>
-                    {% endif %}
-                    <small class="form-text text-muted">
-                        {% trans "We'll use this PLZ to highlight representatives from your constituency." %}
-                    </small>
-                </div>
-
-                <!-- Hidden field for selected representative - will be populated by HTMX suggestions -->
-                <div id="selected-rep-confirm"></div>
 
                 <div class="form-group">
                     <label for="id_representative">{% trans "To Representative:" %}</label>
@@ -48,8 +44,9 @@
                         <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.representative.errors }}</div>
                     {% endif %}
                     <small class="form-text text-muted">
-                        {% trans "Or select from suggestions on the right →" %}
+                        {% trans "Already know who to address? Pick them here. Otherwise, use the suggestions below." %}
                     </small>
+                    <div id="selected-rep-confirm" class="mt-2"></div>
                 </div>
 
                 <div class="form-group">
@@ -72,26 +69,20 @@
                 <a href="{% url 'letter_list' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
             </form>
         </div>
-    </div>
 
-    <!-- Right column: HTMX Suggestions -->
-    <div class="col-md-6">
-        <div id="suggestions-panel" class="sticky-top" style="top: 20px;">
+        <div id="suggestions-panel" class="mb-4">
             <div class="alert alert-light border">
                 <h5>💡 {% trans "Smart Suggestions" %}</h5>
                 <p class="mb-0 small text-muted">
-                    {% trans "Add a title and your PLZ to see tailored representatives, tags, and similar letters." %}
+                    {% trans "Type your title and we'll use your verified profile to suggest representatives, topics, and related letters." %}
                 </p>
             </div>
 
-            <!-- This div will be populated by HTMX -->
             <div id="suggestions-content"
                  hx-post="{% url 'analyze_title' %}"
-                 hx-trigger="keyup changed delay:500ms from:#id_title, keyup change delay:500ms from:#id_postal_code"
-                 hx-include="#letter-form [name='title'], #letter-form [name='postal_code'], #letter-form [name='csrfmiddlewaretoken']"
+                 hx-trigger="keyup changed delay:500ms from:#id_title"
+                 hx-include="#letter-form [name='title'], #letter-form [name='csrfmiddlewaretoken']"
                  hx-indicator="#loading-indicator">
-
-                <!-- Loading indicator -->
                 <div id="loading-indicator" class="htmx-indicator">
                     <div class="text-center py-4">
                         <div class="spinner-border text-primary" role="status">

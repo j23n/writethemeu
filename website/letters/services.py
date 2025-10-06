@@ -145,6 +145,22 @@ class LocationContext:
     def has_constituencies(self) -> bool:
         return bool(self.constituencies)
 
+    def parliament_ids(self) -> Set[int]:
+        ids: Set[int] = set()
+        for constituency in self.constituencies:
+            if constituency.parliament_term_id:
+                ids.add(constituency.parliament_term.parliament_id)
+        return ids
+
+    def filtered_constituencies(self, parliament_ids: Optional[Set[int]]) -> List[Constituency]:
+        if not parliament_ids:
+            return list(self.constituencies)
+        return [
+            constituency
+            for constituency in self.constituencies
+            if constituency.parliament_term.parliament_id in parliament_ids
+        ]
+
 
 class ConstituencyLocator:
     """Heuristic mapping from postal codes to broad constituencies."""
@@ -1023,7 +1039,7 @@ class IdentityVerificationService:
         postal_code = (verification_data.get('postal_code') or '').strip()
         located = ConstituencyLocator.locate(postal_code) if postal_code else LocatedConstituencies(None, None, None)
         constituency = located.local or located.state or located.federal
-
+        
         expires_at_value = verification_data.get('expires_at')
         expires_at = None
         if expires_at_value:
@@ -1044,17 +1060,81 @@ class IdentityVerificationService:
             'verification_data': verification_data,
             'verified_at': timezone.now(),
             'expires_at': expires_at,
+            'verification_type': 'THIRD_PARTY',
         }
 
-        if constituency:
-            defaults['constituency'] = constituency
-            defaults['parliament_term'] = constituency.parliament_term
-            defaults['parliament'] = constituency.parliament_term.parliament
+        defaults['constituency'] = constituency
+        defaults['federal_constituency'] = located.federal
+        defaults['state_constituency'] = located.state
 
         verification, _ = IdentityVerification.objects.update_or_create(
             user=user,
             defaults=defaults,
         )
+        verification._update_parliament_links()
+        verification.save(update_fields=[
+            'provider',
+            'status',
+            'street_address',
+            'postal_code',
+            'city',
+            'state',
+            'country',
+            'verification_data',
+            'verified_at',
+            'expires_at',
+            'constituency',
+            'federal_constituency',
+            'state_constituency',
+            'parliament_term',
+            'parliament',
+            'verification_type',
+        ])
+        return verification
+
+    @staticmethod
+    def self_declare(
+        user,
+        federal_constituency: Optional['Constituency'] = None,
+        state_constituency: Optional['Constituency'] = None,
+    ) -> Optional['IdentityVerification']:
+        from .models import IdentityVerification
+
+        verification, _ = IdentityVerification.objects.get_or_create(
+            user=user,
+            defaults={'provider': 'self_declared'}
+        )
+
+        verification.provider = 'self_declared'
+        verification.status = 'SELF_DECLARED'
+        verification.verification_type = 'SELF_DECLARED'
+        verification.federal_constituency = federal_constituency
+        verification.state_constituency = state_constituency
+        verification.constituency = federal_constituency or state_constituency
+
+        state_value = verification.state
+        for constituency in filter(None, [federal_constituency, state_constituency]):
+            metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
+            if metadata_state:
+                state_value = metadata_state
+                break
+
+        if state_value:
+            verification.state = state_value
+        verification.country = verification.country or 'DE'
+        verification.verified_at = timezone.now()
+        verification.expires_at = None
+
+        verification_data = verification.verification_data or {}
+        verification_data['self_declared'] = True
+        if federal_constituency:
+            verification_data['federal_constituency_id'] = federal_constituency.id
+        if state_constituency:
+            verification_data['state_constituency_id'] = state_constituency.id
+        verification.verification_data = verification_data
+
+        verification._update_parliament_links()
+        verification.save()
         return verification
 
 
@@ -1092,25 +1172,25 @@ class ConstituencySuggestionService:
         matched_topics = cls._match_topics(tokens)
         primary_topic = matched_topics[0] if matched_topics else None
 
-        # Get direct representatives (based on location only)
-        direct_reps = cls._get_direct_representatives(location, limit=5)
+        relevant_parliament_ids = cls._determine_relevant_parliament_ids(matched_topics, location)
 
-        # Get expert representatives (based on topic, excluding directs to avoid overlap)
+        direct_reps = cls._get_direct_representatives(location, relevant_parliament_ids, limit=5)
+
         expert_reps = cls._get_expert_representatives(
             tokens,
             matched_topics,
             location,
+            relevant_parliament_ids,
             exclude_ids={r.id for r in direct_reps},
             limit=5
         )
 
-        # Combine for backward compatibility
         representatives = direct_reps + expert_reps
 
         suggested_tags = cls._match_tags(tokens, matched_topics)
         suggested_level = cls._infer_level(primary_topic, location, tokens)
         explanation = cls._build_explanation(primary_topic, location, tokens)
-        constituencies = location.constituencies
+        constituencies = location.filtered_constituencies(relevant_parliament_ids) or location.constituencies
 
         return {
             'suggested_level': suggested_level,
@@ -1124,6 +1204,7 @@ class ConstituencySuggestionService:
             'suggested_tags': suggested_tags,
             'keywords': tokens,
             'explanation': explanation,
+            'parliament_ids': list(relevant_parliament_ids),
         }
 
     # ------------------------------------------------------------------
@@ -1141,21 +1222,48 @@ class ConstituencySuggestionService:
     @classmethod
     def _resolve_location(cls, user_location: Dict[str, str]) -> LocationContext:
         postal_code = (user_location.get('postal_code') or '').strip()
-        located = ConstituencyLocator.locate(postal_code) if postal_code else LocatedConstituencies(None, None, None)
-        constituencies = [
-            constituency
-            for constituency in (located.local, located.state, located.federal)
-            if constituency
-        ]
+        constituencies: List[Constituency] = []
+
+        provided_constituencies = user_location.get('constituencies')
+        if provided_constituencies:
+            iterable = provided_constituencies if isinstance(provided_constituencies, (list, tuple, set)) else [provided_constituencies]
+            for item in iterable:
+                constituency = None
+                if isinstance(item, Constituency):
+                    constituency = item
+                else:
+                    try:
+                        constituency_id = int(item)
+                    except (TypeError, ValueError):
+                        constituency_id = None
+                    if constituency_id:
+                        constituency = Constituency.objects.filter(id=constituency_id).first()
+                if constituency and all(c.id != constituency.id for c in constituencies):
+                    constituencies.append(constituency)
+
+        if not constituencies and postal_code:
+            located = ConstituencyLocator.locate(postal_code)
+            constituencies.extend(
+                constituency
+                for constituency in (located.local, located.state, located.federal)
+                if constituency
+            )
+        else:
+            located = LocatedConstituencies(None, None, None)
 
         explicit_state = normalize_german_state(user_location.get('state')) if user_location.get('state') else None
         inferred_state = None
         for constituency in constituencies:
-            metadata_state = (constituency.metadata or {}).get('state')
+            metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
             if metadata_state:
                 inferred_state = normalize_german_state(metadata_state)
                 if inferred_state:
                     break
+
+        if not inferred_state and postal_code and not constituencies and located.state:
+            metadata_state = (located.state.metadata or {}).get('state') if located.state and located.state.metadata else None
+            if metadata_state:
+                inferred_state = normalize_german_state(metadata_state)
 
         state = explicit_state or inferred_state
 
@@ -1193,6 +1301,67 @@ class ConstituencySuggestionService:
         if not ranked:
             ranked = sorted(topics, key=lambda item: item.name)
         return ranked[: cls.MAX_TOPICS]
+
+    @classmethod
+    def _determine_relevant_parliament_ids(
+        cls,
+        topics: List[TopicArea],
+        location: LocationContext,
+    ) -> Set[int]:
+        parliament_ids: Set[int] = set()
+        location_parliament_ids = location.parliament_ids()
+        state_code = location.state
+
+        def add_state_parliaments():
+            if not state_code:
+                return
+            state_matches = Parliament.objects.filter(
+                level='STATE',
+                region__iexact=state_code
+            ).values_list('id', flat=True)
+            parliament_ids.update(state_matches)
+
+        def add_federal_parliaments():
+            federal_matches = Parliament.objects.filter(level='FEDERAL').values_list('id', flat=True)
+            parliament_ids.update(federal_matches)
+
+        for topic in topics:
+            if topic.primary_level == 'EU':
+                eu_ids = Parliament.objects.filter(level='EU').values_list('id', flat=True)
+                parliament_ids.update(eu_ids)
+
+            if topic.primary_level == 'STATE' or topic.competency_type == 'STATE':
+                add_state_parliaments()
+
+            if topic.primary_level == 'FEDERAL' or topic.competency_type == 'EXCLUSIVE':
+                add_federal_parliaments()
+
+            if topic.competency_type == 'CONCURRENT' or topic.primary_level == 'MIXED':
+                add_state_parliaments()
+                add_federal_parliaments()
+
+            for committee in topic.committees.all():
+                if committee.parliament_term_id:
+                    parliament_ids.add(committee.parliament_term.parliament_id)
+
+            topic_parliament_ids = topic.representatives.values_list('parliament_id', flat=True)
+            parliament_ids.update(topic_parliament_ids)
+
+        if not parliament_ids:
+            parliament_ids.update(location_parliament_ids)
+
+        if not parliament_ids:
+            add_federal_parliaments()
+
+        if parliament_ids and location_parliament_ids:
+            intersection = parliament_ids & location_parliament_ids
+            if intersection:
+                parliament_ids = intersection
+
+        if not parliament_ids and state_code:
+            add_state_parliaments()
+
+        return parliament_ids
 
     @classmethod
     def _topic_terms(cls, topics: List[TopicArea]) -> Set[str]:
@@ -1243,29 +1412,29 @@ class ConstituencySuggestionService:
         Direct means: represents a specific geographic area (constituency or state),
         not a general list representative.
         """
-        # List representatives at federal/state level represent everyone, not direct
-        if representative.election_mode in ('FEDERAL_LIST', 'STATE_LIST'):
+        # Federal-wide list representatives represent everyone, not direct
+        if representative.election_mode == 'FEDERAL_LIST':
             return False
 
         # EU representatives represent all EU citizens, not direct
         if representative.election_mode == 'EU_LIST':
             return False
 
-        # If we have constituency match, they're direct
+        # Representatives explicitly linked to one of the user's constituencies qualify
         rep_constituencies = list(representative.constituencies.all())
-        if constituency_ids and any(c.id in constituency_ids for c in rep_constituencies):
+        rep_constituency_ids = {c.id for c in rep_constituencies}
+        if constituency_ids & rep_constituency_ids:
             return True
 
-        # If we have state match and they're DIRECT or STATE_REGIONAL_LIST, they're direct
-        if location.state:
+        # Only list mandates can fall back to the overall state alignment
+        if location.state and representative.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
             rep_states = {
                 normalize_german_state((c.metadata or {}).get('state'))
                 for c in rep_constituencies
                 if (c.metadata or {}).get('state')
             }
             if location.state in rep_states:
-                if representative.election_mode in ('DIRECT', 'STATE_REGIONAL_LIST'):
-                    return True
+                return True
 
         return False
 
@@ -1273,6 +1442,7 @@ class ConstituencySuggestionService:
     def _get_direct_representatives(
         cls,
         location: LocationContext,
+        parliament_ids: Set[int],
         limit: int = 5
     ) -> List[Representative]:
         """
@@ -1291,9 +1461,15 @@ class ConstituencySuggestionService:
             'committee_memberships__committee__topic_areas'
         )
 
+        if parliament_ids:
+            base_qs = base_qs.filter(parliament_id__in=parliament_ids)
+
+        relevant_constituencies = location.filtered_constituencies(parliament_ids)
+        constituencies = relevant_constituencies or location.constituencies
+
         location_filter = Q()
-        if location.has_constituencies:
-            location_filter |= Q(constituencies__in=location.constituencies)
+        if constituencies:
+            location_filter |= Q(constituencies__in=constituencies)
         if location.state:
             location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)
 
@@ -1302,12 +1478,13 @@ class ConstituencySuggestionService:
         if not candidates:
             return []
 
-        constituency_ids = {c.id for c in location.constituencies}
+        constituency_ids = {c.id for c in constituencies}
         direct_reps = []
 
         for rep in candidates:
             if cls._is_direct_representative(rep, location, constituency_ids):
                 rep_constituencies = list(rep.constituencies.all())
+                rep_constituency_ids = {c.id for c in rep_constituencies}
                 # Set suggested constituency
                 matched_constituency = None
                 if constituency_ids:
@@ -1324,11 +1501,22 @@ class ConstituencySuggestionService:
                 if not matched_constituency and rep_constituencies:
                     matched_constituency = rep_constituencies[0]
                 rep.suggested_constituency = matched_constituency
-
+                rep._primary_constituency_match = bool(rep_constituency_ids & constituency_ids)
                 direct_reps.append(rep)
 
-        # Sort by name
-        direct_reps.sort(key=lambda r: (r.last_name, r.first_name))
+        # Prioritise constituency matches before broader state matches
+        def direct_rank(rep: Representative) -> Tuple[int, str, str]:
+            primary_match = getattr(rep, '_primary_constituency_match', False)
+            election_mode = rep.election_mode or ''
+            if primary_match and election_mode == 'DIRECT':
+                priority = 0
+            elif primary_match:
+                priority = 1
+            else:
+                priority = 2
+            return (priority, rep.last_name, rep.first_name)
+
+        direct_reps.sort(key=direct_rank)
 
         return direct_reps[:limit]
 
@@ -1338,6 +1526,7 @@ class ConstituencySuggestionService:
         tokens: List[str],
         matched_topics: List[TopicArea],
         location: LocationContext,
+        parliament_ids: Set[int],
         exclude_ids: Set[int],
         limit: int = 5
     ) -> List[Representative]:
@@ -1359,6 +1548,9 @@ class ConstituencySuggestionService:
             'committee_memberships__committee'
         )
 
+        if parliament_ids:
+            base_qs = base_qs.filter(parliament_id__in=parliament_ids)
+
         # Get search terms from tokens and topics
         search_terms = set(tokens)
         search_terms.update(cls._topic_terms(matched_topics))
@@ -1368,7 +1560,10 @@ class ConstituencySuggestionService:
         candidates = []
         if location.has_constituencies or location.state:
             location_filter = Q()
-            if location.has_constituencies:
+            relevant_constituencies = location.filtered_constituencies(parliament_ids)
+            if relevant_constituencies:
+                location_filter |= Q(constituencies__in=relevant_constituencies)
+            elif location.has_constituencies:
                 location_filter |= Q(constituencies__in=location.constituencies)
             if location.state:
                 location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)

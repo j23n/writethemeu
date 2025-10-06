@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from .constants import normalize_german_state
-from .models import Letter, Representative, Signature, Report, Tag
+from .models import Letter, Representative, Signature, Report, Tag, Constituency
 
 
 class UserRegisterForm(UserCreationForm):
@@ -21,14 +21,6 @@ class UserRegisterForm(UserCreationForm):
 
 class LetterForm(forms.ModelForm):
     """Form for creating and editing letters"""
-
-    postal_code = forms.CharField(
-        required=False,
-        max_length=10,
-        label=_('Postal code (PLZ)'),
-        help_text=_('Use your PLZ to narrow down representatives from your parliament.'),
-        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': _('e.g. 10115')})
-    )
 
     tags = forms.CharField(
         required=False,
@@ -62,8 +54,6 @@ class LetterForm(forms.ModelForm):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        from .services import ConstituencyLocator
-
         base_queryset = (
             Representative.objects.filter(is_active=True)
             .select_related('parliament', 'parliament_term')
@@ -72,41 +62,29 @@ class LetterForm(forms.ModelForm):
         filtered_queryset = base_queryset
 
         target_constituencies = []
-        target_state = None
+        target_states = set()
 
         if self.user and hasattr(self.user, 'identity_verification'):
             verification = getattr(self.user, 'identity_verification', None)
             if verification and verification.is_verified:
-                if not self.data and verification.postal_code:
-                    self.fields['postal_code'].initial = verification.postal_code
-                if verification.constituency:
-                    target_constituencies.append(verification.constituency)
+                for constituency in verification.get_constituencies():
+                    if constituency not in target_constituencies:
+                        target_constituencies.append(constituency)
+                    metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
+                    normalized_metadata_state = normalize_german_state(metadata_state) if metadata_state else None
+                    if normalized_metadata_state:
+                        target_states.add(normalized_metadata_state)
                 if verification.normalized_state:
-                    target_state = verification.normalized_state
-
-        postal_code_value = None
-        if self.data:
-            postal_code_value = self.data.get('postal_code')
-        elif 'postal_code' in self.initial:
-            postal_code_value = self.initial.get('postal_code')
-
-        if postal_code_value:
-            located = ConstituencyLocator.locate(postal_code_value)
-            for constituency in filter(None, (located.local, located.state, located.federal)):
-                target_constituencies.append(constituency)
-                if not target_state:
-                    state_hint = normalize_german_state(constituency.metadata.get('state')) if constituency.metadata else None
-                    if state_hint:
-                        target_state = state_hint
+                    target_states.add(verification.normalized_state)
 
         constituency_filter = Q()
         for constituency in target_constituencies:
             constituency_filter |= Q(constituencies=constituency)
 
         state_filter = Q()
-        if target_state:
-            state_filter |= Q(constituencies__metadata__state=target_state)
-            state_filter |= Q(parliament__region__iexact=target_state)
+        for state in target_states:
+            state_filter |= Q(constituencies__metadata__state=state)
+            state_filter |= Q(parliament__region__iexact=state)
 
         combined_filter = constituency_filter | state_filter
         eu_filter = Q(parliament__level='EU')
@@ -215,3 +193,69 @@ class LetterSearchForm(forms.Form):
         required=False,
         widget=forms.HiddenInput()
     )
+
+
+class SelfDeclaredConstituencyForm(forms.Form):
+    """Allow users to self-declare their constituencies."""
+
+    federal_constituency = forms.ModelChoiceField(
+        queryset=Constituency.objects.none(),
+        required=False,
+        label=_('Bundestag constituency'),
+        help_text=_('Pick your Bundestag direct mandate constituency (Wahlkreis).'),
+        empty_label=_('Select constituency')
+    )
+    state_constituency = forms.ModelChoiceField(
+        queryset=Constituency.objects.none(),
+        required=False,
+        label=_('State parliament constituency'),
+        help_text=_('Optionally pick your Landtag constituency if applicable.'),
+        empty_label=_('Select constituency')
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        federal_qs = Constituency.objects.filter(
+            parliament_term__parliament__level='FEDERAL',
+            scope__in=['FEDERAL_DISTRICT']
+        ).select_related('parliament_term__parliament').order_by('name')
+        state_qs = Constituency.objects.filter(
+            parliament_term__parliament__level='STATE',
+            scope__in=['STATE_DISTRICT', 'STATE_REGIONAL_LIST', 'STATE_LIST']
+        ).select_related('parliament_term__parliament').order_by(
+            'parliament_term__parliament__name', 'name'
+        )
+
+        self.fields['federal_constituency'].queryset = federal_qs
+        self.fields['state_constituency'].queryset = state_qs
+        self.fields['federal_constituency'].widget.attrs.update({'class': 'form-select'})
+        self.fields['state_constituency'].widget.attrs.update({'class': 'form-select'})
+
+        if self.user and hasattr(self.user, 'identity_verification'):
+            verification = getattr(self.user, 'identity_verification', None)
+            if verification:
+                if verification.federal_constituency_id:
+                    self.fields['federal_constituency'].initial = verification.federal_constituency_id
+                elif (
+                    verification.constituency_id
+                    and verification.constituency
+                    and verification.constituency.parliament.level == 'FEDERAL'
+                ):
+                    self.fields['federal_constituency'].initial = verification.constituency_id
+
+                if verification.state_constituency_id:
+                    self.fields['state_constituency'].initial = verification.state_constituency_id
+
+    def clean(self):
+        cleaned_data = super().clean()
+        federal = cleaned_data.get('federal_constituency')
+        state = cleaned_data.get('state_constituency')
+
+        if not federal and not state:
+            raise forms.ValidationError(
+                _('Please select at least one constituency to save your profile.')
+            )
+
+        return cleaned_data
