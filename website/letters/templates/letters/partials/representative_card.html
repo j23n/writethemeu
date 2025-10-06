@@ -1,0 +1,40 @@
+{% load i18n %}
+<div class="d-flex align-items-start gap-3 representative-card">
+    {% if representative.photo_url %}
+        <img src="{{ representative.photo_url }}"
+             alt="{{ representative.full_name }}"
+             class="img-fluid rounded shadow-sm"
+             style="width: 110px; max-height: 140px; object-fit: cover;">
+    {% endif %}
+    <div class="flex-grow-1">
+        <h5 class="mb-1">{{ representative.full_name }}</h5>
+        <p class="mb-1 text-muted small">
+            {% if representative.party %}
+                <span class="badge bg-secondary me-1">{{ representative.party }}</span>
+            {% endif %}
+            {{ representative.parliament.name }}
+            {% if constituency %}
+                · {% trans "Constituency" %}: {{ constituency.name }}
+            {% elif representative.primary_constituency %}
+                · {% trans "Constituency" %}: {{ representative.primary_constituency.name }}
+            {% endif %}
+        </p>
+        <p class="mb-1 small text-muted">
+            {% trans "Mandate" %}: {{ representative.get_election_mode_display }}
+            {% if representative.term_start %}
+                · {% trans "Since" %} {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}
+            {% endif %}
+        </p>
+        <p class="mb-2 small">
+            {% if representative.email %}
+                <strong>{% trans "Email" %}:</strong> <a href="mailto:{{ representative.email }}">{{ representative.email }}</a><br>
+            {% endif %}
+            {% if representative.website %}
+                <strong>{% trans "Website" %}:</strong> <a href="{{ representative.website }}" target="_blank" rel="noopener">{{ representative.website }}</a>
+            {% endif %}
+        </p>
+        <a href="{% url 'representative_detail' representative.id %}" class="small">
+            {% trans "View profile" %} →
+        </a>
+    </div>
+</div>

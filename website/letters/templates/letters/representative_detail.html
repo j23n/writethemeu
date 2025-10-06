@@ -13,8 +13,16 @@
                 <h2 class="mb-0">{{ representative.full_name }}</h2>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
+                <div class="row align-items-start">
+                    {% if representative.photo_url %}
+                    <div class="col-md-3 text-center mb-3 mb-md-0">
+                        <img src="{{ representative.photo_url }}"
+                             alt="{{ representative.full_name }}"
+                             class="img-fluid rounded shadow-sm"
+                             style="max-height: 220px; object-fit: cover;">
+                    </div>
+                    {% endif %}
+                    <div class="{% if representative.photo_url %}col-md-5{% else %}col-md-6{% endif %}">
                         <p class="mb-2">
                             <strong>{% trans "Party:" %}</strong>
                             <span class="badge bg-secondary">{{ representative.party }}</span>
@@ -34,6 +42,25 @@
                         {% endif %}
                     </div>
                     <div class="col-md-6">
+                        <p class="mb-2">
+                            <strong>{% trans "Term:" %}</strong>
+                            {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}
+                            {% if representative.term_end %}
+                                - {{ representative.term_end|date:"SHORT_DATE_FORMAT" }}
+                            {% else %}
+                                - {% trans "Present" %}
+                            {% endif %}
+                        </p>
+                        <p class="mb-2">
+                            <strong>{% trans "Status:" %}</strong>
+                            {% if representative.is_active %}
+                                <span class="badge bg-success">{% trans "Active" %}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">{% trans "Inactive" %}</span>
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="{% if representative.photo_url %}col-md-4{% else %}col-md-6{% endif %}">
                         <p class="mb-2">
                             <strong>{% trans "Term:" %}</strong>
                             {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}

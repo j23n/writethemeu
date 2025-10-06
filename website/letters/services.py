@@ -14,13 +14,16 @@ from __future__ import annotations
 import json
 import logging
 import re
+import mimetypes
 from datetime import datetime, date
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import requests
 from django.db import transaction
 from django.db.models import Q
+from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
@@ -96,6 +99,10 @@ class AbgeordnetenwatchAPI:
     @classmethod
     def get_electoral_list(cls, list_id: int) -> Dict:
         return cls._request(f'electoral-lists/{list_id}')['data']
+
+    @classmethod
+    def get_politician(cls, politician_id: int) -> Dict:
+        return cls._request(f'politicians/{politician_id}')['data']
 
     @classmethod
     def get_committees(cls, parliament_period_id: Optional[int] = None) -> List[Dict]:
@@ -225,7 +232,10 @@ class RepresentativeSyncService:
             'committees_updated': 0,
             'memberships_created': 0,
             'memberships_updated': 0,
+            'photos_downloaded': 0,
         }
+        self._politician_cache: Dict[str, Dict[str, Any]] = {}
+        self._photo_url_cache: Dict[str, Optional[str]] = {}
 
     # --------------------------------------
     @classmethod
@@ -353,12 +363,100 @@ class RepresentativeSyncService:
             if m.get('type') == 'mandate' and m.get('electoral_data', {}).get('mandate_won')
         ]
 
+    def _get_politician_details(self, politician_id: Optional[int]) -> Dict[str, Any]:
+        if not politician_id:
+            return {}
+        cache_key = str(politician_id)
+        if cache_key in self._politician_cache:
+            return self._politician_cache[cache_key]
+        try:
+            details = AbgeordnetenwatchAPI.get_politician(politician_id)
+        except Exception:
+            logger.warning("Failed to fetch politician %s", politician_id, exc_info=True)
+            details = {}
+        self._politician_cache[cache_key] = details
+        return details
+
+    def _find_photo_url(self, politician: Dict[str, Any]) -> Optional[str]:
+        image_data = politician.get('image')
+        candidates: List[str] = []
+        if isinstance(image_data, dict):
+            candidates.extend([
+                image_data.get('url'),
+                image_data.get('original'),
+                image_data.get('source'),
+            ])
+            versions = image_data.get('versions')
+            if isinstance(versions, dict):
+                for value in versions.values():
+                    if isinstance(value, str):
+                        candidates.append(value)
+                    elif isinstance(value, dict):
+                        candidates.append(value.get('url'))
+        for candidate in candidates:
+            if candidate:
+                return candidate
+
+        profile_url = politician.get('abgeordnetenwatch_url') or politician.get('url')
+        if not profile_url:
+            return None
+        if profile_url in self._photo_url_cache:
+            return self._photo_url_cache[profile_url]
+        try:
+            response = requests.get(profile_url, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.debug("Failed to load profile page for %s", profile_url, exc_info=True)
+            self._photo_url_cache[profile_url] = None
+            return None
+
+        match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', response.text)
+        if not match:
+            match = re.search(r'<meta[^>]+content="([^"]+)"[^>]+property="og:image"', response.text)
+        photo_url = match.group(1) if match else None
+        self._photo_url_cache[profile_url] = photo_url
+        return photo_url
+
+    def _download_representative_image(self, photo_url: Optional[str], representative: Representative) -> Optional[str]:
+        if not photo_url:
+            return None
+        try:
+            response = requests.get(photo_url, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException:
+            logger.warning("Failed to download photo for %s", representative.full_name, exc_info=True)
+            return None
+
+        content_type = (response.headers.get('Content-Type') or '').split(';')[0]
+        extension = None
+        if content_type:
+            extension = mimetypes.guess_extension(content_type)
+        if extension in ('.jpe', '.jpeg'):
+            extension = '.jpg'
+        if not extension:
+            extension = Path(photo_url).suffix.split('?')[0] or '.jpg'
+        if not extension.startswith('.'):
+            extension = f'.{extension}'
+        if extension.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
+            extension = '.jpg'
+
+        media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
+        media_dir.mkdir(parents=True, exist_ok=True)
+        filename = f"{representative.external_id}{extension}"
+        file_path = media_dir / filename
+        file_path.write_bytes(response.content)
+        self.stats['photos_downloaded'] += 1
+        return f"representatives/{filename}"
+
     # --------------------------------------
     def _import_representative(self, mandate: Dict, parliament: Parliament, term: ParliamentTerm) -> None:
         electoral = mandate.get('electoral_data') or {}
         politician = mandate.get('politician') or {}
         mandate_id = str(mandate.get('id'))
         politician_id = politician.get('id')
+        detailed_politician = self._get_politician_details(politician_id)
+        if detailed_politician:
+            politician = {**politician, **detailed_politician}
         first_name, last_name = self._split_name(politician.get('label', ''))
         party_name = normalize_party_name(self._extract_party_name(mandate))
         election_mode = self._derive_election_mode(parliament, electoral)
@@ -396,6 +494,17 @@ class RepresentativeSyncService:
         rep.constituencies.clear()
         for constituency in self._determine_constituencies(parliament, term, electoral, rep):
             rep.constituencies.add(constituency)
+
+        if not self.dry_run:
+            existing_photo_path = Path(settings.MEDIA_ROOT) / rep.photo_path if rep.photo_path else None
+            needs_download = not (existing_photo_path and existing_photo_path.exists())
+            if needs_download:
+                photo_url = self._find_photo_url(politician)
+                photo_path = self._download_representative_image(photo_url, rep) if photo_url else None
+                if photo_path and rep.photo_path != photo_path:
+                    rep.photo_path = photo_path
+                    rep.photo_updated_at = timezone.now()
+                    rep.save(update_fields=['photo_path', 'photo_updated_at'])
 
     # --------------------------------------
     def _determine_constituencies(
@@ -929,6 +1038,15 @@ class ConstituencySuggestionService:
     MAX_REPRESENTATIVES = 5
     MAX_TAGS = 5
 
+    STOPWORDS = {
+        'und', 'der', 'die', 'das', 'den', 'dem', 'des', 'ein', 'eine', 'einer', 'einem',
+        'für', 'mit', 'von', 'auf', 'bei', 'aus', 'zur', 'zum', 'vom', 'beim', 'ans',
+        'ist', 'sind', 'war', 'waren', 'wird', 'werden', 'hat', 'haben', 'kann', 'können',
+        'soll', 'sollen', 'muss', 'müssen', 'darf', 'dürfen', 'will', 'wollen',
+        'ich', 'du', 'er', 'sie', 'es', 'wir', 'ihr', 'man', 'wie', 'was', 'wer', 'aber',
+        'auch', 'nur', 'noch', 'mehr', 'sehr', 'als', 'bis', 'oder', 'doch', 'denn',
+    }
+
     @classmethod
     def suggest_from_concern(
         cls,
@@ -939,13 +1057,22 @@ class ConstituencySuggestionService:
         location = cls._resolve_location(user_location or {})
         matched_topics = cls._match_topics(tokens)
         primary_topic = matched_topics[0] if matched_topics else None
-        representatives = cls._rank_representatives(
+
+        # Get direct representatives (based on location only)
+        direct_reps = cls._get_direct_representatives(location, limit=5)
+
+        # Get expert representatives (based on topic, excluding directs to avoid overlap)
+        expert_reps = cls._get_expert_representatives(
             tokens,
             matched_topics,
             location,
-            limit=cls.MAX_REPRESENTATIVES,
-            primary_topic=primary_topic,
+            exclude_ids={r.id for r in direct_reps},
+            limit=5
         )
+
+        # Combine for backward compatibility
+        representatives = direct_reps + expert_reps
+
         suggested_tags = cls._match_tags(tokens, matched_topics)
         suggested_level = cls._infer_level(primary_topic, location, tokens)
         explanation = cls._build_explanation(primary_topic, location, tokens)
@@ -955,7 +1082,9 @@ class ConstituencySuggestionService:
             'suggested_level': suggested_level,
             'primary_topic': primary_topic,
             'matched_topics': matched_topics,
-            'representatives': representatives,
+            'representatives': representatives,  # Keep for backward compatibility
+            'direct_representatives': direct_reps,
+            'expert_representatives': expert_reps,
             'suggested_constituencies': constituencies,
             'constituencies': constituencies,
             'suggested_tags': suggested_tags,
@@ -971,7 +1100,7 @@ class ConstituencySuggestionService:
         tokens = []
         for raw_token in cls.KEYWORD_PATTERN.findall(text.lower()):
             token = raw_token.strip('-_')
-            if len(token) >= cls.MIN_TOKEN_LENGTH:
+            if len(token) >= cls.MIN_TOKEN_LENGTH and token not in cls.STOPWORDS:
                 tokens.append(token)
         return tokens
 
@@ -1039,6 +1168,234 @@ class ConstituencySuggestionService:
             if topic.keywords:
                 terms.update(cls._extract_tokens(topic.keywords))
         return terms
+
+    @classmethod
+    def _split_representatives(
+        cls,
+        representatives: List[Representative],
+        location: LocationContext
+    ) -> Tuple[List[Representative], List[Representative]]:
+        """
+        Split representatives into two groups:
+        1. Direct representatives: Those with geographic connection to user
+        2. Subject experts: Those with relevant committee expertise
+        """
+        direct_reps = []
+        expert_reps = []
+
+        constituency_ids = {c.id for c in location.constituencies}
+
+        for rep in representatives:
+            is_direct = cls._is_direct_representative(rep, location, constituency_ids)
+
+            if is_direct:
+                direct_reps.append(rep)
+            else:
+                # Only include in experts if they have committee memberships
+                if rep.committee_memberships.exists():
+                    expert_reps.append(rep)
+
+        return direct_reps, expert_reps
+
+    @classmethod
+    def _is_direct_representative(
+        cls,
+        representative: Representative,
+        location: LocationContext,
+        constituency_ids: Set[int]
+    ) -> bool:
+        """
+        Determine if a representative is a 'direct' representative for the user.
+        Direct means: represents a specific geographic area (constituency or state),
+        not a general list representative.
+        """
+        # List representatives at federal/state level represent everyone, not direct
+        if representative.election_mode in ('FEDERAL_LIST', 'STATE_LIST'):
+            return False
+
+        # EU representatives represent all EU citizens, not direct
+        if representative.election_mode == 'EU_LIST':
+            return False
+
+        # If we have constituency match, they're direct
+        rep_constituencies = list(representative.constituencies.all())
+        if constituency_ids and any(c.id in constituency_ids for c in rep_constituencies):
+            return True
+
+        # If we have state match and they're DIRECT or STATE_REGIONAL_LIST, they're direct
+        if location.state:
+            rep_states = {
+                normalize_german_state((c.metadata or {}).get('state'))
+                for c in rep_constituencies
+                if (c.metadata or {}).get('state')
+            }
+            if location.state in rep_states:
+                if representative.election_mode in ('DIRECT', 'STATE_REGIONAL_LIST'):
+                    return True
+
+        return False
+
+    @classmethod
+    def _get_direct_representatives(
+        cls,
+        location: LocationContext,
+        limit: int = 5
+    ) -> List[Representative]:
+        """
+        Get direct representatives based purely on geographic location.
+        Returns representatives from the user's constituency/state regardless of topic.
+        """
+        if not location.has_constituencies and not location.state:
+            return []
+
+        base_qs = Representative.objects.filter(is_active=True).select_related(
+            'parliament', 'parliament_term'
+        ).prefetch_related(
+            'constituencies',
+            'committee_memberships__committee'
+        )
+
+        location_filter = Q()
+        if location.has_constituencies:
+            location_filter |= Q(constituencies__in=location.constituencies)
+        if location.state:
+            location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)
+
+        candidates = list(base_qs.filter(location_filter).distinct()[:50])
+
+        if not candidates:
+            return []
+
+        constituency_ids = {c.id for c in location.constituencies}
+        direct_reps = []
+
+        for rep in candidates:
+            if cls._is_direct_representative(rep, location, constituency_ids):
+                rep_constituencies = list(rep.constituencies.all())
+                # Set suggested constituency
+                matched_constituency = None
+                if constituency_ids:
+                    for constituency in rep_constituencies:
+                        if constituency.id in constituency_ids:
+                            matched_constituency = constituency
+                            break
+                if not matched_constituency and location.state:
+                    for constituency in rep_constituencies:
+                        metadata_state = normalize_german_state((constituency.metadata or {}).get('state'))
+                        if metadata_state and metadata_state == location.state:
+                            matched_constituency = constituency
+                            break
+                if not matched_constituency and rep_constituencies:
+                    matched_constituency = rep_constituencies[0]
+                rep.suggested_constituency = matched_constituency
+
+                direct_reps.append(rep)
+
+        # Sort by name
+        direct_reps.sort(key=lambda r: (r.last_name, r.first_name))
+
+        return direct_reps[:limit]
+
+    @classmethod
+    def _get_expert_representatives(
+        cls,
+        tokens: List[str],
+        matched_topics: List[TopicArea],
+        location: LocationContext,
+        exclude_ids: Set[int],
+        limit: int = 5
+    ) -> List[Representative]:
+        """
+        Get expert representatives based on topic expertise.
+        Searches across all representatives for committee/focus area matches.
+        """
+        if not tokens and not matched_topics:
+            return []
+
+        base_qs = Representative.objects.filter(
+            is_active=True
+        ).exclude(
+            id__in=exclude_ids
+        ).select_related(
+            'parliament', 'parliament_term'
+        ).prefetch_related(
+            'constituencies',
+            'committee_memberships__committee'
+        )
+
+        # Get search terms from tokens and topics
+        search_terms = set(tokens)
+        search_terms.update(cls._topic_terms(matched_topics))
+        search_terms = {term for term in search_terms if len(term) >= cls.MIN_TOKEN_LENGTH}
+
+        # Get candidates (prioritize from user's location if available, but don't filter exclusively)
+        candidates = []
+        if location.has_constituencies or location.state:
+            location_filter = Q()
+            if location.has_constituencies:
+                location_filter |= Q(constituencies__in=location.constituencies)
+            if location.state:
+                location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)
+
+            # Get local candidates first
+            local_candidates = list(base_qs.filter(location_filter).distinct()[:30])
+            candidates.extend(local_candidates)
+
+            # Add some non-local candidates too
+            if len(local_candidates) < 30:
+                other_candidates = list(base_qs.exclude(
+                    id__in=[c.id for c in local_candidates]
+                )[:30 - len(local_candidates)])
+                candidates.extend(other_candidates)
+        else:
+            candidates = list(base_qs[:50])
+
+        if not candidates:
+            return []
+
+        # Score by expertise
+        scored = []
+        for rep in candidates:
+            expertise_score = 0
+
+            # Committee expertise (primary indicator)
+            committee_keywords = []
+            relevant_committees = []
+            for membership in rep.committee_memberships.all():
+                if membership.committee.keywords:
+                    committee_keywords.extend(membership.committee.get_keywords_list())
+                    # Check if this committee is relevant
+                    for term in search_terms:
+                        if term in ' '.join(membership.committee.get_keywords_list()).lower():
+                            relevant_committees.append(membership)
+                            break
+
+            committee_blob = ' '.join(committee_keywords).lower()
+            for term in search_terms:
+                if term and term in committee_blob:
+                    expertise_score += 5
+
+            # Focus areas (secondary indicator)
+            focus_blob = ' '.join(filter(None, [rep.party, rep.focus_areas or ''])).lower()
+            for term in search_terms:
+                if term and term in focus_blob:
+                    expertise_score += 2
+
+            # Only include reps with actual expertise
+            if expertise_score > 0:
+                rep.expertise_score = expertise_score
+                rep.relevant_committees = relevant_committees[:1]  # Store top committee
+
+                # Set suggested constituency
+                rep_constituencies = list(rep.constituencies.all())
+                rep.suggested_constituency = rep_constituencies[0] if rep_constituencies else None
+
+                scored.append((expertise_score, rep))
+
+        # Sort by expertise score
+        scored.sort(key=lambda item: (-item[0], item[1].last_name, item[1].first_name))
+
+        return [rep for score, rep in scored[:limit]]
 
     @classmethod
     def _rank_representatives(
@@ -1109,39 +1466,42 @@ class ConstituencySuggestionService:
                 matched_constituency = rep_constituencies[0]
             representative.suggested_constituency = matched_constituency
 
-            focus_blob = ' '.join(filter(None, [representative.party, representative.focus_areas or ''])).lower()
+            is_direct = cls._is_direct_representative(representative, location, constituency_ids)
 
-            # Build committee keywords blob
+            # Calculate geographic relevance score (for direct representatives)
+            geo_score = 0
+            if is_direct:
+                if constituency_ids and any(c.id in constituency_ids for c in rep_constituencies):
+                    geo_score += 20  # Exact constituency match
+                elif location.state and location.state in rep_states:
+                    geo_score += 10  # State match
+
+            # Calculate subject expertise score (for all representatives)
+            expertise_score = 0
+
+            # Committee expertise (primary indicator)
             committee_keywords = []
             for membership in representative.committee_memberships.all():
                 if membership.committee.keywords:
                     committee_keywords.extend(membership.committee.get_keywords_list())
             committee_blob = ' '.join(committee_keywords).lower()
 
-            score = 0
-            direct_state_match = False
-            if constituency_ids and any(c.id in constituency_ids for c in rep_constituencies):
-                score += 6
-                if representative.election_mode == 'DIRECT':
-                    score += 10
-            elif location.state and location.state in rep_states:
-                score += 3
-                if representative.election_mode == 'DIRECT':
-                    score += 10
-                    direct_state_match = True
-
-            # Score based on focus areas
-            for term in search_terms:
-                if term and term in focus_blob:
-                    score += 2
-
-            # Score based on committee work - higher weight for committee expertise
             for term in search_terms:
                 if term and term in committee_blob:
-                    score += 4  # Higher score for committee expertise
+                    expertise_score += 5
 
-            if representative.election_mode == 'DIRECT' and not direct_state_match:
-                score += 2
+            # Focus areas (secondary indicator)
+            focus_blob = ' '.join(filter(None, [representative.party, representative.focus_areas or ''])).lower()
+            for term in search_terms:
+                if term and term in focus_blob:
+                    expertise_score += 2
+
+            # Total score combines geography and expertise
+            score = geo_score + expertise_score
+
+            # Store separate scores for potential display/sorting
+            representative.geo_score = geo_score
+            representative.expertise_score = expertise_score
 
             scored.append((score, representative))
 

@@ -43,7 +43,6 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.locale.LocaleMiddleware',  # Language detection
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -63,6 +62,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'django.template.context_processors.media',
             ],
         },
     },
@@ -104,31 +104,23 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'de'  # Default to German
+LANGUAGE_CODE = 'de'
 
-TIME_ZONE = 'Europe/Berlin'  # German timezone
+TIME_ZONE = 'Europe/Berlin'
 
-USE_I18N = True  # Enable internationalization
-USE_L10N = True  # Enable localized formatting (dates, numbers)
+USE_I18N = False
+USE_L10N = True
 
 USE_TZ = True
-
-# Supported languages
-LANGUAGES = [
-    ('de', 'Deutsch'),
-    ('en', 'English'),
-]
-
-# Path for translation files
-LOCALE_PATHS = [
-    BASE_DIR / 'locale',
-]
 
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # Authentication settings
 LOGIN_URL = 'login'
@@ -142,7 +134,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Authentication settings
 LOGIN_REDIRECT_URL = 'letter_list'
-LOGIN_URL = 'login'
+LOGOUT_REDIRECT_URL = 'letter_list'
 
 
 # Constituency boundary data

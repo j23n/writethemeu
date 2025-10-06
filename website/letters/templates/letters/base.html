@@ -152,21 +152,6 @@
     <footer>
         <div class="container">
             <p>&copy; 2025 WriteThem.eu - {% trans "Empowering citizens to write to their representatives" %}</p>
-
-            <!-- Language Switcher -->
-            <form action="{% url 'set_language' %}" method="post" style="display: inline-block; margin-left: 20px;">
-                {% csrf_token %}
-                <input name="next" type="hidden" value="{{ request.get_full_path }}">
-                <select name="language" onchange="this.form.submit()" style="padding: 0.3rem; border-radius: 3px;">
-                    {% get_current_language as LANGUAGE_CODE %}
-                    {% get_available_languages as LANGUAGES %}
-                    {% for lang_code, lang_name in LANGUAGES %}
-                        <option value="{{ lang_code }}"{% if lang_code == LANGUAGE_CODE %} selected{% endif %}>
-                            {{ lang_name }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </form>
         </div>
     </footer>
 

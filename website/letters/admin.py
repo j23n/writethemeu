@@ -36,7 +36,7 @@ class RepresentativeAdmin(admin.ModelAdmin):
     list_display = ['full_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active', 'term_start', 'term_end']
     list_filter = ['is_active', 'parliament__level', 'party', 'parliament_term__name', 'election_mode']
     search_fields = ['first_name', 'last_name', 'party', 'parliament__name', 'parliament_term__name']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'photo_updated_at']
     raw_id_fields = ['parliament', 'parliament_term']
     filter_horizontal = ['constituencies']
 

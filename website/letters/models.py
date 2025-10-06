@@ -182,6 +182,8 @@ class Representative(models.Model):
     phone = models.CharField(max_length=50, blank=True)
     website = models.URLField(blank=True)
     focus_areas = models.TextField(blank=True)
+    photo_path = models.CharField(max_length=255, blank=True)
+    photo_updated_at = models.DateTimeField(null=True, blank=True)
     term_start = models.DateField(null=True, blank=True)
     term_end = models.DateField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -217,6 +219,13 @@ class Representative(models.Model):
         if not self.focus_areas:
             return []
         return [area.strip() for area in self.focus_areas.split(',') if area.strip()]
+
+    @property
+    def photo_url(self):
+        if self.photo_path:
+            from django.conf import settings
+            return settings.MEDIA_URL + self.photo_path
+        return ''
 
     def qualifies_as_constituent(self, verification: 'IdentityVerification') -> bool:
         if not verification or not verification.is_verified:
