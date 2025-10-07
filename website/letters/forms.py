@@ -22,15 +22,9 @@ class UserRegisterForm(UserCreationForm):
 class LetterForm(forms.ModelForm):
     """Form for creating and editing letters"""
 
-    tags = forms.CharField(
-        required=False,
-        help_text=_('Comma-separated tags (e.g., "climate, transport, education")'),
-        widget=forms.TextInput(attrs={'placeholder': _('climate, transport, education')})
-    )
-
     class Meta:
         model = Letter
-        fields = ['title', 'body', 'representative', 'tags']
+        fields = ['title', 'body', 'representative']
         labels = {
             'title': _('Title'),
             'body': _('Letter Body'),
@@ -95,32 +89,6 @@ class LetterForm(forms.ModelForm):
             filtered_queryset = base_queryset
 
         self.fields['representative'].queryset = filtered_queryset
-
-        # Pre-populate tags field if editing
-        if self.instance.pk:
-            self.fields['tags'].initial = ', '.join(
-                tag.name for tag in self.instance.tags.all()
-            )
-
-    def save(self, commit=True):
-        letter = super().save(commit=False)
-
-        if commit:
-            letter.save()
-
-            # Handle tags
-            letter.tags.clear()
-            tags_input = self.cleaned_data.get('tags', '')
-            if tags_input:
-                tag_names = [name.strip() for name in tags_input.split(',') if name.strip()]
-                for tag_name in tag_names:
-                    tag, _ = Tag.objects.get_or_create(
-                        name=tag_name,
-                        defaults={'slug': tag_name.lower().replace(' ', '-')}
-                    )
-                    letter.tags.add(tag)
-
-        return letter
 
 
 
@@ -230,8 +198,14 @@ class SelfDeclaredConstituencyForm(forms.Form):
 
         self.fields['federal_constituency'].queryset = federal_qs
         self.fields['state_constituency'].queryset = state_qs
-        self.fields['federal_constituency'].widget.attrs.update({'class': 'form-select'})
-        self.fields['state_constituency'].widget.attrs.update({'class': 'form-select'})
+        self.fields['federal_constituency'].widget.attrs.update({
+            'class': 'form-select filterable-select',
+            'data-live-search': 'true'
+        })
+        self.fields['state_constituency'].widget.attrs.update({
+            'class': 'form-select filterable-select',
+            'data-live-search': 'true'
+        })
 
         if self.user and hasattr(self.user, 'identity_verification'):
             verification = getattr(self.user, 'identity_verification', None)
