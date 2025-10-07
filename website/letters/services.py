@@ -1315,7 +1315,7 @@ class ConstituencySuggestionService:
             location,
             relevant_parliament_ids,
             exclude_ids={r.id for r in direct_reps},
-            limit=5
+            limit=15
         )
 
         representatives = direct_reps + expert_reps
@@ -1427,7 +1427,13 @@ class ConstituencySuggestionService:
             haystack = ' '.join(
                 filter(None, [topic.name, topic.description, topic.keywords])
             ).lower()
-            score = sum(haystack.count(token) for token in tokens)
+            # Use word boundary matching to avoid substring false positives
+            score = 0
+            for token in tokens:
+                # Match token as whole word (surrounded by word boundaries)
+                pattern = r'\b' + re.escape(token) + r'\b'
+                matches = re.findall(pattern, haystack)
+                score += len(matches)
             scores.append((score, topic))
 
         ranked = [topic for score, topic in sorted(scores, key=lambda item: (-item[0], item[1].name)) if score > 0]
@@ -1589,11 +1595,15 @@ class ConstituencySuggestionService:
         """
         Get direct representatives based purely on geographic location.
         Returns representatives from the user's constituency/state regardless of topic.
+        Only includes direct mandate representatives (DIRECT election mode).
         """
         if not location.has_constituencies and not location.state:
             return []
 
-        base_qs = Representative.objects.filter(is_active=True).select_related(
+        base_qs = Representative.objects.filter(
+            is_active=True,
+            election_mode='DIRECT'
+        ).select_related(
             'parliament', 'parliament_term'
         ).prefetch_related(
             'constituencies',
@@ -1650,16 +1660,10 @@ class ConstituencySuggestionService:
                 rep._primary_constituency_match = bool(rep_constituency_ids & constituency_ids)
                 direct_reps.append(rep)
 
-        # Prioritise constituency matches before broader state matches
+        # Prioritise constituency matches (all are already DIRECT election mode)
         def direct_rank(rep: Representative) -> Tuple[int, str, str]:
             primary_match = getattr(rep, '_primary_constituency_match', False)
-            election_mode = rep.election_mode or ''
-            if primary_match and election_mode == 'DIRECT':
-                priority = 0
-            elif primary_match:
-                priority = 1
-            else:
-                priority = 2
+            priority = 0 if primary_match else 1
             return (priority, rep.last_name, rep.first_name)
 
         direct_reps.sort(key=direct_rank)
@@ -1674,108 +1678,67 @@ class ConstituencySuggestionService:
         location: LocationContext,
         parliament_ids: Set[int],
         exclude_ids: Set[int],
-        limit: int = 5
+        limit: int = 15
     ) -> List[Representative]:
         """
         Get expert representatives based on topic expertise.
-        Searches across all representatives for committee/focus area matches.
+        Simply returns representatives who have the matched TopicAreas assigned.
         """
-        if not tokens and not matched_topics:
+        if not matched_topics:
             return []
 
-        base_qs = Representative.objects.filter(
-            is_active=True
+        # Find representatives with the matched topic areas
+        reps = Representative.objects.filter(
+            is_active=True,
+            topic_areas__in=matched_topics
         ).exclude(
             id__in=exclude_ids
         ).select_related(
             'parliament', 'parliament_term'
         ).prefetch_related(
             'constituencies',
-            'committee_memberships__committee'
-        )
+            'committee_memberships__committee__topic_areas'
+        ).distinct()
 
         if parliament_ids:
-            base_qs = base_qs.filter(parliament_id__in=parliament_ids)
+            reps = reps.filter(parliament_id__in=parliament_ids)
 
-        # Get search terms from tokens and topics
-        search_terms = set(tokens)
-        search_terms.update(cls._topic_terms(matched_topics))
-        search_terms = {term for term in search_terms if len(term) >= cls.MIN_TOKEN_LENGTH}
-
-        # Get candidates (prioritize from user's location if available, but don't filter exclusively)
-        candidates = []
-        if location.has_constituencies or location.state:
-            location_filter = Q()
-            relevant_constituencies = location.filtered_constituencies(parliament_ids)
-            if relevant_constituencies:
-                location_filter |= Q(constituencies__in=relevant_constituencies)
-            elif location.has_constituencies and not parliament_ids:
-                location_filter |= Q(constituencies__in=location.constituencies)
-            if location.state:
-                location_filter |= Q(constituencies__metadata__state__iexact=location.state) | Q(parliament__region__iexact=location.state)
-
-            # Get local candidates first
-            local_candidates = list(base_qs.filter(location_filter).distinct()[:30])
-            candidates.extend(local_candidates)
-
-            # Add some non-local candidates too
-            if len(local_candidates) < 30:
-                other_candidates = list(base_qs.exclude(
-                    id__in=[c.id for c in local_candidates]
-                )[:30 - len(local_candidates)])
-                candidates.extend(other_candidates)
-        else:
-            candidates = list(base_qs[:50])
-
-        if not candidates:
-            return []
-
-        # Score by expertise
-        scored = []
-        for rep in candidates:
-            expertise_score = 0
-
-            # Committee expertise (primary indicator)
-            committee_keywords = []
+        # Enrich with metadata and score for sorting
+        scored_reps = []
+        for rep in reps:
+            # Find a relevant committee
+            matched_topic_ids = {t.id for t in matched_topics}
             relevant_committees = []
+            best_score = 0
+
             for membership in rep.committee_memberships.all():
-                if membership.committee.keywords:
-                    committee_keywords.extend(membership.committee.get_keywords_list())
-                committee_keywords.extend(
-                    membership.committee.topic_areas.values_list('name', flat=True)
-                )
-                # Check if this committee is relevant
-                for term in search_terms:
-                    if term in ' '.join(membership.committee.get_keywords_list()).lower():
-                        relevant_committees.append(membership)
-                        break
+                committee_topic_ids = set(membership.committee.topic_areas.values_list('id', flat=True))
+                if committee_topic_ids & matched_topic_ids:
+                    relevant_committees.append(membership)
+                    # Score based on role
+                    role_scores = {
+                        'chair': 3,
+                        'deputy_chair': 2,
+                        'foreperson': 2,
+                        'member': 1,
+                        'alternate_member': 0,
+                    }
+                    score = role_scores.get(membership.role, 0)
+                    best_score = max(best_score, score)
 
-            committee_blob = ' '.join(committee_keywords).lower()
-            for term in search_terms:
-                if term and term in committee_blob:
-                    expertise_score += 5
+            rep.relevant_committees = relevant_committees[:1]
+            rep.committee_score = best_score
 
-            # Focus areas (secondary indicator)
-            focus_blob = ' '.join(filter(None, [rep.party, rep.focus_areas or ''])).lower()
-            for term in search_terms:
-                if term and term in focus_blob:
-                    expertise_score += 2
+            # Set suggested constituency
+            rep_constituencies = list(rep.constituencies.all())
+            rep.suggested_constituency = rep_constituencies[0] if rep_constituencies else None
 
-            # Only include reps with actual expertise
-            if expertise_score > 0:
-                rep.expertise_score = expertise_score
-                rep.relevant_committees = relevant_committees[:1]  # Store top committee
+            scored_reps.append(rep)
 
-                # Set suggested constituency
-                rep_constituencies = list(rep.constituencies.all())
-                rep.suggested_constituency = rep_constituencies[0] if rep_constituencies else None
+        # Sort by committee score (higher first), then by name
+        scored_reps.sort(key=lambda r: (-r.committee_score, r.last_name, r.first_name))
 
-                scored.append((expertise_score, rep))
-
-        # Sort by expertise score
-        scored.sort(key=lambda item: (-item[0], item[1].last_name, item[1].first_name))
-
-        return [rep for score, rep in scored[:limit]]
+        return scored_reps[:limit]
 
     @classmethod
     def _rank_representatives(

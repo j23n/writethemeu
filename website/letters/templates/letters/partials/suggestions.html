@@ -30,6 +30,20 @@
             </div>
         </div>
 
+        <!-- Keywords -->
+        {% if keywords %}
+            <div class="card mb-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">🔑 {% trans "Related Keywords" %}</h5>
+                </div>
+                <div class="card-body">
+                    {% for keyword in keywords %}
+                        <span class="badge bg-light text-dark me-1 mb-1">{{ keyword }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
         <!-- Direct Representatives -->
         {% if suggestion_result.direct_representatives %}
             <div class="card mb-3">
@@ -103,67 +117,6 @@
                 </div>
                 <div class="card-body">
                     <p class="text-muted">{% trans "No representatives found. Representatives may need to be synced for this governmental level." %}</p>
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Suggested Tags -->
-        {% if suggestion_result.suggested_tags %}
-            <div class="card mb-3">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="mb-0">🏷️ {% trans "Suggested Tags" %}</h5>
-                </div>
-                <div class="card-body">
-                    <p class="small text-muted mb-2">{% trans "Click a tag to add it to your letter." %}</p>
-                    {% for tag in suggestion_result.suggested_tags %}
-                        <button type="button"
-                                class="btn btn-sm btn-outline-primary me-1 mb-1"
-                                onclick="appendTag('{{ tag.name|escapejs }}')">
-                            #{{ tag.name }}
-                        </button>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Keywords -->
-        {% if keywords %}
-            <div class="card mb-3">
-                <div class="card-header bg-info text-white">
-                    <h5 class="mb-0">🔑 {% trans "Related Keywords" %}</h5>
-                </div>
-                <div class="card-body">
-                    {% for keyword in keywords %}
-                        <span class="badge bg-light text-dark me-1 mb-1">{{ keyword }}</span>
-                    {% endfor %}
-                </div>
-            </div>
-        {% endif %}
-
-        <!-- Similar Letters -->
-        {% if similar_letters %}
-            <div class="card">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="mb-0">📝 {% trans "Similar Letters" %}</h5>
-                </div>
-                <div class="card-body">
-                    <p class="small text-muted mb-2">{% trans "Others have written about similar topics:" %}</p>
-                    <div class="list-group">
-                        {% for letter in similar_letters %}
-                            <a href="{% url 'letter_detail' letter.pk %}"
-                               target="_blank"
-                               class="list-group-item list-group-item-action">
-                                <div class="d-flex w-100 justify-content-between">
-                                    <h6 class="mb-1">{{ letter.title }}</h6>
-                                    <small>{% blocktrans count counter=letter.similar_signature_count|default:letter.signature_count %}{{ counter }} signature{% plural %}{{ counter }} signatures{% endblocktrans %}</small>
-                                </div>
-                                <p class="mb-1 small">
-                                    {% trans "To:" %} {{ letter.representative.full_name }} ({{ letter.representative.party }})
-                                </p>
-                                <small class="text-muted">{% trans "by" %} {{ letter.author.username }} - {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}</small>
-                            </a>
-                        {% endfor %}
-                    </div>
                 </div>
             </div>
         {% endif %}
