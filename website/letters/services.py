@@ -1095,9 +1095,14 @@ class RepresentativeSyncService:
         """Map committees to TopicAreas based on keyword overlap."""
         logger.info("Mapping committees to TopicAreas based on keyword overlap...")
 
-        committees = Committee.objects.all()
-        federal_types = ['EXCLUSIVE', 'CONCURRENT', 'DEVIATION', 'JOINT']
-        topic_areas = TopicArea.objects.filter(competency_type__in=federal_types)
+        committees = Committee.objects.select_related('parliament_term__parliament').all()
+
+        # Define topic types by parliament level
+        level_to_competency = {
+            'FEDERAL': ['EXCLUSIVE', 'CONCURRENT', 'DEVIATION', 'JOINT'],
+            'STATE': ['RESIDUAL', 'CONCURRENT', 'DEVIATION', 'JOINT'],
+            'EU': ['SHARED', 'EXCLUSIVE'],
+        }
 
         mapped_count = 0
         total_mappings = 0
@@ -1106,6 +1111,20 @@ class RepresentativeSyncService:
             committee_keywords = set(committee.get_keywords_list())
             if not committee_keywords:
                 continue
+
+            # Determine which TopicAreas are relevant for this committee's parliament level
+            parliament_level = committee.parliament_term.parliament.level
+            competency_types = level_to_competency.get(parliament_level, [])
+
+            if not competency_types:
+                logger.debug(
+                    "No competency types defined for level %s, skipping committee %s",
+                    parliament_level,
+                    committee.name
+                )
+                continue
+
+            topic_areas = TopicArea.objects.filter(competency_type__in=competency_types)
 
             matched_topics = []
             for topic in topic_areas:
