@@ -41,7 +41,7 @@
                     <div class="list-group">
                         {% for membership in memberships %}
                             <div class="list-group-item">
-                                {% include 'letters/partials/representative_card.html' with representative=membership.representative constituency=membership.representative.primary_constituency show_contact=False %}
+                                {% include 'letters/partials/representative_card.html' with representative=membership.representative constituency=membership.representative.primary_constituency show_contact=False show_profile_link=True %}
                                 <p class="text-muted small mt-2 mb-0">
                                     <strong>{% trans "Role" %}:</strong> {{ membership.get_role_display }}
                                     {% if membership.is_active %}

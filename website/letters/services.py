@@ -21,18 +21,19 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import requests
+from tqdm import tqdm
 from django.db import transaction
 from django.db.models import Q
 from django.conf import settings
 from django.utils import timezone
 from django.utils.translation import gettext as _
+from django.utils.html import strip_tags
 
 from .constants import GERMAN_STATE_ALIASES, normalize_german_state, normalize_party_name
 from .models import (
     Committee,
     CommitteeMembership,
     Constituency,
-    ElectoralDistrict,
     Parliament,
     ParliamentTerm,
     Representative,
@@ -293,7 +294,7 @@ class RepresentativeSyncService:
         logger.info("Syncing Bundestag representatives …")
         parliament, term = self._ensure_parliament_and_term(parliament_data, level='FEDERAL', region='DE')
         mandates = self._fetch_active_mandates(term)
-        for mandate in mandates:
+        for mandate in tqdm(mandates, desc="Bundestag representatives", unit="rep"):
             self._import_representative(mandate, parliament, term)
         self._sync_committees_for_term(term)
 
@@ -301,7 +302,7 @@ class RepresentativeSyncService:
         logger.info("Syncing EU parliament representatives …")
         parliament, term = self._ensure_parliament_and_term(parliament_data, level='EU', region='EU')
         mandates = self._fetch_active_mandates(term)
-        for mandate in mandates:
+        for mandate in tqdm(mandates, desc="EU Parliament representatives", unit="rep"):
             self._import_representative(mandate, parliament, term)
         self._sync_committees_for_term(term)
 
@@ -311,7 +312,7 @@ class RepresentativeSyncService:
         region = normalize_german_state(label)
         parliament, term = self._ensure_parliament_and_term(parliament_data, level='STATE', region=region)
         mandates = self._fetch_active_mandates(term)
-        for mandate in mandates:
+        for mandate in tqdm(mandates, desc=f"{label} representatives", unit="rep"):
             self._import_representative(mandate, parliament, term)
         self._sync_committees_for_term(term)
 
@@ -333,6 +334,8 @@ class RepresentativeSyncService:
             name=parliament_data.get('label', ''),
             defaults=defaults,
         )
+        parliament.last_synced_at = timezone.now()
+        parliament.save(update_fields=['last_synced_at'])
         if created:
             self.stats['parliaments_created'] += 1
         else:
@@ -361,6 +364,8 @@ class RepresentativeSyncService:
             name=current_period.get('label', 'Aktuelle Wahlperiode'),
             defaults=term_defaults,
         )
+        term.last_synced_at = timezone.now()
+        term.save(update_fields=['last_synced_at'])
         if term_created:
             self.stats['terms_created'] += 1
         else:
@@ -476,6 +481,76 @@ class RepresentativeSyncService:
         self.stats['photos_downloaded'] += 1
         return f"representatives/{filename}"
 
+    def _ensure_photo_reference(self, representative: Representative) -> Optional[Path]:
+        if representative.photo_path:
+            candidate = Path(settings.MEDIA_ROOT) / representative.photo_path
+            if candidate.exists():
+                return candidate
+
+        media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
+        if not media_dir.exists():
+            return None
+
+        for candidate in sorted(media_dir.glob(f"{representative.external_id}.*")):
+            if candidate.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
+                continue
+            representative.photo_path = f"representatives/{candidate.name}"
+            representative.photo_updated_at = representative.photo_updated_at or timezone.now()
+            representative.save(update_fields=['photo_path', 'photo_updated_at'])
+            return candidate
+        return None
+
+    @staticmethod
+    def _clean_text(value: Any) -> str:
+        if not isinstance(value, str):
+            return ''
+        return strip_tags(value).strip()
+
+    def _extract_biography(self, politician: Dict[str, Any]) -> str:
+        profile = politician.get('profile') or {}
+        for key in ('short_description', 'intro', 'text', 'description'):
+            bio = profile.get(key) or politician.get(key)
+            cleaned = self._clean_text(bio)
+            if cleaned:
+                return cleaned
+        return ''
+
+    def _extract_focus_topics(self, politician: Dict[str, Any]) -> List[str]:
+        topics: List[str] = []
+        seen: Set[str] = set()
+
+        sources = []
+        if isinstance(politician.get('politician_topics'), list):
+            sources.append(politician['politician_topics'])
+        activity_topics = (politician.get('activity') or {}).get('topics')
+        if isinstance(activity_topics, list):
+            sources.append(activity_topics)
+
+        for source in sources:
+            for topic in source:
+                if not isinstance(topic, dict):
+                    continue
+                label = topic.get('label')
+                if not label and isinstance(topic.get('topic'), dict):
+                    label = topic['topic'].get('label')
+                cleaned = self._clean_text(label)
+                if cleaned and cleaned not in seen:
+                    seen.add(cleaned)
+                    topics.append(cleaned)
+        return topics
+
+    def _extract_links(self, politician: Dict[str, Any]) -> List[Dict[str, str]]:
+        links: List[Dict[str, str]] = []
+        for entry in politician.get('links') or []:
+            if not isinstance(entry, dict):
+                continue
+            url = entry.get('url')
+            if not url:
+                continue
+            label = entry.get('label') or entry.get('type') or url
+            links.append({'label': label, 'url': url})
+        return links
+
     # --------------------------------------
     def _import_representative(self, mandate: Dict, parliament: Parliament, term: ParliamentTerm) -> None:
         electoral = mandate.get('electoral_data') or {}
@@ -510,10 +585,24 @@ class RepresentativeSyncService:
             }
         }
 
+        metadata = dict(defaults['metadata'])
+        biography = self._extract_biography(politician)
+        if biography:
+            metadata['biography'] = biography
+        focus_topics = self._extract_focus_topics(politician)
+        if focus_topics:
+            metadata['focus_topics'] = focus_topics
+        links = self._extract_links(politician)
+        if links:
+            metadata['links'] = links
+        defaults['metadata'] = metadata
+
         rep, created = Representative.objects.update_or_create(
             external_id=mandate_id,
             defaults=defaults,
         )
+        rep.last_synced_at = timezone.now()
+        rep.save(update_fields=['last_synced_at'])
         if created:
             self.stats['representatives_created'] += 1
         else:
@@ -524,7 +613,7 @@ class RepresentativeSyncService:
             rep.constituencies.add(constituency)
 
         if not self.dry_run:
-            existing_photo_path = Path(settings.MEDIA_ROOT) / rep.photo_path if rep.photo_path else None
+            existing_photo_path = self._ensure_photo_reference(rep)
             needs_download = not (existing_photo_path and existing_photo_path.exists())
             if needs_download:
                 photo_url = self._find_photo_url(politician)
@@ -533,6 +622,12 @@ class RepresentativeSyncService:
                     rep.photo_path = photo_path
                     rep.photo_updated_at = timezone.now()
                     rep.save(update_fields=['photo_path', 'photo_updated_at'])
+            else:
+                self._ensure_photo_reference(rep)
+
+        if focus_topics and not rep.focus_areas:
+            rep.focus_areas = ', '.join(focus_topics)
+            rep.save(update_fields=['focus_areas'])
 
     # --------------------------------------
     def _determine_constituencies(
@@ -582,12 +677,6 @@ class RepresentativeSyncService:
         district_id = const_data.get('id')
         state_name = normalize_german_state(self._extract_state_from_electoral(electoral, parliament))
 
-        district = self._get_or_create_district(
-            parliament,
-            name=district_name,
-            external_id=district_id,
-            metadata={'state': state_name, 'source': 'abgeordnetenwatch'},
-        )
         scope = 'FEDERAL_DISTRICT' if parliament.level == 'FEDERAL' else 'STATE_DISTRICT'
         constituency = self._get_or_create_constituency(
             term,
@@ -596,7 +685,6 @@ class RepresentativeSyncService:
             external_id=district_id,
             metadata={'state': state_name}
         )
-        constituency.districts.add(district)
         return constituency
 
     # --------------------------------------
@@ -630,36 +718,6 @@ class RepresentativeSyncService:
         return 'FEDERAL_STATE_LIST', state_name
 
     # --------------------------------------
-    def _get_or_create_district(
-        self,
-        parliament: Parliament,
-        name: str,
-        external_id: Optional[int],
-        metadata: Dict,
-    ) -> ElectoralDistrict:
-        defaults = {
-            'parliament': parliament,
-            'name': name,
-            'level': 'FEDERAL' if parliament.level == 'FEDERAL' else 'STATE',
-            'metadata': metadata,
-        }
-        if external_id:
-            district, created = ElectoralDistrict.objects.update_or_create(
-                external_id=str(external_id),
-                defaults=defaults,
-            )
-        else:
-            district, created = ElectoralDistrict.objects.update_or_create(
-                parliament=parliament,
-                name=name,
-                defaults=defaults,
-            )
-        if created:
-            self.stats['districts_created'] += 1
-        else:
-            self.stats['districts_updated'] += 1
-        return district
-
     def _get_or_create_constituency(
         self,
         term: ParliamentTerm,
@@ -687,6 +745,8 @@ class RepresentativeSyncService:
                 name=name,
                 defaults={**defaults, 'name': name},
             )
+        constituency.last_synced_at = timezone.now()
+        constituency.save(update_fields=['last_synced_at'])
         if created:
             self.stats['constituencies_created'] += 1
         else:
@@ -785,7 +845,7 @@ class RepresentativeSyncService:
 
         # Create a mapping of external committee IDs to Committee objects
         committee_map = {}
-        for committee_data in committees_data:
+        for committee_data in tqdm(committees_data, desc=f"Committees for {term.name}", unit="committee"):
             committee = self._import_committee(committee_data, term)
             if committee:
                 committee_map[committee_data['id']] = committee
@@ -794,7 +854,7 @@ class RepresentativeSyncService:
         logger.info("Syncing committee memberships for %s (fetching %d committees) …", term, len(committee_map))
 
         # Fetch memberships for each committee individually to avoid timeout
-        for committee_id, committee in committee_map.items():
+        for committee_id, committee in tqdm(committee_map.items(), desc="Committee memberships", unit="committee"):
             try:
                 memberships_data = AbgeordnetenwatchAPI.fetch_paginated(
                     'committee-memberships',
@@ -807,6 +867,7 @@ class RepresentativeSyncService:
             except Exception as e:
                 logger.error("Failed to fetch memberships for committee %s: %s", committee_id, e)
 
+        self._map_committees_to_topics()
         self._update_representative_topics(term)
 
     def _import_committee(self, committee_data: Dict, term: ParliamentTerm) -> Optional[Committee]:
@@ -820,8 +881,8 @@ class RepresentativeSyncService:
                 return None
 
             # Extract topic information
-            topics = committee_data.get('field_topics', [])
-            topic_labels = [t.get('label', '') for t in topics]
+            topics = committee_data.get('field_topics') or []
+            topic_labels = [t.get('label', '') for t in topics if isinstance(t, dict)]
 
             # Extract keywords from committee name and topics
             keywords = self._extract_committee_keywords(name, topic_labels)
@@ -850,6 +911,8 @@ class RepresentativeSyncService:
                 external_id=external_id,
                 defaults=defaults,
             )
+            committee.last_synced_at = timezone.now()
+            committee.save(update_fields=['last_synced_at'])
 
             if created:
                 self.stats['committees_created'] += 1
@@ -968,6 +1031,8 @@ class RepresentativeSyncService:
                 committee=committee,
                 defaults=defaults,
             )
+            membership.last_synced_at = timezone.now()
+            membership.save(update_fields=['last_synced_at'])
 
             if created:
                 self.stats['memberships_created'] += 1
@@ -1025,6 +1090,43 @@ class RepresentativeSyncService:
             'eligible_member': 'member',
         }
         return role_mapping.get(api_role, 'member')
+
+    def _map_committees_to_topics(self) -> None:
+        """Map committees to TopicAreas based on keyword overlap."""
+        logger.info("Mapping committees to TopicAreas based on keyword overlap...")
+
+        committees = Committee.objects.all()
+        federal_types = ['EXCLUSIVE', 'CONCURRENT', 'DEVIATION', 'JOINT']
+        topic_areas = TopicArea.objects.filter(competency_type__in=federal_types)
+
+        mapped_count = 0
+        total_mappings = 0
+
+        for committee in committees:
+            committee_keywords = set(committee.get_keywords_list())
+            if not committee_keywords:
+                continue
+
+            matched_topics = []
+            for topic in topic_areas:
+                topic_keywords = set(topic.get_keywords_list())
+                overlap = committee_keywords & topic_keywords
+
+                if len(overlap) >= 1:
+                    matched_topics.append(topic)
+
+            if matched_topics:
+                committee.topic_areas.set(matched_topics)
+                mapped_count += 1
+                total_mappings += len(matched_topics)
+
+        logger.info(
+            "Committee-to-topic mapping complete: %d committees mapped to %d total topics",
+            mapped_count,
+            total_mappings
+        )
+        self.stats['committees_mapped'] = mapped_count
+        self.stats['committee_topic_mappings'] = total_mappings
 
 
 # ---------------------------------------------------------------------------
@@ -1912,4 +2014,104 @@ class TopicSuggestionService:
             'suggested_representatives': suggestion.get('representatives', [])[:limit],
             'suggested_tags': suggestion.get('suggested_tags', []),
             'explanation': suggestion.get('explanation'),
+        }
+
+
+class CommitteeTopicMappingService:
+    """Maps committees to TopicAreas based on keyword overlap."""
+
+    MIN_KEYWORD_OVERLAP = 1
+
+    @classmethod
+    def map_all_committees(cls, min_overlap: int = MIN_KEYWORD_OVERLAP) -> Dict[str, Any]:
+        """
+        Map all committees to their relevant TopicAreas based on keyword overlap.
+
+        Args:
+            min_overlap: Minimum number of overlapping keywords required for a match
+
+        Returns:
+            Dictionary with mapping statistics and details
+        """
+        committees = Committee.objects.all()
+        federal_types = ['EXCLUSIVE', 'CONCURRENT', 'DEVIATION', 'JOINT']
+        topic_areas = TopicArea.objects.filter(competency_type__in=federal_types)
+
+        stats = {
+            'total_committees': 0,
+            'mapped_committees': 0,
+            'total_mappings': 0,
+            'committees_by_topic_count': {},
+            'details': []
+        }
+
+        for committee in tqdm(committees, desc="Mapping committees to topics", unit="committee"):
+            committee_keywords = set(committee.get_keywords_list())
+            if not committee_keywords:
+                continue
+
+            stats['total_committees'] += 1
+            matched_topics = []
+
+            for topic in topic_areas:
+                topic_keywords = set(topic.get_keywords_list())
+                overlap = committee_keywords & topic_keywords
+
+                if len(overlap) >= min_overlap:
+                    matched_topics.append({
+                        'topic': topic,
+                        'overlap_count': len(overlap),
+                        'overlap_keywords': sorted(overlap)
+                    })
+
+            if matched_topics:
+                matched_topics.sort(key=lambda x: x['overlap_count'], reverse=True)
+
+                committee.topic_areas.set([m['topic'] for m in matched_topics])
+
+                stats['mapped_committees'] += 1
+                stats['total_mappings'] += len(matched_topics)
+
+                topic_count = len(matched_topics)
+                stats['committees_by_topic_count'][topic_count] = \
+                    stats['committees_by_topic_count'].get(topic_count, 0) + 1
+
+                stats['details'].append({
+                    'committee': committee.name,
+                    'committee_keywords': sorted(committee_keywords),
+                    'matched_topics': [
+                        {
+                            'name': m['topic'].name,
+                            'overlap_count': m['overlap_count'],
+                            'overlap_keywords': m['overlap_keywords']
+                        }
+                        for m in matched_topics
+                    ]
+                })
+
+        return stats
+
+    @classmethod
+    def get_committee_mapping_report(cls, committee: Committee) -> Dict[str, Any]:
+        """Get detailed mapping report for a specific committee."""
+        committee_keywords = set(committee.get_keywords_list())
+        topic_areas = list(committee.topic_areas.all())
+
+        matches = []
+        for topic in topic_areas:
+            topic_keywords = set(topic.get_keywords_list())
+            overlap = committee_keywords & topic_keywords
+            matches.append({
+                'topic_name': topic.name,
+                'topic_type': topic.competency_type,
+                'overlap_count': len(overlap),
+                'overlap_keywords': sorted(overlap),
+                'topic_keywords': sorted(topic_keywords),
+            })
+
+        return {
+            'committee_name': committee.name,
+            'committee_keywords': sorted(committee_keywords),
+            'matched_topics': matches,
+            'match_count': len(matches),
         }

@@ -14,12 +14,10 @@
             <div class="card-body">
                 {% include 'letters/partials/representative_card.html' with representative=representative constituency=representative.primary_constituency %}
 
-                {% if topic_areas %}
+                {% if representative.biography %}
                 <div class="mt-3">
-                    <strong>{% trans "Focus Topics" %}:</strong>
-                    {% for topic in topic_areas %}
-                        <span class="badge bg-light text-dark border me-1">{{ topic.name }}</span>
-                    {% endfor %}
+                    <h5>{% trans "Über" %} {{ representative.full_name }}</h5>
+                    <p class="mb-0">{{ representative.biography }}</p>
                 </div>
                 {% endif %}
             </div>
@@ -126,6 +124,20 @@
                 {% endif %}
 
                 <hr>
+
+                {% if representative.contact_links %}
+                <div class="mb-3">
+                    <h6>{% trans "Kontakt" %}</h6>
+                    <ul class="small mb-2">
+                        {% for link in representative.contact_links %}
+                            <li>
+                                <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }}</a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                <hr>
+                {% endif %}
 
                 <div>
                     <h6>{% trans "Write a Letter" %}</h6>

@@ -1,4 +1,4 @@
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 from django.db import models
 from django.contrib.auth.models import User
@@ -40,6 +40,7 @@ class Parliament(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['level', 'name']
@@ -66,6 +67,7 @@ class ParliamentTerm(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['parliament__level', 'parliament__name', 'name']
@@ -73,40 +75,6 @@ class ParliamentTerm(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.parliament.name})"
-
-
-class ElectoralDistrict(models.Model):
-    """Individual electoral district used to define constituencies."""
-
-    DISTRICT_LEVEL_CHOICES = [
-        ('FEDERAL', _('Federal district')),
-        ('STATE', _('State district')),
-        ('REGIONAL', _('Regional district')),
-    ]
-
-    parliament = models.ForeignKey(
-        Parliament,
-        on_delete=models.CASCADE,
-        related_name='electoral_districts'
-    )
-    name = models.CharField(max_length=255)
-    code = models.CharField(max_length=50, blank=True)
-    external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
-    level = models.CharField(max_length=20, choices=DISTRICT_LEVEL_CHOICES)
-    metadata = models.JSONField(default=dict, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['parliament__level', 'name']
-        indexes = [
-            models.Index(fields=['parliament', 'code']),
-            models.Index(fields=['parliament', 'level']),
-        ]
-
-    def __str__(self):
-        return f"{self.name} ({self.code})" if self.code else self.name
 
 
 class Constituency(models.Model):
@@ -130,15 +98,11 @@ class Constituency(models.Model):
     name = models.CharField(max_length=255)
     external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
     scope = models.CharField(max_length=30, choices=SCOPE_CHOICES)
-    districts = models.ManyToManyField(
-        ElectoralDistrict,
-        blank=True,
-        related_name='constituencies'
-    )
     metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['parliament_term__parliament__level', 'name']
@@ -198,6 +162,7 @@ class Representative(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['last_name', 'first_name']
@@ -222,10 +187,14 @@ class Representative(models.Model):
             self._constituency_cache = constituencies
         return constituencies[0] if constituencies else None
 
+    def get_metadata_value(self, key: str, default=None):
+        metadata = self.metadata or {}
+        return metadata.get(key, default)
+
     def get_focus_areas_list(self):
-        if not self.focus_areas:
-            return []
-        return [area.strip() for area in self.focus_areas.split(',') if area.strip()]
+        if self.focus_areas:
+            return [area.strip() for area in self.focus_areas.split(',') if area.strip()]
+        return self.focus_topics
 
     @property
     def photo_url(self):
@@ -233,6 +202,37 @@ class Representative(models.Model):
             from django.conf import settings
             return settings.MEDIA_URL + self.photo_path
         return ''
+
+    @property
+    def biography(self) -> str:
+        value = self.get_metadata_value('biography', '')
+        if isinstance(value, str):
+            return value.strip()
+        return ''
+
+    @property
+    def focus_topics(self) -> List[str]:
+        value = self.get_metadata_value('focus_topics', [])
+        if isinstance(value, list):
+            return [topic for topic in value if isinstance(topic, str) and topic.strip()]
+        if isinstance(value, str):
+            return [topic.strip() for topic in value.split(',') if topic.strip()]
+        return []
+
+    @property
+    def contact_links(self) -> List[Dict[str, str]]:
+        links = self.get_metadata_value('links', [])
+        cleaned: List[Dict[str, str]] = []
+        if isinstance(links, list):
+            for link in links:
+                if not isinstance(link, dict):
+                    continue
+                url = link.get('url')
+                if not url:
+                    continue
+                label = link.get('label') or link.get('type') or url
+                cleaned.append({'label': label, 'url': url})
+        return cleaned
 
     def qualifies_as_constituent(self, verification: 'IdentityVerification') -> bool:
         if not verification or not verification.is_verified:
@@ -369,6 +369,7 @@ class Committee(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['parliament_term__parliament__name', 'name']
@@ -417,6 +418,7 @@ class CommitteeMembership(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True, help_text=_('Last time this was synced from external API'))
 
     class Meta:
         ordering = ['representative', 'committee']

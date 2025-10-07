@@ -1,7 +1,8 @@
 {% load i18n %}
 {% with show_contact=show_contact|default:True %}
-{% with show_profile_link=show_profile_link|default:True %}
+{% with show_profile_link=show_profile_link|default:False %}
 {% with topics=topic_areas|default:representative.topic_areas.all %}
+{% with focus_topics=representative.focus_topics %}
 <div class="d-flex align-items-start gap-3 representative-card">
     {% if representative.photo_url %}
         <img src="{{ representative.photo_url }}"
@@ -28,11 +29,22 @@
                 · {% trans "Since" %} {{ representative.term_start|date:"SHORT_DATE_FORMAT" }}
             {% endif %}
         </p>
+        {% if focus_topics %}
+            <p class="mb-2 small">
+                <strong>{% trans "Focus" %} ({% trans "self-declared" %}):</strong>
+                {% for topic in focus_topics|slice:":3" %}
+                    <span class="badge bg-light text-dark border me-1">{{ topic }}</span>
+                {% endfor %}
+                {% if focus_topics|length > 3 %}
+                    <span class="text-muted">+{{ focus_topics|length|add:'-3' }}</span>
+                {% endif %}
+            </p>
+        {% endif %}
         {% if topics %}
             <p class="mb-2 small">
-                <strong>{% trans "Focus" %}:</strong>
+                <strong>{% trans "Committees" %}:</strong>
                 {% for topic in topics|slice:":3" %}
-                    <span class="badge bg-light text-dark border me-1">{{ topic.name }}</span>
+                    <span class="badge bg-info text-dark border me-1">{{ topic.name }}</span>
                 {% endfor %}
                 {% if topics|length > 3 %}
                     <span class="text-muted">+{{ topics|length|add:'-3' }}</span>
@@ -56,6 +68,7 @@
         {% endif %}
     </div>
 </div>
+{% endwith %}
 {% endwith %}
 {% endwith %}
 {% endwith %}

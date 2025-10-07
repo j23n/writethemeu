@@ -1,9 +1,11 @@
 from datetime import date
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from .forms import LetterForm
 from .models import (
@@ -19,7 +21,7 @@ from .models import (
     Tag,
     TopicArea,
 )
-from .services import ConstituencySuggestionService, IdentityVerificationService
+from .services import ConstituencySuggestionService, IdentityVerificationService, RepresentativeSyncService
 from .templatetags import markdown_extras
 
 
@@ -570,3 +572,69 @@ class MarkdownFilterTests(TestCase):
         self.assertIn('<ol', rendered)
         self.assertIn('<li>Eins</li>', rendered)
         self.assertIn('<li>Zwei</li>', rendered)
+
+
+class RepresentativeMetadataExtractionTests(TestCase):
+
+    def setUp(self):
+        self.service = RepresentativeSyncService(dry_run=True)
+
+    def test_extract_biography_prefers_profile(self):
+        politician = {
+            'profile': {'short_description': '<p>Kurzvita</p>'},
+            'description': 'Langtext'
+        }
+        bio = self.service._extract_biography(politician)
+        self.assertEqual(bio, 'Kurzvita')
+
+    def test_extract_focus_topics_merges_sources(self):
+        politician = {
+            'politician_topics': [{'label': 'Bildung'}, {'topic': {'label': 'Forschung'}}],
+            'activity': {'topics': [{'label': 'Forschung'}, {'label': 'Kultur'}]}
+        }
+        topics = self.service._extract_focus_topics(politician)
+        self.assertTrue({'Bildung', 'Forschung', 'Kultur'}.issubset(set(topics)))
+
+    def test_extract_links_filters_empty_entries(self):
+        politician = {
+            'links': [
+                {'label': 'Website', 'url': 'https://example.org'},
+                {'type': 'Twitter', 'url': 'https://twitter.com/example'},
+                {'label': 'Ohne URL'}
+            ]
+        }
+        links = self.service._extract_links(politician)
+        self.assertEqual(len(links), 2)
+        self.assertEqual(links[0]['label'], 'Website')
+
+    def test_ensure_photo_reference_sets_existing_path(self):
+        with TemporaryDirectory() as tmp:
+            with override_settings(MEDIA_ROOT=tmp, MEDIA_URL='/media/'):
+                service = RepresentativeSyncService(dry_run=True)
+                parliament = Parliament.objects.create(
+                    name='Testparlament',
+                    level='FEDERAL',
+                    legislative_body='Bundestag',
+                    region='DE'
+                )
+                term = ParliamentTerm.objects.create(
+                    parliament=parliament,
+                    name='Testperiode',
+                    start_date=date(2024, 1, 1)
+                )
+                rep = Representative.objects.create(
+                    parliament=parliament,
+                    parliament_term=term,
+                    election_mode='DIRECT',
+                    external_id='999',
+                    first_name='Test',
+                    last_name='Person',
+                    is_active=True
+                )
+                media_dir = Path(tmp) / 'representatives'
+                media_dir.mkdir(parents=True, exist_ok=True)
+                (media_dir / '999.jpg').write_bytes(b'fake')
+
+                service._ensure_photo_reference(rep)
+                rep.refresh_from_db()
+                self.assertEqual(rep.photo_path, 'representatives/999.jpg')

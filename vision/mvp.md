@@ -70,7 +70,7 @@ Empower citizens to participate in democracy by writing impactful open letters t
    - [ ] Add feedback/contact channel for users.
    - [ ] Track key funnel metrics (letter creation, signature conversion).
 9. **Testing & QA**
-   - [x] Expand automated test coverage (matching, verification, export workflow).
+   - [ ] Expand automated test coverage (matching, verification, export workflow).
    - [ ] QA checklist for matching accuracy, verification flow, admin exports.
 
 ## Out of Scope for MVP

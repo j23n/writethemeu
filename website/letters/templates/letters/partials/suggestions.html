@@ -45,7 +45,7 @@
                     <div class="list-group">
                         {% for rep in suggestion_result.direct_representatives %}
                             <div class="list-group-item">
-                                {% include 'letters/partials/representative_card.html' with representative=rep constituency=rep.suggested_constituency show_contact=False %}
+                                {% include 'letters/partials/representative_card.html' with representative=rep constituency=rep.suggested_constituency show_contact=False show_profile_link=True %}
                                 <div class="text-end mt-2">
                                     <button type="button"
                                             class="btn btn-sm btn-primary"
@@ -75,7 +75,7 @@
                     <div class="list-group">
                         {% for rep in suggestion_result.expert_representatives %}
                             <div class="list-group-item">
-                                {% include 'letters/partials/representative_card.html' with representative=rep constituency=rep.suggested_constituency show_contact=False %}
+                                {% include 'letters/partials/representative_card.html' with representative=rep constituency=rep.suggested_constituency show_contact=False show_profile_link=True %}
                                 {% if rep.relevant_committees %}
                                     <p class="text-success small mt-2 mb-2">
                                         ✓ {{ rep.relevant_committees.0.role }} {% trans "of" %} {{ rep.relevant_committees.0.committee.name }}

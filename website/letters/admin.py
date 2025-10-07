@@ -5,6 +5,7 @@ from django.utils.translation import gettext_lazy as _
 from .models import (
     Parliament,
     ParliamentTerm,
+    Constituency,
     Representative,
     Tag,
     TopicArea,
@@ -19,19 +20,28 @@ from .models import (
 
 @admin.register(Parliament)
 class ParliamentAdmin(admin.ModelAdmin):
-    list_display = ['name', 'level', 'legislative_body', 'region']
+    list_display = ['name', 'level', 'legislative_body', 'region', 'last_synced_at']
     list_filter = ['level', 'region']
     search_fields = ['name', 'legislative_body', 'region']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at']
 
 
 @admin.register(ParliamentTerm)
 class ParliamentTermAdmin(admin.ModelAdmin):
-    list_display = ['name', 'parliament', 'start_date', 'end_date']
+    list_display = ['name', 'parliament', 'start_date', 'end_date', 'last_synced_at']
     list_filter = ['parliament__level', 'start_date']
     search_fields = ['name', 'parliament__name']
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at']
     raw_id_fields = ['parliament']
+
+
+@admin.register(Constituency)
+class ConstituencyAdmin(admin.ModelAdmin):
+    list_display = ['name', 'scope', 'parliament_term', 'external_id', 'last_synced_at']
+    list_filter = ['scope', 'parliament_term__parliament__level']
+    search_fields = ['name', 'external_id']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at']
+    raw_id_fields = ['parliament_term']
 
 
 class CommitteeMembershipInlineForRepresentative(admin.TabularInline):
@@ -50,10 +60,10 @@ class CommitteeMembershipInlineForCommittee(admin.TabularInline):
 
 @admin.register(Representative)
 class RepresentativeAdmin(admin.ModelAdmin):
-    list_display = ['full_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active', 'term_start', 'term_end']
+    list_display = ['full_name', 'party', 'parliament', 'parliament_term', 'election_mode', 'is_active', 'last_synced_at']
     list_filter = ['is_active', 'parliament__level', 'party', 'parliament_term__name', 'election_mode']
     search_fields = ['first_name', 'last_name', 'party', 'parliament__name', 'parliament_term__name']
-    readonly_fields = ['created_at', 'updated_at', 'photo_updated_at', 'photo_preview']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at', 'photo_updated_at', 'photo_preview']
     raw_id_fields = ['parliament', 'parliament_term']
     filter_horizontal = ['constituencies', 'topic_areas']
     inlines = [CommitteeMembershipInlineForRepresentative]
@@ -73,7 +83,7 @@ class RepresentativeAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
         (_('Metadata'), {
-            'fields': ('metadata', 'created_at', 'updated_at'),
+            'fields': ('metadata', 'created_at', 'updated_at', 'last_synced_at'),
             'classes': ('collapse',)
         }),
     )
@@ -126,10 +136,10 @@ class TopicAreaAdmin(admin.ModelAdmin):
 
 @admin.register(Committee)
 class CommitteeAdmin(admin.ModelAdmin):
-    list_display = ['name', 'parliament_term', 'topic_area_list', 'member_count', 'created_at']
+    list_display = ['name', 'parliament_term', 'topic_area_list', 'member_count', 'last_synced_at']
     list_filter = ['parliament_term__parliament__level', 'topic_areas']
     search_fields = ['name', 'description', 'parliament_term__parliament__name', 'topic_areas__name']
-    readonly_fields = ['created_at', 'updated_at', 'member_count']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at', 'member_count']
     filter_horizontal = ['topic_areas']
     inlines = [CommitteeMembershipInlineForCommittee]
 
@@ -142,7 +152,7 @@ class CommitteeAdmin(admin.ModelAdmin):
             'description': 'Link this committee to TopicAreas in our taxonomy'
         }),
         ('Metadata', {
-            'fields': ('keywords', 'metadata', 'created_at', 'updated_at', 'member_count'),
+            'fields': ('keywords', 'metadata', 'created_at', 'updated_at', 'last_synced_at', 'member_count'),
             'classes': ('collapse',)
         }),
     )
@@ -159,10 +169,10 @@ class CommitteeAdmin(admin.ModelAdmin):
 
 @admin.register(CommitteeMembership)
 class CommitteeMembershipAdmin(admin.ModelAdmin):
-    list_display = ['representative', 'committee', 'role', 'is_active', 'start_date', 'end_date']
+    list_display = ['representative', 'committee', 'role', 'is_active', 'start_date', 'end_date', 'last_synced_at']
     list_filter = ['role', 'committee__parliament_term__parliament__name']
     search_fields = ['representative__first_name', 'representative__last_name', 'committee__name']
-    readonly_fields = ['created_at', 'updated_at', 'is_active']
+    readonly_fields = ['created_at', 'updated_at', 'last_synced_at', 'is_active']
     raw_id_fields = ['representative', 'committee']
 
     fieldsets = (
@@ -173,7 +183,7 @@ class CommitteeMembershipAdmin(admin.ModelAdmin):
             'fields': ('start_date', 'end_date', 'is_active')
         }),
         ('Metadata', {
-            'fields': ('metadata', 'created_at', 'updated_at'),
+            'fields': ('metadata', 'created_at', 'updated_at', 'last_synced_at'),
             'classes': ('collapse',)
         }),
     )
