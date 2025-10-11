@@ -1028,3 +1028,103 @@ class GeoJSONDataTests(TestCase):
         actual_numbers = set(wkr_numbers)
 
         self.assertEqual(actual_numbers, expected_numbers, "Constituency numbers should be 1-299 with no gaps")
+
+
+class WahlkreisLocatorTests(TestCase):
+    """Test the WahlkreisLocator service for point-in-polygon constituency matching."""
+
+    def test_locate_bundestag_building(self):
+        """Test that Bundestag coordinates (52.5186, 13.3761) find a Berlin constituency."""
+        from .services import WahlkreisLocator
+
+        locator = WahlkreisLocator()
+        result = locator.locate(52.5186, 13.3761)
+
+        self.assertIsNotNone(result, "Bundestag coordinates should find a constituency")
+        wkr_nr, wkr_name, land_name = result
+        self.assertIsInstance(wkr_nr, int)
+        self.assertGreater(wkr_nr, 0)
+        self.assertLessEqual(wkr_nr, 299)
+        self.assertIsInstance(wkr_name, str)
+        self.assertIsInstance(land_name, str)
+        self.assertIn('Berlin', land_name, "Bundestag should be in a Berlin constituency")
+
+    def test_locate_hamburg_rathaus(self):
+        """Test that Hamburg Rathaus (53.5511, 9.9937) finds a Hamburg constituency."""
+        from .services import WahlkreisLocator
+
+        locator = WahlkreisLocator()
+        result = locator.locate(53.5511, 9.9937)
+
+        self.assertIsNotNone(result, "Hamburg Rathaus coordinates should find a constituency")
+        wkr_nr, wkr_name, land_name = result
+        self.assertIsInstance(wkr_nr, int)
+        self.assertGreater(wkr_nr, 0)
+        self.assertLessEqual(wkr_nr, 299)
+        self.assertIn('Hamburg', land_name, "Hamburg Rathaus should be in a Hamburg constituency")
+
+    def test_locate_multiple_known_locations(self):
+        """Test multiple German cities to ensure accurate constituency matching."""
+        from .services import WahlkreisLocator
+
+        locator = WahlkreisLocator()
+
+        # Munich: Marienplatz (48.1374, 11.5755)
+        munich_result = locator.locate(48.1374, 11.5755)
+        self.assertIsNotNone(munich_result, "Munich coordinates should find a constituency")
+        self.assertIn('Bayern', munich_result[2], "Munich should be in Bavaria")
+
+        # Cologne: Dom (50.9413, 6.9583)
+        cologne_result = locator.locate(50.9413, 6.9583)
+        self.assertIsNotNone(cologne_result, "Cologne coordinates should find a constituency")
+        self.assertIn('Nordrhein-Westfalen', cologne_result[2], "Cologne should be in NRW")
+
+        # Frankfurt: Römer (50.1106, 8.6821)
+        frankfurt_result = locator.locate(50.1106, 8.6821)
+        self.assertIsNotNone(frankfurt_result, "Frankfurt coordinates should find a constituency")
+        self.assertIn('Hessen', frankfurt_result[2], "Frankfurt should be in Hessen")
+
+        # Dresden: Frauenkirche (51.0515, 13.7416)
+        dresden_result = locator.locate(51.0515, 13.7416)
+        self.assertIsNotNone(dresden_result, "Dresden coordinates should find a constituency")
+        self.assertIn('Sachsen', dresden_result[2], "Dresden should be in Saxony")
+
+        # Stuttgart: Schlossplatz (48.7775, 9.1797)
+        stuttgart_result = locator.locate(48.7775, 9.1797)
+        self.assertIsNotNone(stuttgart_result, "Stuttgart coordinates should find a constituency")
+        self.assertIn('Baden-Württemberg', stuttgart_result[2], "Stuttgart should be in Baden-Württemberg")
+
+    def test_coordinates_outside_germany(self):
+        """Test that coordinates outside Germany return None."""
+        from .services import WahlkreisLocator
+
+        locator = WahlkreisLocator()
+
+        # Paris, France (48.8566, 2.3522)
+        paris_result = locator.locate(48.8566, 2.3522)
+        self.assertIsNone(paris_result, "Paris coordinates should not find a German constituency")
+
+        # London, UK (51.5074, -0.1278)
+        london_result = locator.locate(51.5074, -0.1278)
+        self.assertIsNone(london_result, "London coordinates should not find a German constituency")
+
+        # New York, USA (40.7128, -74.0060)
+        nyc_result = locator.locate(40.7128, -74.0060)
+        self.assertIsNone(nyc_result, "NYC coordinates should not find a German constituency")
+
+    def test_geojson_loads_successfully(self):
+        """Test that the service can load the 44MB GeoJSON file without errors."""
+        from .services import WahlkreisLocator
+        import time
+
+        start_time = time.time()
+        locator = WahlkreisLocator()
+        load_time = time.time() - start_time
+
+        # Verify the service loaded constituencies
+        self.assertIsNotNone(locator.constituencies, "Constituencies should be loaded")
+        self.assertGreater(len(locator.constituencies), 0, "Should have loaded constituencies")
+        self.assertEqual(len(locator.constituencies), 299, "Should have loaded all 299 constituencies")
+
+        # Verify loading is reasonably fast (< 2 seconds)
+        self.assertLess(load_time, 2.0, f"GeoJSON loading took {load_time:.2f}s, should be under 2 seconds")

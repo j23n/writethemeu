@@ -339,6 +339,70 @@ class AddressGeocoder:
 
 
 # ---------------------------------------------------------------------------
+# Wahlkreis (Constituency) Locator using Point-in-Polygon matching
+# ---------------------------------------------------------------------------
+
+
+class WahlkreisLocator:
+    """Locate which Wahlkreis (constituency) a coordinate falls within using Shapely."""
+
+    def __init__(self, geojson_path=None):
+        """
+        Load and parse GeoJSON constituencies.
+
+        Args:
+            geojson_path: Path to the GeoJSON file. If None, uses settings.CONSTITUENCY_BOUNDARIES_PATH
+        """
+        from shapely.geometry import shape
+
+        if geojson_path is None:
+            geojson_path = settings.CONSTITUENCY_BOUNDARIES_PATH
+
+        self.constituencies = []
+
+        # Load and parse GeoJSON file
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Parse each feature and store geometry with properties
+        for feature in data.get('features', []):
+            properties = feature.get('properties', {})
+            wkr_nr = properties.get('WKR_NR')
+            wkr_name = properties.get('WKR_NAME', '')
+            land_name = properties.get('LAND_NAME', '')
+
+            # Parse geometry using Shapely
+            geometry = shape(feature['geometry'])
+
+            # Store as tuple: (wkr_nr, wkr_name, land_name, geometry)
+            self.constituencies.append((wkr_nr, wkr_name, land_name, geometry))
+
+    def locate(self, latitude, longitude):
+        """
+        Find constituency containing the given coordinates.
+
+        Args:
+            latitude: Latitude coordinate
+            longitude: Longitude coordinate
+
+        Returns:
+            tuple: (wkr_nr, wkr_name, land_name) or None if not found
+        """
+        from shapely.geometry import Point
+
+        # Create point from coordinates
+        point = Point(longitude, latitude)
+
+        # Iterate through constituencies and check containment
+        for wkr_nr, wkr_name, land_name, geometry in self.constituencies:
+            if geometry.contains(point):
+                return (wkr_nr, wkr_name, land_name)
+
+        # No match found
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Constituency / address helper
 # ---------------------------------------------------------------------------
 
