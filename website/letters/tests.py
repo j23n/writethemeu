@@ -752,6 +752,134 @@ class GeocodeCacheTests(TestCase):
         self.assertEqual(retrieved.street, 'Unter den Linden 77')
 
 
+class AddressGeocoderTests(TestCase):
+    """Test the AddressGeocoder service with OSM Nominatim API."""
+
+    def test_successful_geocoding_with_mocked_api(self):
+        """Test successful geocoding with mocked Nominatim API response."""
+        from unittest.mock import patch, Mock
+        from .services import AddressGeocoder
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                'lat': '52.5200066',
+                'lon': '13.404954',
+                'display_name': 'Berlin, Germany'
+            }
+        ]
+
+        with patch('requests.get', return_value=mock_response) as mock_get:
+            geocoder = AddressGeocoder()
+            lat, lon, success, error = geocoder.geocode(
+                street='Unter den Linden 77',
+                postal_code='10117',
+                city='Berlin'
+            )
+
+            self.assertTrue(success)
+            self.assertIsNone(error)
+            self.assertAlmostEqual(lat, 52.5200066, places=6)
+            self.assertAlmostEqual(lon, 13.404954, places=6)
+
+            # Verify the request was made correctly
+            mock_get.assert_called_once()
+            call_args = mock_get.call_args
+            self.assertIn('nominatim.openstreetmap.org', call_args[0][0])
+            self.assertEqual(call_args[1]['headers']['User-Agent'], 'WriteThem.eu/0.1 (civic engagement platform)')
+
+    def test_cache_hit_no_api_call(self):
+        """Test that cache hits don't make API calls."""
+        from unittest.mock import patch
+        from .models import GeocodeCache
+        from .services import AddressGeocoder
+        import hashlib
+
+        # Create a cache entry
+        address_string = 'Unter den Linden 77|10117|Berlin|DE'
+        address_hash = hashlib.sha256(address_string.encode('utf-8')).hexdigest()
+
+        GeocodeCache.objects.create(
+            address_hash=address_hash,
+            street='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin',
+            country='DE',
+            latitude=52.5200066,
+            longitude=13.404954,
+            success=True
+        )
+
+        with patch('requests.get') as mock_get:
+            geocoder = AddressGeocoder()
+            lat, lon, success, error = geocoder.geocode(
+                street='Unter den Linden 77',
+                postal_code='10117',
+                city='Berlin'
+            )
+
+            self.assertTrue(success)
+            self.assertIsNone(error)
+            self.assertAlmostEqual(lat, 52.5200066, places=6)
+            self.assertAlmostEqual(lon, 13.404954, places=6)
+
+            # Verify NO API call was made
+            mock_get.assert_not_called()
+
+    def test_failed_geocoding_cached(self):
+        """Test that failed geocoding attempts are cached."""
+        from unittest.mock import patch, Mock
+        from .models import GeocodeCache
+        from .services import AddressGeocoder
+
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []  # Empty result = not found
+
+        with patch('requests.get', return_value=mock_response):
+            geocoder = AddressGeocoder()
+            lat, lon, success, error = geocoder.geocode(
+                street='Nonexistent Street 999',
+                postal_code='99999',
+                city='Nowhere'
+            )
+
+            self.assertFalse(success)
+            self.assertIsNotNone(error)
+            self.assertIsNone(lat)
+            self.assertIsNone(lon)
+
+            # Verify the failure was cached
+            import hashlib
+            address_string = 'Nonexistent Street 999|99999|Nowhere|DE'
+            address_hash = hashlib.sha256(address_string.encode('utf-8')).hexdigest()
+
+            cache_entry = GeocodeCache.objects.get(address_hash=address_hash)
+            self.assertFalse(cache_entry.success)
+            self.assertEqual(cache_entry.error_message, error)
+
+    def test_api_error_handling(self):
+        """Test that API errors are handled gracefully."""
+        from unittest.mock import patch
+        from .services import AddressGeocoder
+        import requests
+
+        with patch('requests.get', side_effect=requests.RequestException('API Error')):
+            geocoder = AddressGeocoder()
+            lat, lon, success, error = geocoder.geocode(
+                street='Test Street',
+                postal_code='12345',
+                city='Test City'
+            )
+
+            self.assertFalse(success)
+            self.assertIsNotNone(error)
+            self.assertIsNone(lat)
+            self.assertIsNone(lon)
+            self.assertIn('API Error', error)
+
+
 class RepresentativeMetadataExtractionTests(TestCase):
 
     def setUp(self):
