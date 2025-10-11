@@ -419,6 +419,9 @@ class LocationContext:
     postal_code: Optional[str]
     state: Optional[str]
     constituencies: List[Constituency]
+    street: Optional[str] = None
+    city: Optional[str] = None
+    country: str = 'DE'
 
     @property
     def has_constituencies(self) -> bool:
@@ -1830,9 +1833,15 @@ class ConstituencySuggestionService:
 
     @classmethod
     def _resolve_location(cls, user_location: Dict[str, str]) -> LocationContext:
+        # Extract address components
         postal_code = (user_location.get('postal_code') or '').strip()
+        street = (user_location.get('street') or '').strip()
+        city = (user_location.get('city') or '').strip()
+        country = (user_location.get('country') or 'DE').upper()
+
         constituencies: List[Constituency] = []
 
+        # First, check if constituencies are provided directly
         provided_constituencies = user_location.get('constituencies')
         if provided_constituencies:
             iterable = provided_constituencies if isinstance(provided_constituencies, (list, tuple, set)) else [provided_constituencies]
@@ -1850,18 +1859,41 @@ class ConstituencySuggestionService:
                 if constituency and all(c.id != constituency.id for c in constituencies):
                     constituencies.append(constituency)
 
-        if not constituencies and postal_code:
-            located = ConstituencyLocator.locate_legacy(postal_code)
-            constituencies.extend(
-                constituency
-                for constituency in (located.local, located.state, located.federal)
-                if constituency
-            )
-        else:
-            located = LocatedConstituencies(None, None, None)
+        # If no constituencies provided, try address-based or PLZ-based lookup
+        if not constituencies:
+            locator = ConstituencyLocator()
 
+            # Try full address lookup if available
+            if street and postal_code and city:
+                # Use new address-based API
+                representatives = locator.locate(
+                    street=street,
+                    postal_code=postal_code,
+                    city=city,
+                    country=country
+                )
+
+                # Extract unique constituencies from representatives
+                constituency_ids_seen = set()
+                for rep in representatives:
+                    for constituency in rep.constituencies.all():
+                        if constituency.id not in constituency_ids_seen:
+                            constituencies.append(constituency)
+                            constituency_ids_seen.add(constituency.id)
+
+            # Fallback to PLZ-only if no full address or if address lookup failed
+            if not constituencies and postal_code:
+                located = ConstituencyLocator.locate_legacy(postal_code)
+                constituencies.extend(
+                    constituency
+                    for constituency in (located.local, located.state, located.federal)
+                    if constituency
+                )
+
+        # Determine state from various sources
         explicit_state = normalize_german_state(user_location.get('state')) if user_location.get('state') else None
         inferred_state = None
+
         for constituency in constituencies:
             metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
             if metadata_state:
@@ -1869,17 +1901,15 @@ class ConstituencySuggestionService:
                 if inferred_state:
                     break
 
-        if not inferred_state and postal_code and not constituencies and located.state:
-            metadata_state = (located.state.metadata or {}).get('state') if located.state and located.state.metadata else None
-            if metadata_state:
-                inferred_state = normalize_german_state(metadata_state)
-
         state = explicit_state or inferred_state
 
         return LocationContext(
             postal_code=postal_code or None,
             state=state,
             constituencies=constituencies,
+            street=street or None,
+            city=city or None,
+            country=country,
         )
 
     @classmethod

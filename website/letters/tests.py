@@ -688,6 +688,65 @@ class SuggestionServiceTests(ParliamentFixtureMixin, TestCase):
         self.assertNotIn(self.state_rep_list.last_name, content)
         self.assertIn(self.federal_expert_rep.last_name, content)
 
+    def test_suggest_with_full_address(self):
+        """Test that suggestions work with full address (street, postal_code, city)."""
+        from unittest.mock import patch, Mock
+
+        # Mock geocoding to return coordinates for Bundestag building
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = [
+            {
+                'lat': '52.5186',
+                'lon': '13.3761',
+                'display_name': 'Berlin, Germany'
+            }
+        ]
+
+        with patch('requests.get', return_value=mock_response):
+            result = ConstituencySuggestionService.suggest_from_concern(
+                'Mehr Verkehr und ÖPNV in Berlin Mitte',
+                user_location={
+                    'street': 'Platz der Republik 1',
+                    'postal_code': '11011',
+                    'city': 'Berlin',
+                    'country': 'DE'
+                }
+            )
+
+            # Should find representatives (direct representatives from Berlin)
+            self.assertGreater(len(result['representatives']), 0)
+            self.assertIn(self.transport_topic, result['matched_topics'])
+
+            # Should have direct representatives from Berlin
+            direct_reps = result.get('direct_representatives', [])
+            # At least one Berlin rep should be suggested
+            berlin_reps = [
+                rep for rep in direct_reps
+                if any(
+                    (c.metadata or {}).get('state') == 'Berlin'
+                    for c in rep.constituencies.all()
+                )
+            ]
+            self.assertGreater(len(berlin_reps), 0, "Should suggest at least one Berlin representative")
+
+    def test_suggest_with_plz_only_backward_compatibility(self):
+        """Test that PLZ-only suggestions still work (backward compatibility)."""
+        result = ConstituencySuggestionService.suggest_from_concern(
+            'Klimaschutz ist wichtig',
+            user_location={
+                'postal_code': '10115',  # Berlin PLZ
+            }
+        )
+
+        # Should work without crashing
+        self.assertIsInstance(result, dict)
+        self.assertIn('representatives', result)
+        self.assertIn('matched_topics', result)
+
+        # Result should be valid even if empty
+        self.assertIsInstance(result['representatives'], list)
+
 
 class CompetencyPageTests(TestCase):
     """Ensure the competency overview renders topics for visitors."""
