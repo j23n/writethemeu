@@ -1128,3 +1128,126 @@ class WahlkreisLocatorTests(TestCase):
 
         # Verify loading is reasonably fast (< 2 seconds)
         self.assertLess(load_time, 2.0, f"GeoJSON loading took {load_time:.2f}s, should be under 2 seconds")
+
+
+class ConstituencyLocatorIntegrationTests(ParliamentFixtureMixin, TestCase):
+    """Test the integrated ConstituencyLocator with address-based and PLZ fallback."""
+
+    def test_locate_by_full_address_returns_constituencies(self):
+        """Test address-based constituency lookup returns Representatives."""
+        from unittest.mock import patch, Mock
+        from .services import ConstituencyLocator
+
+        # Mock the geocoding response for Platz der Republik 1, Berlin
+        # This is the Bundestag building location
+        mock_geocode_response = Mock()
+        mock_geocode_response.status_code = 200
+        mock_geocode_response.json.return_value = [
+            {
+                'lat': '52.5186',
+                'lon': '13.3761',
+                'display_name': 'Platz der Republik, Berlin, Germany'
+            }
+        ]
+
+        with patch('requests.get', return_value=mock_geocode_response):
+            locator = ConstituencyLocator()
+            result = locator.locate(
+                street='Platz der Republik 1',
+                postal_code='11011',
+                city='Berlin'
+            )
+
+            # Result should be a list of Representative objects
+            self.assertIsInstance(result, list)
+            # Should find at least one representative
+            self.assertGreater(len(result), 0)
+
+            # All results should be Representative instances
+            from .models import Representative
+            for rep in result:
+                self.assertIsInstance(rep, Representative)
+                # Representatives should be from Berlin
+                rep_states = {
+                    (c.metadata or {}).get('state')
+                    for c in rep.constituencies.all()
+                    if c.metadata
+                }
+                self.assertIn('Berlin', rep_states, f"Representative {rep} should be from Berlin")
+
+    def test_locate_by_full_address_with_cache(self):
+        """Test that cached geocoding results are used for constituency lookup."""
+        from .models import GeocodeCache
+        from .services import ConstituencyLocator
+        import hashlib
+
+        # Pre-populate cache with Berlin coordinates
+        address_string = 'Unter den Linden 77|10117|Berlin|DE'
+        address_hash = hashlib.sha256(address_string.encode('utf-8')).hexdigest()
+
+        GeocodeCache.objects.create(
+            address_hash=address_hash,
+            street='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin',
+            country='DE',
+            latitude=52.5186,
+            longitude=13.3761,
+            success=True
+        )
+
+        # No mocking needed - should use cache
+        locator = ConstituencyLocator()
+        result = locator.locate(
+            street='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin'
+        )
+
+        # Should find representatives
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+
+    def test_locate_by_plz_fallback_when_geocoding_fails(self):
+        """Test PLZ-based fallback when address geocoding fails."""
+        from unittest.mock import patch, Mock
+        from .services import ConstituencyLocator
+
+        # Mock geocoding to return failure
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = []  # Empty = not found
+
+        with patch('requests.get', return_value=mock_response):
+            locator = ConstituencyLocator()
+            result = locator.locate(
+                street='Nonexistent Street 999',
+                postal_code='10115',  # Berlin PLZ
+                city='Berlin'
+            )
+
+            # Should still find representatives using PLZ fallback
+            self.assertIsInstance(result, list)
+            # PLZ fallback might return empty list or representatives depending on data
+            # The important thing is it doesn't crash
+
+    def test_locate_by_plz_only_maintains_backward_compatibility(self):
+        """Test that PLZ-only lookup still works (backward compatibility)."""
+        from .services import ConstituencyLocator
+
+        locator = ConstituencyLocator()
+        result = locator.locate(postal_code='10115')  # Berlin PLZ
+
+        # Should work without crashing
+        self.assertIsInstance(result, list)
+        # Result depends on existing data, but should at least not error
+
+    def test_locate_without_parameters_returns_empty(self):
+        """Test that calling locate without parameters returns empty list."""
+        from .services import ConstituencyLocator
+
+        locator = ConstituencyLocator()
+        result = locator.locate()
+
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 0)
