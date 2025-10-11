@@ -100,6 +100,14 @@
         <p style="color: #7f8c8d;">{% trans "You haven't signed any letters yet." %} <a href="{% url 'letter_list' %}">{% trans "Browse letters" %}</a></p>
     {% endif %}
 </div>
+
+<div class="card">
+    <h3>{% trans "Account" %}</h3>
+    <p class="text-muted">
+        {% trans "Need a fresh start? You can delete your account at any time. Your letters stay visible but without your name." %}
+    </p>
+    <a href="{% url 'delete_account' %}" class="btn btn-outline-danger">{% trans "Delete account" %}</a>
+</div>
 {% endblock %}
 
 {% block extra_js %}

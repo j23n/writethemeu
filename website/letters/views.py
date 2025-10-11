@@ -2,8 +2,10 @@ import re
 from collections import OrderedDict
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login
+from django.contrib.auth import login, logout
+from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db.models import Q, Count
 from django.core.paginator import Paginator
@@ -14,6 +16,11 @@ from django.http import HttpResponseRedirect, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.utils.translation import gettext_lazy as _, gettext
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.contrib.auth.tokens import default_token_generator
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
 
 from .models import Letter, Signature, Report, Representative, Tag, IdentityVerification, TopicArea, Committee
 from .forms import (
@@ -25,6 +32,27 @@ from .forms import (
     SelfDeclaredConstituencyForm
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
+
+
+def _send_activation_email(user, request):
+    """Send double opt-in activation email containing confirmation link."""
+
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    token = default_token_generator.make_token(user)
+    activation_link = request.build_absolute_uri(
+        reverse('activate_account', args=[uid, token])
+    )
+
+    context = {
+        'activation_link': activation_link,
+        'username': user.username,
+    }
+
+    subject = gettext('Confirm your WriteThem.eu account')
+    message = render_to_string('letters/emails/account_activation_email.txt', context)
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@writethem.eu')
+
+    send_mail(subject, message, from_email, [user.email], fail_silently=False)
 
 
 # Letter Views
@@ -218,14 +246,52 @@ def register(request):
     if request.method == 'POST':
         form = UserRegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            messages.success(request, gettext('Welcome, %(username)s! Your account has been created.') % {'username': user.username})
-            return redirect('letter_list')
+            user = form.save(commit=False)
+            user.is_active = False
+            user.email = form.cleaned_data['email'].strip()
+            user.save()
+
+            _send_activation_email(user, request)
+
+            messages.success(
+                request,
+                gettext('Please confirm your email address. We sent you a link to activate your account.')
+            )
+            return redirect('registration_pending')
     else:
         form = UserRegisterForm()
 
     return render(request, 'letters/register.html', {'form': form})
+
+
+def registration_pending(request):
+    """Show instructions after registration until user activates account."""
+
+    return render(request, 'letters/account_activation_sent.html')
+
+
+def activate_account(request, uidb64, token):
+    """Activate user accounts after email confirmation."""
+
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user and default_token_generator.check_token(user, token):
+        if not user.is_active:
+            user.is_active = True
+            user.save()
+            messages.success(
+                request,
+                gettext('Your account has been activated. You can now log in.')
+            )
+        else:
+            messages.info(request, gettext('Your account is already active.'))
+        return redirect('login')
+
+    return render(request, 'letters/account_activation_invalid.html', status=400)
 
 
 @login_required
@@ -271,6 +337,23 @@ def profile(request):
     }
 
     return render(request, 'letters/profile.html', context)
+
+
+@login_required
+def delete_account(request):
+    """Allow users to delete their account while preserving authored letters."""
+
+    if request.method == 'POST':
+        user = request.user
+        logout(request)
+        user.delete()
+        messages.success(
+            request,
+            gettext('Your account has been deleted. Your published letters remain available to the public.')
+        )
+        return redirect('letter_list')
+
+    return render(request, 'letters/account_delete_confirm.html')
 
 
 class CompetencyOverviewView(TemplateView):

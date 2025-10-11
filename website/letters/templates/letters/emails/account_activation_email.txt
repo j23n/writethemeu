@@ -1,0 +1,10 @@
+Hallo {{ username }},
+
+vielen Dank für deine Registrierung bei WriteThem.eu.
+Bitte bestätige deine E-Mail-Adresse, indem du auf den folgenden Link klickst:
+
+{{ activation_link }}
+
+Wenn du dieses Konto nicht erstellen wolltest, kannst du diese Nachricht ignorieren.
+
+Bis gleich auf WriteThem.eu

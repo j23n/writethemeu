@@ -1,0 +1,18 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Delete account" %} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card" style="max-width: 520px; margin: 0 auto;">
+    <h2>{% trans "Delete your account" %}</h2>
+    <p class="text-muted">
+        {% trans "Deleting your account will remove your personal data and signatures. Letters you have published stay online but are shown without your name." %}
+    </p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">{% trans "Yes, delete my account" %}</button>
+        <a href="{% url 'profile' %}" class="btn btn-secondary">{% trans "Cancel" %}</a>
+    </form>
+</div>
+{% endblock %}

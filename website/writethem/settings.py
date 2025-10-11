@@ -139,3 +139,7 @@ LOGOUT_REDIRECT_URL = 'letter_list'
 
 # Constituency boundary data
 CONSTITUENCY_BOUNDARIES_PATH = BASE_DIR / 'letters' / 'data' / 'wahlkreise_sample.geojson'
+
+# Email settings (development defaults; override in production)
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = 'noreply@writethem.eu'

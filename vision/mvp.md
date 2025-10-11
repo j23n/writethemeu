@@ -45,30 +45,37 @@ Empower citizens to participate in democracy by writing impactful open letters t
    - [x] Expand `TopicArea` taxonomy, add NLP/keyword scoring, and present explanations.
    - [x] Enrich representative metadata with committee focus, responsiveness, photos.
    - [x] Scope recommendation engine to relevant parliaments using constituency + topic competence.
-2. **Identity Verification Integration**
+2. **Account Management**
+   - [ ] Add account deletion option (removes signatures but keeps letters)
+   - [ ] Add double opt-in for account creation
+3. **UX**
+   - [ ] Add letter list sorting by signatures / verified signatures / age
+   - [ ] Add filtering based on TopicArea keywords
+   - [ ] Remove Kompetenzen info page
+   - [ ] Rudimentary branding - color scheme, bootstrap
+3. **Identity Verification Integration**
    - [ ] Build provider abstraction and connect to first reusable ID service.
    - [ ] Persist provider response (hash/ID, address) with expiry handling; skip manual verification path.
+   - [ ] Determine if providers exist offering login-provider functionality
    - [x] Support self-declared constituency verification with profile management UI.
 3. **Letter Authoring UX**
    - [x] Polish HTMX suggestions and representative cards for consistency.
    - [ ] Allow draft auto-save and clearer edit states pre-signature.
    - [ ] Add share buttons and clearer “copy link” prompt on letter detail.
-4. **Signature Threshold Workflow**
-   - [ ] Configurable thresholds per representative type, admin notification when reached.
-   - [ ] Export letters and supporters as PDF/CSV; mark fulfilment status (printed/sent).
-5. **Admin Tooling**
-   - [ ] Dedicated dashboard or extended Django admin for analytics, moderation, verification oversight.
-   - [ ] Simple stats (letters per day, signatures per letter), filters for unverified vs verified.
+   - [ ] Add minimum letter length of 500 characters.
+   - [ ] Make it very clear that letters cannot be changed after publication
+   - [ ] Make it very clear that you can remove your signature from a letter, but not the letter itself
 6. **Localization & Accessibility**
    - [ ] Complete en/de translation coverage for all templates and forms.
    - [ ] Ensure forms, buttons, and suggestions meet accessibility best practices.
 7. **Deployment Readiness**
    - [ ] Production config (secrets, logging, error tracking, email backend).
-   - [ ] Static/media hosting (e.g., S3 + CDN), WSGI deployment (Fly.io/Heroku/etc.).
-   - [ ] Health checks, Sentry or equivalent for monitoring.
+   - [ ] Deploy to VPS - static media, unicorn, nginx, docker
+   - [ ] Health checks with Tinylytics
+   - [ ] Add caching
 8. **Feedback & Analytics**
    - [ ] Add feedback/contact channel for users.
-   - [ ] Track key funnel metrics (letter creation, signature conversion).
+   - [ ] Add simple analytics app. Middleware that keeps track of impressions -> build this so it can easily be moved into a separate repo
 9. **Testing & QA**
    - [ ] Expand automated test coverage (matching, verification, export workflow).
    - [ ] QA checklist for matching accuracy, verification flow, admin exports.
@@ -78,3 +85,5 @@ Empower citizens to participate in democracy by writing impactful open letters t
 - In-browser letter editing with collaboration.
 - Advanced analytics or CRM tooling.
 - Multiple identity providers (beyond initial integration).
+- Expert matching based on representative metadata keywords
+- Biography providers, display on representative detail view and extract keywords for matching

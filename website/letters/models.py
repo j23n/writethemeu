@@ -449,7 +449,13 @@ class Letter(models.Model):
 
     title = models.CharField(max_length=255)
     body = models.TextField()
-    author = models.ForeignKey(User, on_delete=models.CASCADE, related_name='letters')
+    author = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='letters',
+        null=True,
+        blank=True,
+    )
     representative = models.ForeignKey(Representative, on_delete=models.CASCADE, related_name='letters')
     tags = models.ManyToManyField(Tag, blank=True, related_name='letters')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PUBLISHED')
@@ -471,6 +477,14 @@ class Letter(models.Model):
     @property
     def signature_count(self):
         return self.signatures.count()
+
+    @property
+    def author_display_name(self):
+        
+        if self.author:
+            full_name = self.author.get_full_name()
+            return full_name or self.author.username
+        return _('Deleted user')
 
     @property
     def verified_signature_count(self):

@@ -1,0 +1,1 @@
+- use uv run python for every python command, including manage.py, scripts, temporary fixes, etc.

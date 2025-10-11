@@ -18,6 +18,14 @@ class UserRegisterForm(UserCreationForm):
         model = User
         fields = ['username', 'email', 'first_name', 'last_name', 'password1', 'password2']
 
+    def clean_email(self):
+        email = self.cleaned_data['email'].strip()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                _('An account with this email already exists. If you registered before, please check your inbox for the activation link or reset your password.')
+            )
+        return email
+
 
 class LetterForm(forms.ModelForm):
     """Form for creating and editing letters"""

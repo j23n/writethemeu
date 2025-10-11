@@ -10,7 +10,7 @@
     </p>
 
     <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 6px;">
-        <p style="margin-bottom: 0.4rem;"><strong>Author:</strong> {{ letter.author.username }}</p>
+        <p style="margin-bottom: 0.4rem;"><strong>Author:</strong> {{ letter.author_display_name }}</p>
         <p style="margin-bottom: 0.4rem;"><strong>To:</strong> {{ letter.representative.full_name }} ({{ letter.representative.party }})</p>
         <p style="margin-bottom: 0; color: #7f8c8d; font-size: 0.9rem;">Published {{ letter.published_at|date:"M d, Y" }}</p>
     </div>

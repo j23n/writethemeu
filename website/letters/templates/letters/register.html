@@ -6,6 +6,7 @@
 {% block content %}
 <div class="card" style="max-width: 500px; margin: 0 auto;">
     <h2>{% trans "Register" %}</h2>
+    <p class="text-muted">{% trans "After registration we'll send you an email to confirm your address before you can sign in." %}</p>
 
     <form method="post">
         {% csrf_token %}

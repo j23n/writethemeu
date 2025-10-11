@@ -2,7 +2,7 @@
 <div class="card" style="margin-bottom: 1.5rem;">
     <h3><a href="{% url 'letter_detail' letter.pk %}" style="color: #2c3e50; text-decoration: none;">{{ letter.title }}</a></h3>
     <p style="color: #7f8c8d; font-size: 0.9rem;">
-        {% trans "By" %} {{ letter.author.username }} |
+        {% trans "By" %} {{ letter.author_display_name }} |
         {% trans "To" %} <a href="{% url 'representative_detail' letter.representative.id %}">{{ letter.representative.full_name }}</a> ({{ letter.representative.party }}) |
         {{ letter.representative.parliament.name }} |
         {{ letter.published_at|date:"SHORT_DATE_FORMAT" }}
