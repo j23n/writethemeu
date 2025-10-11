@@ -346,6 +346,10 @@ class AddressGeocoder:
 class WahlkreisLocator:
     """Locate which Wahlkreis (constituency) a coordinate falls within using Shapely."""
 
+    # Class-level cache for parsed constituencies
+    _cached_constituencies = None
+    _cached_path = None
+
     def __init__(self, geojson_path=None):
         """
         Load and parse GeoJSON constituencies.
@@ -358,9 +362,14 @@ class WahlkreisLocator:
         if geojson_path is None:
             geojson_path = settings.CONSTITUENCY_BOUNDARIES_PATH
 
-        self.constituencies = []
+        # Use cached constituencies if available and path matches
+        if (WahlkreisLocator._cached_constituencies is not None and
+            WahlkreisLocator._cached_path == geojson_path):
+            self.constituencies = WahlkreisLocator._cached_constituencies
+            return
 
         # Load and parse GeoJSON file
+        self.constituencies = []
         with open(geojson_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
@@ -376,6 +385,10 @@ class WahlkreisLocator:
 
             # Store as tuple: (wkr_nr, wkr_name, land_name, geometry)
             self.constituencies.append((wkr_nr, wkr_name, land_name, geometry))
+
+        # Cache the parsed constituencies
+        WahlkreisLocator._cached_constituencies = self.constituencies
+        WahlkreisLocator._cached_path = geojson_path
 
     def locate(self, latitude, longitude):
         """
