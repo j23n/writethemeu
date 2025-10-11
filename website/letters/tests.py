@@ -731,6 +731,27 @@ class MarkdownFilterTests(TestCase):
         self.assertIn('<li>Zwei</li>', rendered)
 
 
+class GeocodeCacheTests(TestCase):
+    """Test geocoding cache model."""
+
+    def test_cache_stores_and_retrieves_coordinates(self):
+        from .models import GeocodeCache
+
+        cache_entry = GeocodeCache.objects.create(
+            address_hash='test_hash_123',
+            street='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin',
+            latitude=52.5170365,
+            longitude=13.3888599,
+        )
+
+        retrieved = GeocodeCache.objects.get(address_hash='test_hash_123')
+        self.assertEqual(retrieved.latitude, 52.5170365)
+        self.assertEqual(retrieved.longitude, 13.3888599)
+        self.assertEqual(retrieved.street, 'Unter den Linden 77')
+
+
 class RepresentativeMetadataExtractionTests(TestCase):
 
     def setUp(self):

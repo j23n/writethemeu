@@ -768,3 +768,40 @@ class Report(models.Model):
 
     def __str__(self):
         return f"Report on '{self.letter.title}' - {self.get_reason_display()}"
+
+
+class GeocodeCache(models.Model):
+    """Cache geocoding results to minimize API calls."""
+
+    address_hash = models.CharField(
+        max_length=64,
+        unique=True,
+        db_index=True,
+        help_text="SHA256 hash of normalized address for fast lookup"
+    )
+    street = models.CharField(max_length=255, blank=True)
+    postal_code = models.CharField(max_length=10, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=2, default='DE')
+
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+
+    success = models.BooleanField(
+        default=True,
+        help_text="False if geocoding failed, to avoid repeated failed lookups"
+    )
+    error_message = models.TextField(blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Geocode Cache Entry"
+        verbose_name_plural = "Geocode Cache Entries"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        if self.latitude and self.longitude:
+            return f"{self.city} ({self.latitude}, {self.longitude})"
+        return f"{self.city} (failed)"
