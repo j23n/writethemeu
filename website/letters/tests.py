@@ -944,3 +944,87 @@ class RepresentativeMetadataExtractionTests(TestCase):
                 service._ensure_photo_reference(rep)
                 rep.refresh_from_db()
                 self.assertEqual(rep.photo_path, 'representatives/999.jpg')
+
+
+class GeoJSONDataTests(TestCase):
+    """Test that official Bundestag constituency GeoJSON data is available and valid."""
+
+    def test_geojson_file_exists(self):
+        """Verify the wahlkreise.geojson file exists in the data directory."""
+        from pathlib import Path
+        from django.conf import settings
+
+        geojson_path = Path(settings.BASE_DIR) / 'letters' / 'data' / 'wahlkreise.geojson'
+        self.assertTrue(geojson_path.exists(), f"GeoJSON file not found at {geojson_path}")
+
+    def test_geojson_is_valid_and_loadable(self):
+        """Verify the GeoJSON file is valid JSON and has expected structure."""
+        import json
+        from pathlib import Path
+        from django.conf import settings
+
+        geojson_path = Path(settings.BASE_DIR) / 'letters' / 'data' / 'wahlkreise.geojson'
+
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        self.assertEqual(data['type'], 'FeatureCollection')
+        self.assertIn('features', data)
+        self.assertIsInstance(data['features'], list)
+
+    def test_geojson_contains_all_constituencies(self):
+        """Verify the GeoJSON contains all 299 Bundestag constituencies."""
+        import json
+        from pathlib import Path
+        from django.conf import settings
+
+        geojson_path = Path(settings.BASE_DIR) / 'letters' / 'data' / 'wahlkreise.geojson'
+
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        self.assertEqual(len(data['features']), 299)
+
+    def test_geojson_features_have_required_properties(self):
+        """Verify each feature has required properties: WKR_NR, WKR_NAME, LAND_NR, LAND_NAME."""
+        import json
+        from pathlib import Path
+        from django.conf import settings
+
+        geojson_path = Path(settings.BASE_DIR) / 'letters' / 'data' / 'wahlkreise.geojson'
+
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Check first feature
+        if len(data['features']) > 0:
+            feature = data['features'][0]
+            self.assertEqual(feature['type'], 'Feature')
+            self.assertIn('properties', feature)
+            self.assertIn('geometry', feature)
+
+            properties = feature['properties']
+            self.assertIn('WKR_NR', properties)
+            self.assertIn('WKR_NAME', properties)
+            self.assertIn('LAND_NR', properties)
+            self.assertIn('LAND_NAME', properties)
+
+            # Verify geometry type
+            self.assertEqual(feature['geometry']['type'], 'Polygon')
+
+    def test_geojson_constituency_numbers_complete(self):
+        """Verify constituency numbers range from 1 to 299 with no gaps."""
+        import json
+        from pathlib import Path
+        from django.conf import settings
+
+        geojson_path = Path(settings.BASE_DIR) / 'letters' / 'data' / 'wahlkreise.geojson'
+
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        wkr_numbers = [f['properties']['WKR_NR'] for f in data['features']]
+        expected_numbers = set(range(1, 300))
+        actual_numbers = set(wkr_numbers)
+
+        self.assertEqual(actual_numbers, expected_numbers, "Constituency numbers should be 1-299 with no gaps")

@@ -157,6 +157,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyshp"
+version = "3.0.2.post1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/7f/fb/07f057ff01229c575831766b44bd249aefa086146cf5bce52e172d77cf4e/pyshp-3.0.2.post1.tar.gz", hash = "sha256:18e34a66759b6d34a6f535978c76dad518200f23a727d9e22af8e8535c0245b9", size = 2192180, upload-time = "2025-10-10T16:04:58.529Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/92/a8ad817864a560b96ac1c817f9c56bb7eacc1a7d522e2d39afe9e9c77d7b/pyshp-3.0.2.post1-py3-none-any.whl", hash = "sha256:b0aec66bc55f7cd3a846f6b02c5a9eec1fc1d2cff16ccfcf6493a6773c7eb602", size = 58298, upload-time = "2025-10-10T16:04:57.151Z" },
+]
+
+[[package]]
 name = "requests"
 version = "2.32.5"
 source = { registry = "https://pypi.org/simple" }
@@ -260,6 +269,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "django" },
     { name = "geopy" },
+    { name = "pyshp" },
     { name = "requests" },
     { name = "shapely" },
     { name = "tqdm" },
@@ -269,6 +279,7 @@ dependencies = [
 requires-dist = [
     { name = "django", specifier = ">=5.2.6" },
     { name = "geopy", specifier = ">=2.4.0" },
+    { name = "pyshp", specifier = ">=2.3.1" },
     { name = "requests", specifier = ">=2.31.0" },
     { name = "shapely", specifier = ">=2.1.0" },
     { name = "tqdm", specifier = ">=4.67.1" },
