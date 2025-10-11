@@ -52,6 +52,39 @@
     </div>
 
     <div class="mt-4">
+        <h3>{% trans "Ihre Adresse" %}</h3>
+        <p class="text-muted">
+            {% trans "Geben Sie Ihre vollständige Adresse ein, um präzise Wahlkreis- und Abgeordnetenempfehlungen zu erhalten." %}
+        </p>
+        {% if verification and verification.street_address %}
+            <div class="alert alert-info" role="status">
+                <strong>{% trans "Gespeicherte Adresse:" %}</strong><br>
+                {{ verification.street_address }}<br>
+                {{ verification.postal_code }} {{ verification.city }}
+            </div>
+        {% endif %}
+        <form method="post" class="mt-3">
+            {% csrf_token %}
+            {% if address_form.non_field_errors %}
+                <div class="alert alert-danger">{{ address_form.non_field_errors }}</div>
+            {% endif %}
+            {% for field in address_form %}
+                <div class="form-group mb-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.errors %}
+                        <div class="text-danger small">{{ field.errors|join:', ' }}</div>
+                    {% endif %}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                </div>
+            {% endfor %}
+            <button type="submit" name="address_form_submit" class="btn btn-primary">{% trans "Adresse speichern" %}</button>
+        </form>
+    </div>
+
+    <div class="mt-4">
         <h3>{% trans "Self-declare your constituency" %}</h3>
         <p class="text-muted">
             {% trans "Select the constituencies you live in so we can prioritise the right representatives." %}

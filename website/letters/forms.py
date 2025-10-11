@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from .constants import normalize_german_state
-from .models import Letter, Representative, Signature, Report, Tag, Constituency
+from .models import Letter, Representative, Signature, Report, Tag, Constituency, IdentityVerification
 
 
 class UserRegisterForm(UserCreationForm):
@@ -238,6 +238,70 @@ class SelfDeclaredConstituencyForm(forms.Form):
         if not federal and not state:
             raise forms.ValidationError(
                 _('Please select at least one constituency to save your profile.')
+            )
+
+        return cleaned_data
+
+
+class IdentityVerificationForm(forms.Form):
+    """Form for collecting full address for identity verification."""
+
+    street_address = forms.CharField(
+        max_length=255,
+        required=False,
+        label=_('Straße und Hausnummer'),
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': _('z.B. Unter den Linden 77')
+        })
+    )
+    postal_code = forms.CharField(
+        max_length=20,
+        required=False,
+        label=_('Postleitzahl'),
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': _('z.B. 10117')
+        })
+    )
+    city = forms.CharField(
+        max_length=100,
+        required=False,
+        label=_('Stadt'),
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': _('z.B. Berlin')
+        })
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        # Pre-fill with existing address if available
+        if self.user and hasattr(self.user, 'identity_verification'):
+            verification = getattr(self.user, 'identity_verification', None)
+            if verification:
+                if verification.street_address:
+                    self.fields['street_address'].initial = verification.street_address
+                if verification.postal_code:
+                    self.fields['postal_code'].initial = verification.postal_code
+                if verification.city:
+                    self.fields['city'].initial = verification.city
+
+    def clean(self):
+        cleaned_data = super().clean()
+        street_address = cleaned_data.get('street_address')
+        postal_code = cleaned_data.get('postal_code')
+        city = cleaned_data.get('city')
+
+        # Check if any field is provided
+        has_any = any([street_address, postal_code, city])
+        has_all = all([street_address, postal_code, city])
+
+        if has_any and not has_all:
+            raise forms.ValidationError(
+                _('Bitte geben Sie eine vollständige Adresse ein (Straße, PLZ und Stadt) oder lassen Sie alle Felder leer.')
             )
 
         return cleaned_data

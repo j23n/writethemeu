@@ -1310,3 +1310,185 @@ class ConstituencyLocatorIntegrationTests(ParliamentFixtureMixin, TestCase):
 
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 0)
+
+
+class IdentityVerificationFormTests(TestCase):
+    """Test the IdentityVerificationForm for full address collection."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='password123',
+            email='testuser@example.com',
+        )
+
+    def test_form_requires_all_address_fields_together(self):
+        """Test that form validation requires all address fields if any is provided."""
+        from .forms import IdentityVerificationForm
+
+        # Only street provided - should fail
+        form = IdentityVerificationForm(
+            data={
+                'street_address': 'Unter den Linden 77',
+                'postal_code': '',
+                'city': '',
+            },
+            user=self.user
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
+
+        # Only PLZ provided - should fail
+        form = IdentityVerificationForm(
+            data={
+                'street_address': '',
+                'postal_code': '10117',
+                'city': '',
+            },
+            user=self.user
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
+
+        # Only city provided - should fail
+        form = IdentityVerificationForm(
+            data={
+                'street_address': '',
+                'postal_code': '',
+                'city': 'Berlin',
+            },
+            user=self.user
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
+
+    def test_form_accepts_all_address_fields(self):
+        """Test that form is valid when all address fields are provided."""
+        from .forms import IdentityVerificationForm
+
+        form = IdentityVerificationForm(
+            data={
+                'street_address': 'Unter den Linden 77',
+                'postal_code': '10117',
+                'city': 'Berlin',
+            },
+            user=self.user
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_form_accepts_empty_address(self):
+        """Test that form is valid when all address fields are empty."""
+        from .forms import IdentityVerificationForm
+
+        form = IdentityVerificationForm(
+            data={
+                'street_address': '',
+                'postal_code': '',
+                'city': '',
+            },
+            user=self.user
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_form_prefills_existing_address(self):
+        """Test that form prefills existing address from verification."""
+        from .forms import IdentityVerificationForm
+
+        # Create verification with address
+        verification = IdentityVerification.objects.create(
+            user=self.user,
+            status='SELF_DECLARED',
+            street_address='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin',
+        )
+
+        form = IdentityVerificationForm(user=self.user)
+
+        self.assertEqual(form.fields['street_address'].initial, 'Unter den Linden 77')
+        self.assertEqual(form.fields['postal_code'].initial, '10117')
+        self.assertEqual(form.fields['city'].initial, 'Berlin')
+
+
+class ProfileViewAddressTests(TestCase):
+    """Test profile view address form submission."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='testuser',
+            password='password123',
+            email='testuser@example.com',
+        )
+        self.client.login(username='testuser', password='password123')
+
+    def test_profile_view_saves_address(self):
+        """Test that profile view saves address correctly."""
+        response = self.client.post(
+            reverse('profile'),
+            {
+                'address_form_submit': '1',
+                'street_address': 'Unter den Linden 77',
+                'postal_code': '10117',
+                'city': 'Berlin',
+            },
+            follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, reverse('profile'))
+
+        # Verify address was saved
+        verification = IdentityVerification.objects.get(user=self.user)
+        self.assertEqual(verification.street_address, 'Unter den Linden 77')
+        self.assertEqual(verification.postal_code, '10117')
+        self.assertEqual(verification.city, 'Berlin')
+        self.assertEqual(verification.status, 'SELF_DECLARED')
+        self.assertEqual(verification.verification_type, 'SELF_DECLARED')
+
+    def test_profile_view_updates_existing_address(self):
+        """Test that profile view updates existing address."""
+        # Create initial verification
+        verification = IdentityVerification.objects.create(
+            user=self.user,
+            status='SELF_DECLARED',
+            street_address='Old Street 1',
+            postal_code='12345',
+            city='OldCity',
+        )
+
+        response = self.client.post(
+            reverse('profile'),
+            {
+                'address_form_submit': '1',
+                'street_address': 'Unter den Linden 77',
+                'postal_code': '10117',
+                'city': 'Berlin',
+            },
+            follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Verify address was updated
+        verification.refresh_from_db()
+        self.assertEqual(verification.street_address, 'Unter den Linden 77')
+        self.assertEqual(verification.postal_code, '10117')
+        self.assertEqual(verification.city, 'Berlin')
+
+    def test_profile_view_displays_saved_address(self):
+        """Test that profile view displays saved address."""
+        # Create verification with address
+        verification = IdentityVerification.objects.create(
+            user=self.user,
+            status='SELF_DECLARED',
+            street_address='Unter den Linden 77',
+            postal_code='10117',
+            city='Berlin',
+        )
+
+        response = self.client.get(reverse('profile'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Unter den Linden 77')
+        self.assertContains(response, '10117')
+        self.assertContains(response, 'Berlin')
