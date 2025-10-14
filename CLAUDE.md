@@ -164,3 +164,4 @@ YOU MUST follow this debugging framework for ANY technical issue:
 - Document architectural decisions and their outcomes for future reference
 - Track patterns in user feedback to improve collaboration over time
 - When you notice something that should be fixed but is unrelated to your current task, document it in your journal rather than fixing it immediately
+- Always use uv run python manage.py {shell,runserver,test,etc}
