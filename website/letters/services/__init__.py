@@ -7,16 +7,12 @@ from .constituency import (
     ConstituencyLocator,
     LocatedConstituencies,
     LocationContext,
-)
-
-# Import remaining classes from monolith for backward compatibility
-from .._services_monolith import (
     ConstituencySuggestionService,
-    RepresentativeSyncService,
-    IdentityVerificationService,
-    TopicSuggestionService,
-    CommitteeTopicMappingService,
 )
+from .identity import IdentityVerificationService
+from .topics import TopicSuggestionService, CommitteeTopicMappingService
+
+from .representative_sync import RepresentativeSyncService
 
 __all__ = [
     'AbgeordnetenwatchAPI',
