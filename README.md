@@ -7,6 +7,47 @@
 4. Download constituency boundaries: `uv run python manage.py fetch_wahlkreis_data` (required for accurate address-based matching).
 5. Launch the dev server with `uv run python manage.py runserver` and visit http://localhost:8000/.
 
+## Internationalization
+
+WriteThem.eu supports German (default) and English.
+
+### Using the Site
+
+- Visit `/de/` for German interface
+- Visit `/en/` for English interface
+- Use the language switcher in the header to toggle languages
+- Language preference is saved in a cookie
+
+### For Developers
+
+**Translation workflow:**
+
+1. Wrap new UI strings with translation functions:
+   - Templates: `{% trans "Text" %}` or `{% blocktrans %}`
+   - Python: `gettext()` or `gettext_lazy()`
+
+2. Extract strings to .po files:
+   ```bash
+   cd website
+   uv run python manage.py makemessages -l de -l en
+   ```
+
+3. Translate strings in `.po` files:
+   - Edit `locale/de/LC_MESSAGES/django.po` (German translations)
+   - Edit `locale/en/LC_MESSAGES/django.po` (English, mostly identity translations)
+
+4. Compile translations:
+   ```bash
+   uv run python manage.py compilemessages
+   ```
+
+5. Check translation completeness:
+   ```bash
+   uv run python manage.py check_translations
+   ```
+
+**Important:** All code, comments, and translation keys should be in English. Only .po files contain actual translations.
+
 ## Architecture
 - **Frameworks**: Django 5.2 / Python 3.13 managed with `uv`. The project root holds dependency metadata; all Django code lives in `website/` (settings in `writethem/`, app logic in `letters/`).
 - **Domain models**: `letters/models.py` defines parliaments, terms, constituencies, representatives, committees, letters, signatures, identity verification, and moderation reports. Relationships reflect multi-level mandates (EU/Federal/State) and committee membership.

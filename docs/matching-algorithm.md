@@ -81,3 +81,12 @@ python manage.py test letters.tests.test_address_matching
 python manage.py test letters.tests.test_topic_mapping
 python manage.py test letters.tests.test_constituency_suggestions
 ```
+
+## Internationalization
+
+The constituency matching system works identically in both German and English:
+
+- Addresses can be entered in German format (standard use case)
+- UI language (German/English) does not affect geocoding or matching logic
+- Representative names, constituency names, and geographic data remain in original German
+- All user-facing labels and messages are translated
