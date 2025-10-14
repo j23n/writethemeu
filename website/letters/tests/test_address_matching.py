@@ -150,15 +150,35 @@ class WahlkreisLocationTests(TestCase):
 
     def test_locate_bundestag_coordinates(self):
         """Test that Bundestag coordinates find correct Berlin constituency."""
-        pass
+        locator = WahlkreisLocator()
+        result = locator.locate(52.5186, 13.3761)
+
+        self.assertIsNotNone(result)
+        wkr_nr, wkr_name, land_name = result
+        self.assertIsInstance(wkr_nr, int)
+        self.assertIn('Berlin', land_name)
 
     def test_locate_hamburg_coordinates(self):
         """Test that Hamburg coordinates find correct constituency."""
-        pass
+        locator = WahlkreisLocator()
+        result = locator.locate(53.5511, 9.9937)
+
+        self.assertIsNotNone(result)
+        wkr_nr, wkr_name, land_name = result
+        self.assertIsInstance(wkr_nr, int)
+        self.assertIn('Hamburg', land_name)
 
     def test_coordinates_outside_germany(self):
         """Test that coordinates outside Germany return None."""
-        pass
+        locator = WahlkreisLocator()
+
+        # Paris coordinates
+        result = locator.locate(48.8566, 2.3522)
+        self.assertIsNone(result)
+
+        # London coordinates
+        result = locator.locate(51.5074, -0.1278)
+        self.assertIsNone(result)
 
 
 class FullAddressMatchingTests(TestCase):
