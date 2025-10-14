@@ -55,19 +55,89 @@ class AddressGeocodingTests(TestCase):
 
     def test_geocode_success_with_mocked_api(self):
         """Test successful geocoding with mocked Nominatim response."""
-        pass
+        with patch('requests.get') as mock_get:
+            # Mock successful Nominatim response
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = [{
+                'lat': '52.5186',
+                'lon': '13.3761'
+            }]
+            mock_get.return_value = mock_response
+
+            lat, lon, success, error = self.geocoder.geocode(
+                'Platz der Republik 1',
+                '11011',
+                'Berlin'
+            )
+
+            self.assertTrue(success)
+            self.assertIsNone(error)
+            self.assertAlmostEqual(lat, 52.5186, places=4)
+            self.assertAlmostEqual(lon, 13.3761, places=4)
 
     def test_geocode_caches_results(self):
         """Test that geocoding results are cached in database."""
-        pass
+        with patch('requests.get') as mock_get:
+            mock_response = MagicMock()
+            mock_response.status_code = 200
+            mock_response.json.return_value = [{
+                'lat': '52.5186',
+                'lon': '13.3761'
+            }]
+            mock_get.return_value = mock_response
+
+            # First call should cache
+            self.geocoder.geocode('Platz der Republik 1', '11011', 'Berlin')
+
+            # Check cache entry exists
+            cache_key = self.geocoder._generate_cache_key(
+                'Platz der Republik 1', '11011', 'Berlin', 'DE'
+            )
+            cache_entry = GeocodeCache.objects.filter(address_hash=cache_key).first()
+            self.assertIsNotNone(cache_entry)
+            self.assertTrue(cache_entry.success)
 
     def test_geocode_returns_cached_results(self):
         """Test that cached geocoding results are reused."""
-        pass
+        # Create cache entry
+        cache_key = self.geocoder._generate_cache_key(
+            'Test Street', '12345', 'Test City', 'DE'
+        )
+        GeocodeCache.objects.create(
+            address_hash=cache_key,
+            success=True,
+            latitude=52.0,
+            longitude=13.0
+        )
+
+        # Should return cached result without API call
+        with patch('requests.get') as mock_get:
+            lat, lon, success, error = self.geocoder.geocode(
+                'Test Street', '12345', 'Test City'
+            )
+
+            # Verify no API call was made
+            mock_get.assert_not_called()
+
+            # Verify cached results returned
+            self.assertTrue(success)
+            self.assertEqual(lat, 52.0)
+            self.assertEqual(lon, 13.0)
 
     def test_geocode_handles_api_error(self):
         """Test graceful handling of Nominatim API errors."""
-        pass
+        with patch('requests.get') as mock_get:
+            mock_get.side_effect = Exception("API Error")
+
+            lat, lon, success, error = self.geocoder.geocode(
+                'Invalid Street', '99999', 'Nowhere'
+            )
+
+            self.assertFalse(success)
+            self.assertIsNone(lat)
+            self.assertIsNone(lon)
+            self.assertIn('API Error', error)
 
 
 class WahlkreisLocationTests(TestCase):
