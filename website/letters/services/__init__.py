@@ -3,12 +3,14 @@
 
 from .abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
 from .geocoding import AddressGeocoder, WahlkreisLocator
+from .constituency import (
+    ConstituencyLocator,
+    LocatedConstituencies,
+    LocationContext,
+)
 
 # Import remaining classes from monolith for backward compatibility
 from .._services_monolith import (
-    LocatedConstituencies,
-    LocationContext,
-    ConstituencyLocator,
     ConstituencySuggestionService,
     RepresentativeSyncService,
     IdentityVerificationService,
