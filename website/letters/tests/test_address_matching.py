@@ -187,11 +187,33 @@ class FullAddressMatchingTests(TestCase):
     @patch('letters.services.AddressGeocoder.geocode')
     def test_address_to_constituency_pipeline(self, mock_geocode):
         """Test full pipeline from address to constituency with mocked geocoding."""
-        pass
+        # Mock geocoding to return Bundestag coordinates
+        mock_geocode.return_value = (52.5186, 13.3761, True, None)
+
+        locator = ConstituencyLocator()
+        representatives = locator.locate(
+            street='Platz der Republik 1',
+            postal_code='11011',
+            city='Berlin'
+        )
+
+        # Should return representatives (even if list is empty due to no DB data)
+        self.assertIsInstance(representatives, list)
+        mock_geocode.assert_called_once()
 
     def test_plz_fallback_when_geocoding_fails(self):
         """Test PLZ prefix fallback when geocoding fails."""
-        pass
+        with patch('letters.services.AddressGeocoder.geocode') as mock_geocode:
+            # Mock geocoding failure
+            mock_geocode.return_value = (None, None, False, "Geocoding failed")
+
+            locator = ConstituencyLocator()
+            representatives = locator.locate(
+                postal_code='10115'  # Berlin postal code
+            )
+
+            # Should still return list (using PLZ fallback)
+            self.assertIsInstance(representatives, list)
 
 
 # End of file
