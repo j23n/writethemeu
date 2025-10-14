@@ -14,6 +14,9 @@ media/
 *.sqlite3
 db.sqlite3
 
+# Compiled translation files (generated from .po)
+*.mo
+
 # Shapefile components (use fetch_wahlkreis_data to regenerate GeoJSON)
 *.shp
 *.shx
