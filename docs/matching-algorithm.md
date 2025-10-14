@@ -69,4 +69,15 @@ This approach provides constituency-accurate matching (exact Wahlkreis), signifi
 ### Management Commands
 
 - **fetch_wahlkreis_data**: Downloads official Bundestag constituency boundaries
-- **test_matching**: Tests address matching with sample German addresses
+- **query_wahlkreis**: Query constituency by address or postal code
+- **query_topics**: Find matching topics for letter text
+- **query_representatives**: Find representatives by address and/or topics
+
+### Testing
+
+Run the test suite:
+```bash
+python manage.py test letters.tests.test_address_matching
+python manage.py test letters.tests.test_topic_mapping
+python manage.py test letters.tests.test_constituency_suggestions
+```
