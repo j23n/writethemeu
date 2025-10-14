@@ -2,11 +2,10 @@
 # ABOUTME: Re-exports all service classes for backward compatibility with existing imports.
 
 from .abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
+from .geocoding import AddressGeocoder, WahlkreisLocator
 
 # Import remaining classes from monolith for backward compatibility
 from .._services_monolith import (
-    AddressGeocoder,
-    WahlkreisLocator,
     LocatedConstituencies,
     LocationContext,
     ConstituencyLocator,
