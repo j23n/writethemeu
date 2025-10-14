@@ -1,8 +1,11 @@
 # ABOUTME: API client for fetching parliament and representative data from Abgeordnetenwatch.
 # ABOUTME: Handles pagination and HTTP communication with the public Abgeordnetenwatch v2 API.
 
+import logging
 from typing import Any, Dict, List, Optional
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class AbgeordnetenwatchAPI:
@@ -15,7 +18,7 @@ class AbgeordnetenwatchAPI:
     def _request(cls, endpoint: str, params: Optional[Dict] = None) -> Dict:
         params = params or {}
         url = f"{cls.BASE_URL}/{endpoint}"
-        print(f"GET {url} params={params}")
+        logger.debug("GET %s params=%s", url, params)
         response = requests.get(url, params=params, timeout=30)
         response.raise_for_status()
         return response.json()
