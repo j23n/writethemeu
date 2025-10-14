@@ -3,6 +3,8 @@
 
 from django.test import TestCase
 from django.conf import settings
+from django.core.management import call_command
+from io import StringIO
 
 
 class I18nConfigurationTests(TestCase):
@@ -75,3 +77,13 @@ class LetterFormI18nTests(TestCase):
         # Test English version
         response = self.client.get('/en/letter/new/')
         self.assertEqual(response.status_code, 200)
+
+
+class TranslationCompletenessTests(TestCase):
+    def test_check_translations_command_exists(self):
+        """Test that check_translations command can be called."""
+        out = StringIO()
+        call_command('check_translations', stdout=out)
+        output = out.getvalue()
+        self.assertIn('Deutsch', output)
+        self.assertIn('English', output)
