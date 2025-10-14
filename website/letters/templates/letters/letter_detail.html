@@ -55,9 +55,9 @@
                 <div style="padding: 0.8rem 0; border-bottom: 1px solid #ecf0f1;">
                     <strong>{{ signature.display_name }}</strong>
                     {% if signature.is_verified_constituent %}
-                        <span class="badge badge-verified">✓ Verified Constituent</span>
+                        <span class="badge badge-verified">{% trans "✓ Verified Constituent" %}</span>
                     {% elif signature.is_verified_non_constituent %}
-                        <span class="badge badge-verified">✓ Verified</span>
+                        <span class="badge badge-verified">{% trans "✓ Verified" %}</span>
                     {% endif %}
                     <p style="color: #7f8c8d; font-size: 0.85rem;">{{ signature.signed_at|date:"M d, Y" }}</p>
                     {% if signature.comment %}

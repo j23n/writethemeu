@@ -38,17 +38,17 @@
     {% if is_paginated %}
         <div style="text-align: center; margin: 2rem 0;">
             {% if page_obj.has_previous %}
-                <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary">Previous</a>
+                <a href="?page={{ page_obj.previous_page_number }}" class="btn btn-secondary">{% trans "Previous" %}</a>
             {% endif %}
-            <span style="margin: 0 1rem;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            <span style="margin: 0 1rem;">{% blocktrans with page=page_obj.number total=page_obj.paginator.num_pages %}Page {{ page }} of {{ total }}{% endblocktrans %}</span>
             {% if page_obj.has_next %}
-                <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary">Next</a>
+                <a href="?page={{ page_obj.next_page_number }}" class="btn btn-secondary">{% trans "Next" %}</a>
             {% endif %}
         </div>
     {% endif %}
 {% else %}
     <div class="card">
-        <p>No letters found. <a href="{% url 'letter_create' %}">Be the first to write one!</a></p>
+        <p>{% trans "No letters found." %} <a href="{% url 'letter_create' %}">{% trans "Be the first to write one!" %}</a></p>
     </div>
 {% endif %}
 {% endblock %}
