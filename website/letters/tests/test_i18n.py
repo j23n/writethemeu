@@ -58,3 +58,20 @@ class LanguageSwitcherTests(TestCase):
         # Check cookie was set
         self.assertIn('django_language', response.cookies)
         self.assertEqual(response.cookies['django_language'].value, 'en')
+
+
+class LetterFormI18nTests(TestCase):
+    def test_letter_form_template_renders(self):
+        """Test that letter creation form renders without errors."""
+        from django.contrib.auth.models import User
+        # Create a user and log them in
+        user = User.objects.create_user(username='testuser', password='testpass')
+        self.client.login(username='testuser', password='testpass')
+
+        # Test German version
+        response = self.client.get('/de/letter/new/')
+        self.assertEqual(response.status_code, 200)
+
+        # Test English version
+        response = self.client.get('/en/letter/new/')
+        self.assertEqual(response.status_code, 200)
