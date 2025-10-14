@@ -130,14 +130,19 @@ class AddressGeocodingTests(TestCase):
         with patch('requests.get') as mock_get:
             mock_get.side_effect = Exception("API Error")
 
-            lat, lon, success, error = self.geocoder.geocode(
-                'Invalid Street', '99999', 'Nowhere'
-            )
+            # Capture expected warning log
+            with self.assertLogs('letters.services', level='WARNING') as log_context:
+                lat, lon, success, error = self.geocoder.geocode(
+                    'Invalid Street', '99999', 'Nowhere'
+                )
 
             self.assertFalse(success)
             self.assertIsNone(lat)
             self.assertIsNone(lon)
             self.assertIn('API Error', error)
+            # Verify expected warning was logged
+            self.assertEqual(len(log_context.output), 1)
+            self.assertIn('Geocoding failed', log_context.output[0])
 
 
 class WahlkreisLocationTests(TestCase):
