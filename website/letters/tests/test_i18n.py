@@ -37,3 +37,24 @@ class I18nURLTests(TestCase):
         from django.urls import reverse
         url = reverse('set_language')
         self.assertEqual(url, '/i18n/setlang/')
+
+
+class LanguageSwitcherTests(TestCase):
+    def test_language_switcher_present_in_page(self):
+        """Test that language switcher form is present."""
+        response = self.client.get('/de/')
+        self.assertContains(response, 'name="language"')
+        self.assertContains(response, 'Deutsch')
+        self.assertContains(response, 'English')
+
+    def test_language_switch_changes_language(self):
+        """Test that submitting language form changes language."""
+        response = self.client.post(
+            '/i18n/setlang/',
+            {'language': 'en', 'next': '/en/'},
+        )
+        # Check we got a redirect
+        self.assertEqual(response.status_code, 302)
+        # Check cookie was set
+        self.assertIn('django_language', response.cookies)
+        self.assertEqual(response.cookies['django_language'].value, 'en')
