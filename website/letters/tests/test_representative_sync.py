@@ -187,4 +187,80 @@ class FindPhotoUrlTests(TestCase):
         self.assertIsNone(result)
 
 
+class DownloadRepresentativeImageTests(TestCase):
+    """Test the _download_representative_image method with simplified extension detection."""
+
+    def setUp(self):
+        """Set up test service instance and mock representative."""
+        self.service = RepresentativeSyncService(dry_run=True)
+        from letters.models import Representative, Parliament, ParliamentTerm
+
+        parliament = Parliament.objects.create(
+            name='Test Parliament',
+            level='FEDERAL',
+            region='DE'
+        )
+        term = ParliamentTerm.objects.create(
+            parliament=parliament,
+            name='Test Term'
+        )
+        self.representative = Representative.objects.create(
+            external_id='test-123',
+            parliament=parliament,
+            parliament_term=term,
+            first_name='Test',
+            last_name='Person',
+            party='Test Party',
+            election_mode='DIRECT'
+        )
+
+    @patch('letters.services.representative_sync.requests.get')
+    def test_extracts_extension_from_url(self, mock_get):
+        """Test that extension is extracted from URL path."""
+        mock_response = Mock()
+        mock_response.content = b'fake image data'
+        mock_response.headers = {}
+        mock_get.return_value = mock_response
+
+        result = self.service._download_representative_image(
+            'https://example.com/photo.png',
+            self.representative
+        )
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.png'))
+
+    @patch('letters.services.representative_sync.requests.get')
+    def test_defaults_to_jpg_when_no_extension(self, mock_get):
+        """Test that .jpg is used as default when no extension found."""
+        mock_response = Mock()
+        mock_response.content = b'fake image data'
+        mock_response.headers = {}
+        mock_get.return_value = mock_response
+
+        result = self.service._download_representative_image(
+            'https://example.com/photo',
+            self.representative
+        )
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.jpg'))
+
+    @patch('letters.services.representative_sync.requests.get')
+    def test_handles_url_with_query_params(self, mock_get):
+        """Test that query parameters are stripped from extension."""
+        mock_response = Mock()
+        mock_response.content = b'fake image data'
+        mock_response.headers = {}
+        mock_get.return_value = mock_response
+
+        result = self.service._download_representative_image(
+            'https://example.com/photo.webp?size=large&version=2',
+            self.representative
+        )
+
+        self.assertIsNotNone(result)
+        self.assertTrue(result.endswith('.webp'))
+
+
 # End of file

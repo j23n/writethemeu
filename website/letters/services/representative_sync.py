@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import mimetypes
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -219,17 +218,12 @@ class RepresentativeSyncService:
             logger.warning("Failed to download photo for %s", representative.full_name, exc_info=True)
             return None
 
-        content_type = (response.headers.get('Content-Type') or '').split(';')[0]
-        extension = None
-        if content_type:
-            extension = mimetypes.guess_extension(content_type)
-        if extension in ('.jpe', '.jpeg'):
+        extension = Path(photo_url).suffix.split('?')[0]
+        if not extension or not extension.startswith('.'):
+            logger.warning("No valid extension found in URL %s, defaulting to .jpg", photo_url)
             extension = '.jpg'
-        if not extension:
-            extension = Path(photo_url).suffix.split('?')[0] or '.jpg'
-        if not extension.startswith('.'):
-            extension = f'.{extension}'
         if extension.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
+            logger.warning("Unusual image extension %s for %s, defaulting to .jpg", extension, photo_url)
             extension = '.jpg'
 
         media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
