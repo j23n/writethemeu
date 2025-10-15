@@ -29,24 +29,24 @@
 
                     <div class="row">
                         <div class="col-md-8 mb-2">
-                            <label for="search_street" class="form-label">{% trans "Street and Number" %}</label>
-                            <input type="text" id="search_street" name="search_street" class="form-control" placeholder="Platz der Republik 1">
+                            <label for="street_address" class="form-label">{% trans "Street and Number" %}</label>
+                            <input type="text" id="street_address" name="street_address" class="form-control" placeholder="Platz der Republik 1">
                         </div>
                         <div class="col-md-4 mb-2">
-                            <label for="search_postal_code" class="form-label">{% trans "Postal Code" %}</label>
-                            <input type="text" id="search_postal_code" name="search_postal_code" class="form-control" placeholder="11011">
+                            <label for="postal_code" class="form-label">{% trans "Postal Code" %}</label>
+                            <input type="text" id="postal_code" name="postal_code" class="form-control" placeholder="11011">
                         </div>
                     </div>
                     <div class="row">
                         <div class="col-md-8 mb-2">
-                            <label for="search_city" class="form-label">{% trans "City" %}</label>
-                            <input type="text" id="search_city" name="search_city" class="form-control" placeholder="Berlin">
+                            <label for="city" class="form-label">{% trans "City" %}</label>
+                            <input type="text" id="city" name="city" class="form-control" placeholder="Berlin">
                         </div>
                         <div class="col-md-4 mb-2">
                             <label class="form-label">&nbsp;</label>
                             <button type="button"
                                     hx-post="{% url 'search_wahlkreis' %}"
-                                    hx-include="[name='search_street'],[name='search_postal_code'],[name='search_city']"
+                                    hx-include="[name='street_address'],[name='postal_code'],[name='city']"
                                     hx-target="#search-message"
                                     hx-swap="innerHTML"
                                     class="btn btn-secondary w-100 d-block">

@@ -31,7 +31,6 @@ from .forms import (
     SelfDeclaredConstituencyForm,
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
-from .services.geocoding import AddressGeocoder, WahlkreisLocator
 
 logger = logging.getLogger('letters.services')
 
@@ -599,61 +598,51 @@ def search_wahlkreis(request):
             'error': 'Please provide street address, postal code, and city.'
         })
 
-    # Geocode address
-    geocoder = AddressGeocoder()
-    lat, lon, success, error_msg = geocoder.geocode(
-        street=street_address,
-        postal_code=postal_code,
-        city=city,
-        country='DE'
-    )
-
-    if not success:
-        return render(request, 'letters/partials/wahlkreis_search_result.html', {
-            'success': False,
-            'error': error_msg or 'Could not find address. Please check your input or select Wahlkreise manually.'
-        })
-
-    # Find Wahlkreis
+    # Find constituencies using ConstituencyLocator
+    # (handles geocoding internally)
     try:
-        locator = WahlkreisLocator()
-        result = locator.locate(lat, lon)
+        from .services.constituency import ConstituencyLocator
 
-        if not result:
-            return render(request, 'letters/partials/wahlkreis_search_result.html', {
-                'success': False,
-                'error': 'Could not determine Wahlkreis for this location. Please select manually.'
-            })
+        locator = ConstituencyLocator()
+        constituencies = locator.locate(
+            street=street_address,
+            postal_code=postal_code,
+            city=city,
+            country='DE'
+        )
 
-        wkr_nr, wkr_name, land_name = result
-
-        # Verify constituency exists in database before returning success
-        federal_constituency = Constituency.objects.filter(
-            external_id=str(wkr_nr),
-            scope='FEDERAL_DISTRICT'
-        ).first()
-
-        if not federal_constituency:
-            logger.error(
-                f'Address search found Wahlkreis {wkr_nr} ({wkr_name}) but no matching '
-                f'Constituency record exists in database. Run sync_representatives to import data.'
+        if not constituencies:
+            logger.warning(
+                f'Address search found no constituencies for {street_address}, {postal_code} {city}'
             )
             return render(request, 'letters/partials/wahlkreis_search_result.html', {
                 'success': False,
-                'error': 'Representative data not loaded. Please select constituencies manually or contact support.'
+                'error': 'Could not find constituencies for this address. Please select manually.'
             })
 
-        # Find state constituency by matching land_name
-        state_constituency = Constituency.objects.filter(
-            scope='STATE_DISTRICT',
-            name__icontains=land_name
-        ).first()
+        # Find federal and state constituencies
+        federal_constituency = None
+        state_constituency = None
+
+        for constituency in constituencies:
+            if constituency.scope == 'FEDERAL_DISTRICT' and not federal_constituency:
+                federal_constituency = constituency
+            elif constituency.scope in ['STATE_LIST', 'STATE_DISTRICT'] and not state_constituency:
+                state_constituency = constituency
+
+        # Get display name from metadata if available
+        wahlkreis_name = 'Unknown'
+        land_name = 'Unknown'
+
+        if federal_constituency and federal_constituency.metadata:
+            wahlkreis_name = federal_constituency.name
+            land_name = federal_constituency.metadata.get('state', 'Unknown')
 
         return render(request, 'letters/partials/wahlkreis_search_result.html', {
             'success': True,
-            'wahlkreis_name': wkr_name,
+            'wahlkreis_name': wahlkreis_name,
             'land_name': land_name,
-            'federal_constituency_id': federal_constituency.id,
+            'federal_constituency_id': federal_constituency.id if federal_constituency else None,
             'state_constituency_id': state_constituency.id if state_constituency else None,
         })
 
