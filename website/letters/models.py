@@ -687,23 +687,11 @@ class IdentityVerification(models.Model):
         states = self.get_constituency_states()
         return next(iter(states)) if states else None
 
-    def link_constituency(self, constituency: Constituency, scope: Optional[str] = None) -> None:
-        """Attach the verification to a specific constituency and infer parliament links."""
+    def link_constituency(self, constituency: Constituency) -> None:
+        """Add a constituency to this verification's M2M relationship."""
         if not constituency:
             return
-
-        scope = scope or constituency.scope
-
-        if scope in {'FEDERAL_DISTRICT', 'STATE_DISTRICT'}:
-            self.constituency = constituency
-        elif not self.constituency:
-            self.constituency = constituency
-
-        if scope and scope.startswith('FEDERAL'):
-            self.federal_constituency = constituency
-        if scope and scope.startswith('STATE'):
-            self.state_constituency = constituency
-
+        self.constituencies.add(constituency)
         self._update_parliament_links()
 
     def _update_parliament_links(self) -> None:
@@ -719,15 +707,8 @@ class IdentityVerification(models.Model):
         super().save(*args, **kwargs)
 
     def get_constituencies(self) -> List[Constituency]:
-        """Return distinct constituencies linked to this verification."""
-        constituencies: List[Constituency] = []
-        seen: Set[int] = set()
-        for attr in ('constituency', 'federal_constituency', 'state_constituency'):
-            constituency = getattr(self, attr, None)
-            if constituency and constituency.id not in seen:
-                constituencies.append(constituency)
-                seen.add(constituency.id)
-        return constituencies
+        """Return all constituencies linked via the M2M relationship."""
+        return list(self.constituencies.all())
 
     def constituency_ids(self) -> List[int]:
         return [c.id for c in self.get_constituencies()]
