@@ -1,3 +1,4 @@
+import logging
 import re
 from collections import OrderedDict
 
@@ -20,7 +21,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
-from .models import Letter, Signature, Representative, Tag, IdentityVerification, TopicArea, Committee
+from .models import Letter, Signature, Representative, Tag, IdentityVerification, TopicArea, Committee, Constituency
 from .forms import (
     LetterForm,
     SignatureForm,
@@ -31,6 +32,8 @@ from .forms import (
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
 from .services.geocoding import AddressGeocoder, WahlkreisLocator
+
+logger = logging.getLogger('letters.services')
 
 
 def _send_activation_email(user, request):
@@ -624,6 +627,22 @@ def search_wahlkreis(request):
 
         wkr_nr, wkr_name, land_name = result
 
+        # Verify constituency exists in database before returning success
+        federal_constituency = Constituency.objects.filter(
+            external_id=str(wkr_nr),
+            scope='FEDERAL_DISTRICT'
+        ).first()
+
+        if not federal_constituency:
+            logger.error(
+                f'Address search found Wahlkreis {wkr_nr} ({wkr_name}) but no matching '
+                f'Constituency record exists in database. Run sync_representatives to import data.'
+            )
+            return JsonResponse({
+                'success': False,
+                'error': 'Representative data not loaded. Please select constituencies manually or contact support.'
+            })
+
         return JsonResponse({
             'success': True,
             'wahlkreis_nr': wkr_nr,
@@ -632,6 +651,7 @@ def search_wahlkreis(request):
         })
 
     except Exception as e:
+        logger.exception('Unexpected error during wahlkreis search')
         return JsonResponse({
             'success': False,
             'error': 'Search temporarily unavailable. Please select Wahlkreise manually.'
