@@ -98,6 +98,12 @@ class Constituency(models.Model):
     name = models.CharField(max_length=255)
     external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
     scope = models.CharField(max_length=30, choices=SCOPE_CHOICES)
+    wahlkreis_id = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text=_('Geographic Wahlkreis identifier (e.g., WKR_NR from GeoJSON)')
+    )
     metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
