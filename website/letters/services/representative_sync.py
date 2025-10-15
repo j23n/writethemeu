@@ -41,8 +41,6 @@ class RepresentativeSyncService:
             'parliaments_updated': 0,
             'terms_created': 0,
             'terms_updated': 0,
-            'districts_created': 0,
-            'districts_updated': 0,
             'constituencies_created': 0,
             'constituencies_updated': 0,
             'representatives_created': 0,
