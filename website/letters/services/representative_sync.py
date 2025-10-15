@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import logging
-import mimetypes
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -42,8 +41,6 @@ class RepresentativeSyncService:
             'parliaments_updated': 0,
             'terms_created': 0,
             'terms_updated': 0,
-            'districts_created': 0,
-            'districts_updated': 0,
             'constituencies_created': 0,
             'constituencies_updated': 0,
             'representatives_created': 0,
@@ -55,7 +52,6 @@ class RepresentativeSyncService:
             'photos_downloaded': 0,
         }
         self._politician_cache: Dict[str, Dict[str, Any]] = {}
-        self._photo_url_cache: Dict[str, Optional[str]] = {}
 
     # --------------------------------------
     @classmethod
@@ -72,38 +68,21 @@ class RepresentativeSyncService:
         for parliament_data in parliaments:
             label = parliament_data.get('label', '')
             if level in ('all', 'eu') and label == 'EU-Parlament':
-                self._sync_eu(parliament_data)
+                self._sync_parliament(parliament_data, level='EU', region='EU', description='EU parliament')
             elif level in ('all', 'federal') and label == 'Bundestag':
-                self._sync_federal(parliament_data)
+                self._sync_parliament(parliament_data, level='FEDERAL', region='DE', description='Bundestag')
             elif level in ('all', 'state') and label not in ('Bundestag', 'EU-Parlament'):
                 if state and normalize_german_state(label) != normalize_german_state(state):
                     continue
-                self._sync_state(parliament_data)
+                region = normalize_german_state(label)
+                self._sync_parliament(parliament_data, level='STATE', region=region, description=f"Landtag {label}")
 
     # --------------------------------------
-    def _sync_federal(self, parliament_data: Dict[str, Any]) -> None:
-        logger.info("Syncing Bundestag representatives …")
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='FEDERAL', region='DE')
+    def _sync_parliament(self, parliament_data: Dict[str, Any], level: str, region: str, description: str) -> None:
+        logger.info("Syncing %s representatives …", description)
+        parliament, term = self._ensure_parliament_and_term(parliament_data, level=level, region=region)
         mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc="Bundestag representatives", unit="rep"):
-            self._import_representative(mandate, parliament, term)
-        self._sync_committees_for_term(term)
-
-    def _sync_eu(self, parliament_data: Dict[str, Any]) -> None:
-        logger.info("Syncing EU parliament representatives …")
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='EU', region='EU')
-        mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc="EU Parliament representatives", unit="rep"):
-            self._import_representative(mandate, parliament, term)
-        self._sync_committees_for_term(term)
-
-    def _sync_state(self, parliament_data: Dict[str, Any]) -> None:
-        label = parliament_data.get('label', '')
-        logger.info("Syncing Landtag representatives for %s …", label)
-        region = normalize_german_state(label)
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='STATE', region=region)
-        mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc=f"{label} representatives", unit="rep"):
+        for mandate in tqdm(mandates, desc=f"{description} representatives", unit="rep"):
             self._import_representative(mandate, parliament, term)
         self._sync_committees_for_term(term)
 
@@ -225,26 +204,7 @@ class RepresentativeSyncService:
         for candidate in candidates:
             if candidate:
                 return candidate
-
-        profile_url = politician.get('abgeordnetenwatch_url') or politician.get('url')
-        if not profile_url:
-            return None
-        if profile_url in self._photo_url_cache:
-            return self._photo_url_cache[profile_url]
-        try:
-            response = requests.get(profile_url, timeout=30)
-            response.raise_for_status()
-        except requests.RequestException:
-            logger.debug("Failed to load profile page for %s", profile_url, exc_info=True)
-            self._photo_url_cache[profile_url] = None
-            return None
-
-        match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', response.text)
-        if not match:
-            match = re.search(r'<meta[^>]+content="([^"]+)"[^>]+property="og:image"', response.text)
-        photo_url = match.group(1) if match else None
-        self._photo_url_cache[profile_url] = photo_url
-        return photo_url
+        return None
 
     def _download_representative_image(self, photo_url: Optional[str], representative: Representative) -> Optional[str]:
         if not photo_url:
@@ -256,17 +216,12 @@ class RepresentativeSyncService:
             logger.warning("Failed to download photo for %s", representative.full_name, exc_info=True)
             return None
 
-        content_type = (response.headers.get('Content-Type') or '').split(';')[0]
-        extension = None
-        if content_type:
-            extension = mimetypes.guess_extension(content_type)
-        if extension in ('.jpe', '.jpeg'):
+        extension = Path(photo_url).suffix.split('?')[0]
+        if not extension or not extension.startswith('.'):
+            logger.warning("No valid extension found in URL %s, defaulting to .jpg", photo_url)
             extension = '.jpg'
-        if not extension:
-            extension = Path(photo_url).suffix.split('?')[0] or '.jpg'
-        if not extension.startswith('.'):
-            extension = f'.{extension}'
         if extension.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
+            logger.warning("Unusual image extension %s for %s, defaulting to .jpg", extension, photo_url)
             extension = '.jpg'
 
         media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
@@ -276,25 +231,6 @@ class RepresentativeSyncService:
         file_path.write_bytes(response.content)
         self.stats['photos_downloaded'] += 1
         return f"representatives/{filename}"
-
-    def _ensure_photo_reference(self, representative: Representative) -> Optional[Path]:
-        if representative.photo_path:
-            candidate = Path(settings.MEDIA_ROOT) / representative.photo_path
-            if candidate.exists():
-                return candidate
-
-        media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
-        if not media_dir.exists():
-            return None
-
-        for candidate in sorted(media_dir.glob(f"{representative.external_id}.*")):
-            if candidate.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
-                continue
-            representative.photo_path = f"representatives/{candidate.name}"
-            representative.photo_updated_at = representative.photo_updated_at or timezone.now()
-            representative.save(update_fields=['photo_path', 'photo_updated_at'])
-            return candidate
-        return None
 
     @staticmethod
     def _clean_text(value: Any) -> str:
@@ -359,6 +295,25 @@ class RepresentativeSyncService:
         first_name, last_name = self._split_name(politician.get('label', ''))
         party_name = normalize_party_name(self._extract_party_name(mandate))
         election_mode = self._derive_election_mode(parliament, electoral)
+        biography = self._extract_biography(politician)
+        focus_topics = self._extract_focus_topics(politician)
+        links = self._extract_links(politician)
+
+        metadata = {
+            'mandate': mandate,
+            'politician_id': politician_id,
+            'abgeordnetenwatch_url': (
+                politician.get('abgeordnetenwatch_url')
+                or politician.get('url')
+            ),
+            'wikipedia_url': self._extract_wikipedia_link(politician),
+        }
+        if biography:
+            metadata['biography'] = biography
+        if focus_topics:
+            metadata['focus_topics'] = focus_topics
+        if links:
+            metadata['links'] = links
 
         defaults = {
             'parliament_term': term,
@@ -370,28 +325,9 @@ class RepresentativeSyncService:
             'term_start': self._parse_date(mandate.get('start_date')) or term.start_date,
             'term_end': self._parse_date(mandate.get('end_date')) or term.end_date,
             'is_active': True,
-            'metadata': {
-                'mandate': mandate,
-                'politician_id': politician_id,
-                'abgeordnetenwatch_url': (
-                    politician.get('abgeordnetenwatch_url')
-                    or politician.get('url')
-                ),
-                'wikipedia_url': self._extract_wikipedia_link(politician),
-            }
+            'metadata': metadata,
+            'focus_areas': ', '.join(focus_topics) if focus_topics else '',
         }
-
-        metadata = dict(defaults['metadata'])
-        biography = self._extract_biography(politician)
-        if biography:
-            metadata['biography'] = biography
-        focus_topics = self._extract_focus_topics(politician)
-        if focus_topics:
-            metadata['focus_topics'] = focus_topics
-        links = self._extract_links(politician)
-        if links:
-            metadata['links'] = links
-        defaults['metadata'] = metadata
 
         rep, created = Representative.objects.update_or_create(
             external_id=mandate_id,
@@ -409,21 +345,14 @@ class RepresentativeSyncService:
             rep.constituencies.add(constituency)
 
         if not self.dry_run:
-            existing_photo_path = self._ensure_photo_reference(rep)
-            needs_download = not (existing_photo_path and existing_photo_path.exists())
-            if needs_download:
+            photo_path_exists = rep.photo_path and (Path(settings.MEDIA_ROOT) / rep.photo_path).exists()
+            if not photo_path_exists:
                 photo_url = self._find_photo_url(politician)
                 photo_path = self._download_representative_image(photo_url, rep) if photo_url else None
                 if photo_path and rep.photo_path != photo_path:
                     rep.photo_path = photo_path
                     rep.photo_updated_at = timezone.now()
                     rep.save(update_fields=['photo_path', 'photo_updated_at'])
-            else:
-                self._ensure_photo_reference(rep)
-
-        if focus_topics and not rep.focus_areas:
-            rep.focus_areas = ', '.join(focus_topics)
-            rep.save(update_fields=['focus_areas'])
 
     # --------------------------------------
     def _determine_constituencies(
@@ -434,6 +363,11 @@ class RepresentativeSyncService:
         representative: Representative,
     ) -> Iterable[Constituency]:
         mandate_won = electoral.get('mandate_won')
+
+        if mandate_won == 'constituency':
+            yield self._handle_direct_mandate(parliament, term, electoral)
+            return
+
         if parliament.level == 'EU':
             yield self._get_or_create_constituency(
                 term,
@@ -441,10 +375,6 @@ class RepresentativeSyncService:
                 name='Europäische Union',
                 metadata={'state': 'Deutschland'}
             )
-            return
-
-        if mandate_won == 'constituency':
-            yield self._handle_direct_mandate(parliament, term, electoral)
             return
 
         if parliament.level == 'FEDERAL':
