@@ -234,25 +234,6 @@ class RepresentativeSyncService:
         self.stats['photos_downloaded'] += 1
         return f"representatives/{filename}"
 
-    def _ensure_photo_reference(self, representative: Representative) -> Optional[Path]:
-        if representative.photo_path:
-            candidate = Path(settings.MEDIA_ROOT) / representative.photo_path
-            if candidate.exists():
-                return candidate
-
-        media_dir = Path(settings.MEDIA_ROOT) / 'representatives'
-        if not media_dir.exists():
-            return None
-
-        for candidate in sorted(media_dir.glob(f"{representative.external_id}.*")):
-            if candidate.suffix.lower() not in {'.jpg', '.jpeg', '.png', '.webp'}:
-                continue
-            representative.photo_path = f"representatives/{candidate.name}"
-            representative.photo_updated_at = representative.photo_updated_at or timezone.now()
-            representative.save(update_fields=['photo_path', 'photo_updated_at'])
-            return candidate
-        return None
-
     @staticmethod
     def _clean_text(value: Any) -> str:
         if not isinstance(value, str):
@@ -366,17 +347,14 @@ class RepresentativeSyncService:
             rep.constituencies.add(constituency)
 
         if not self.dry_run:
-            existing_photo_path = self._ensure_photo_reference(rep)
-            needs_download = not (existing_photo_path and existing_photo_path.exists())
-            if needs_download:
+            photo_path_exists = rep.photo_path and (Path(settings.MEDIA_ROOT) / rep.photo_path).exists()
+            if not photo_path_exists:
                 photo_url = self._find_photo_url(politician)
                 photo_path = self._download_representative_image(photo_url, rep) if photo_url else None
                 if photo_path and rep.photo_path != photo_path:
                     rep.photo_path = photo_path
                     rep.photo_updated_at = timezone.now()
                     rep.save(update_fields=['photo_path', 'photo_updated_at'])
-            else:
-                self._ensure_photo_reference(rep)
 
         if focus_topics and not rep.focus_areas:
             rep.focus_areas = ', '.join(focus_topics)
