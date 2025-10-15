@@ -2,6 +2,7 @@ import re
 from collections import OrderedDict
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
@@ -30,6 +31,7 @@ from .forms import (
     IdentityVerificationForm
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
+from .services.geocoding import AddressGeocoder, WahlkreisLocator
 
 
 def _send_activation_email(user, request):
@@ -614,8 +616,69 @@ def complete_verification(request):
     return redirect('profile')
 
 
+@login_required
+@require_http_methods(["POST"])
+def search_wahlkreis(request):
+    """
+    HTMX endpoint: Search for Wahlkreis by address.
+    Returns JSON with constituency data or error message.
+    """
+    street_address = request.POST.get('street_address', '').strip()
+    postal_code = request.POST.get('postal_code', '').strip()
+    city = request.POST.get('city', '').strip()
+
+    # Validate required fields
+    if not all([street_address, postal_code, city]):
+        return JsonResponse({
+            'success': False,
+            'error': 'Please provide street address, postal code, and city.'
+        })
+
+    # Geocode address
+    geocoder = AddressGeocoder()
+    lat, lon, success, error_msg = geocoder.geocode(
+        street=street_address,
+        postal_code=postal_code,
+        city=city,
+        country='DE'
+    )
+
+    if not success:
+        return JsonResponse({
+            'success': False,
+            'error': error_msg or 'Could not find address. Please check your input or select Wahlkreise manually.'
+        })
+
+    # Find Wahlkreis
+    try:
+        locator = WahlkreisLocator()
+        result = locator.locate(lat, lon)
+
+        if not result:
+            return JsonResponse({
+                'success': False,
+                'error': 'Could not determine Wahlkreis for this location. Please select manually.'
+            })
+
+        wkr_nr, wkr_name, land_name = result
+
+        return JsonResponse({
+            'success': True,
+            'wahlkreis_nr': wkr_nr,
+            'wahlkreis_name': wkr_name,
+            'land_name': land_name,
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': 'Search temporarily unavailable. Please select Wahlkreise manually.'
+        })
+
+
 # Letter Creation Suggestions (HTMX endpoints)
 
+@login_required
 @require_http_methods(["POST"])
 def analyze_letter_title(request):
     """

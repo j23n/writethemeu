@@ -18,6 +18,7 @@ urlpatterns = [
 
     # HTMX endpoints
     path('api/analyze-title/', views.analyze_letter_title, name='analyze_title'),
+    path('api/search-wahlkreis/', views.search_wahlkreis, name='search_wahlkreis'),
 
     # Authentication URLs
     path('register/', views.register, name='register'),
