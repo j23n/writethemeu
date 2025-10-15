@@ -365,6 +365,11 @@ class RepresentativeSyncService:
         representative: Representative,
     ) -> Iterable[Constituency]:
         mandate_won = electoral.get('mandate_won')
+
+        if mandate_won == 'constituency':
+            yield self._handle_direct_mandate(parliament, term, electoral)
+            return
+
         if parliament.level == 'EU':
             yield self._get_or_create_constituency(
                 term,
@@ -372,10 +377,6 @@ class RepresentativeSyncService:
                 name='Europäische Union',
                 metadata={'state': 'Deutschland'}
             )
-            return
-
-        if mandate_won == 'constituency':
-            yield self._handle_direct_mandate(parliament, term, electoral)
             return
 
         if parliament.level == 'FEDERAL':
