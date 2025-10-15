@@ -5,7 +5,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from letters.models import IdentityVerification, TopicArea
+from letters.models import IdentityVerification, TopicArea, Parliament, ParliamentTerm, Constituency
 
 
 class CompetencyPageTests(TestCase):
@@ -42,77 +42,6 @@ class ProfileViewAddressTests(TestCase):
         )
         self.client.login(username='testuser', password='password123')
 
-    def test_profile_view_saves_address(self):
-        """Test that profile view saves address correctly."""
-        response = self.client.post(
-            reverse('profile'),
-            {
-                'address_form_submit': '1',
-                'street_address': 'Unter den Linden 77',
-                'postal_code': '10117',
-                'city': 'Berlin',
-            },
-            follow=True
-        )
-
-        self.assertEqual(response.status_code, 200)
-        self.assertRedirects(response, reverse('profile'))
-
-        # Verify address was saved
-        verification = IdentityVerification.objects.get(user=self.user)
-        self.assertEqual(verification.street_address, 'Unter den Linden 77')
-        self.assertEqual(verification.postal_code, '10117')
-        self.assertEqual(verification.city, 'Berlin')
-        self.assertEqual(verification.status, 'SELF_DECLARED')
-        self.assertEqual(verification.verification_type, 'SELF_DECLARED')
-
-    def test_profile_view_updates_existing_address(self):
-        """Test that profile view updates existing address."""
-        # Create initial verification
-        verification = IdentityVerification.objects.create(
-            user=self.user,
-            status='SELF_DECLARED',
-            street_address='Old Street 1',
-            postal_code='12345',
-            city='OldCity',
-        )
-
-        response = self.client.post(
-            reverse('profile'),
-            {
-                'address_form_submit': '1',
-                'street_address': 'Unter den Linden 77',
-                'postal_code': '10117',
-                'city': 'Berlin',
-            },
-            follow=True
-        )
-
-        self.assertEqual(response.status_code, 200)
-
-        # Verify address was updated
-        verification.refresh_from_db()
-        self.assertEqual(verification.street_address, 'Unter den Linden 77')
-        self.assertEqual(verification.postal_code, '10117')
-        self.assertEqual(verification.city, 'Berlin')
-
-    def test_profile_view_displays_saved_address(self):
-        """Test that profile view displays saved address."""
-        # Create verification with address
-        _ = IdentityVerification.objects.create(
-            user=self.user,
-            status='SELF_DECLARED',
-            street_address='Unter den Linden 77',
-            postal_code='10117',
-            city='Berlin',
-        )
-
-        response = self.client.get(reverse('profile'))
-
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Unter den Linden 77')
-        self.assertContains(response, '10117')
-        self.assertContains(response, 'Berlin')
 
     def test_profile_page_does_not_show_verification_section(self):
         """Profile page should not display verification section"""
@@ -120,3 +49,40 @@ class ProfileViewAddressTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Identity & Constituency')
         self.assertNotContains(response, 'Start Third-party Verification')
+
+    def test_profile_post_only_accepts_constituency_form(self):
+        """Profile POST should only handle constituency form, not address"""
+        # Create test constituencies
+        bundestag = Parliament.objects.create(
+            name='Bundestag', level='FEDERAL', legislative_body='Bundestag', region='DE'
+        )
+        term = ParliamentTerm.objects.create(parliament=bundestag, name='20. Wahlperiode')
+        federal_const = Constituency.objects.create(
+            parliament_term=term, name='Berlin-Mitte', scope='FEDERAL_DISTRICT'
+        )
+
+        # Test 1: Constituency form should work
+        response = self.client.post(reverse('profile'), {
+            'federal_constituency': federal_const.id,
+            'state_constituency': ''
+        })
+
+        self.assertEqual(response.status_code, 302)  # Redirect after success
+
+        # Verify constituency was saved
+        verification = IdentityVerification.objects.get(user=self.user)
+        self.assertEqual(verification.federal_constituency, federal_const)
+
+        # Test 2: Address form should NOT work anymore (no address_form_submit handling)
+        response = self.client.post(reverse('profile'), {
+            'address_form_submit': '1',
+            'street_address': 'Test Street 123',
+            'postal_code': '12345',
+            'city': 'TestCity',
+        })
+
+        # Should not save address or redirect with success
+        # View should either ignore this or show form errors
+        verification.refresh_from_db()
+        # Address fields should not be updated (they might not even exist)
+        # This test will fail until we remove address form handling

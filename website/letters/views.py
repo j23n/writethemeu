@@ -28,7 +28,6 @@ from .forms import (
     LetterSearchForm,
     UserRegisterForm,
     SelfDeclaredConstituencyForm,
-    IdentityVerificationForm
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
 from .services.geocoding import AddressGeocoder, WahlkreisLocator
@@ -314,64 +313,27 @@ def profile(request):
         verification = None
 
     if request.method == 'POST':
-        # Check which form was submitted
-        if 'address_form_submit' in request.POST:
-            address_form = IdentityVerificationForm(request.POST, user=user)
-            constituency_form = SelfDeclaredConstituencyForm(user=user)
+        constituency_form = SelfDeclaredConstituencyForm(request.POST, user=user)
 
-            if address_form.is_valid():
-                street_address = address_form.cleaned_data.get('street_address')
-                postal_code = address_form.cleaned_data.get('postal_code')
-                city = address_form.cleaned_data.get('city')
-
-                # Only update if all fields are provided
-                if street_address and postal_code and city:
-                    # Get or create verification record
-                    verification, created = IdentityVerification.objects.get_or_create(
-                        user=user,
-                        defaults={
-                            'status': 'SELF_DECLARED',
-                            'verification_type': 'SELF_DECLARED',
-                        }
-                    )
-
-                    # Update address fields
-                    verification.street_address = street_address
-                    verification.postal_code = postal_code
-                    verification.city = city
-                    verification.save()
-
-                    messages.success(
-                        request,
-                        _('Ihre Adresse wurde gespeichert.')
-                    )
-                    return redirect('profile')
-        else:
-            # Constituency form submission
-            constituency_form = SelfDeclaredConstituencyForm(request.POST, user=user)
-            address_form = IdentityVerificationForm(user=user)
-
-            if constituency_form.is_valid():
-                IdentityVerificationService.self_declare(
-                    user=user,
-                    federal_constituency=constituency_form.cleaned_data['federal_constituency'],
-                    state_constituency=constituency_form.cleaned_data['state_constituency'],
-                )
-                messages.success(
-                    request,
-                    _('Your constituency information has been updated.')
-                )
-                return redirect('profile')
+        if constituency_form.is_valid():
+            IdentityVerificationService.self_declare(
+                user=user,
+                federal_constituency=constituency_form.cleaned_data['federal_constituency'],
+                state_constituency=constituency_form.cleaned_data['state_constituency'],
+            )
+            messages.success(
+                request,
+                _('Your constituency information has been updated.')
+            )
+            return redirect('profile')
     else:
         constituency_form = SelfDeclaredConstituencyForm(user=user)
-        address_form = IdentityVerificationForm(user=user)
 
     context = {
         'user_letters': user_letters,
         'user_signatures': user_signatures,
         'verification': verification,
         'constituency_form': constituency_form,
-        'address_form': address_form,
     }
 
     return render(request, 'letters/profile.html', context)
