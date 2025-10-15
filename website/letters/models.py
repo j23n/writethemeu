@@ -624,6 +624,30 @@ class IdentityVerification(models.Model):
         blank=True,
         related_name='state_verified_residents'
     )
+    # Wahlkreis identifiers (geographic electoral districts)
+    federal_wahlkreis_number = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text=_('Federal Wahlkreis number (1-299)')
+    )
+    state_wahlkreis_number = models.CharField(
+        max_length=10,
+        null=True,
+        blank=True,
+        help_text=_('State-specific Wahlkreis identifier')
+    )
+    eu_wahlkreis = models.CharField(
+        max_length=10,
+        default='DE',
+        help_text=_('EU Wahlkreis (always DE for Germany)')
+    )
+    # All applicable constituencies for this verification
+    constituencies = models.ManyToManyField(
+        Constituency,
+        blank=True,
+        related_name='verified_residents_all'
+    )
     verification_data = models.JSONField(default=dict, blank=True)
     verification_type = models.CharField(
         max_length=20,
