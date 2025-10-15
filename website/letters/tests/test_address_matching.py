@@ -192,6 +192,49 @@ class WahlkreisLocationTests(TestCase):
         result = locator.locate(51.5074, -0.1278)
         self.assertIsNone(result)
 
+    def test_locator_loads_available_state_files(self):
+        """Test WahlkreisLocator loads state GeoJSON files if they exist."""
+        import tempfile
+        import shutil
+        import json
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Copy federal fixture
+            federal_path = tmpdir_path / 'wahlkreise_federal.geojson'
+            shutil.copy(self.fixture_path, federal_path)
+
+            # Create mock state file for BW
+            state_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[9.0, 48.7], [9.1, 48.7], [9.1, 48.8], [9.0, 48.8], [9.0, 48.7]]]
+                    },
+                    "properties": {
+                        "WKR_NR": 1,
+                        "WKR_NAME": "Stuttgart I",
+                        "LAND_CODE": "BW",
+                        "LAND_NAME": "Baden-Württemberg",
+                        "LEVEL": "STATE"
+                    }
+                }]
+            }
+
+            state_path = tmpdir_path / 'wahlkreise_bw.geojson'
+            state_path.write_text(json.dumps(state_data))
+
+            # Initialize locator with this directory
+            locator = WahlkreisLocator(geojson_path=str(federal_path))
+
+            # Verify state data was loaded
+            self.assertIn('BW', locator.state_constituencies)
+            self.assertEqual(len(locator.state_constituencies['BW']), 1)
+
 
 class FullAddressMatchingTests(TestCase):
     """Integration tests for full address → constituency matching."""

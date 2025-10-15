@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import time
+from pathlib import Path
 from typing import Optional, Tuple
 
 import requests
@@ -226,32 +227,37 @@ class WahlkreisLocator:
 
     # Class-level cache for parsed constituencies
     _cached_constituencies = None
+    _cached_state_constituencies = None
     _cached_path = None
 
     def __init__(self, geojson_path=None):
         """
-        Load and parse GeoJSON constituencies.
+        Load and parse GeoJSON constituencies for federal and available states.
 
         Args:
-            geojson_path: Path to the GeoJSON file. If None, uses settings.CONSTITUENCY_BOUNDARIES_PATH
+            geojson_path: Path to the federal GeoJSON file. If None, uses settings.CONSTITUENCY_BOUNDARIES_PATH
         """
         from shapely.geometry import shape
 
         if geojson_path is None:
             geojson_path = settings.CONSTITUENCY_BOUNDARIES_PATH
 
+        geojson_path = Path(geojson_path)
+        data_dir = geojson_path.parent
+
         # Use cached constituencies if available and path matches
         if (WahlkreisLocator._cached_constituencies is not None and
-            WahlkreisLocator._cached_path == geojson_path):
+            WahlkreisLocator._cached_path == str(geojson_path)):
             self.constituencies = WahlkreisLocator._cached_constituencies
+            self.state_constituencies = WahlkreisLocator._cached_state_constituencies
             return
 
-        # Load and parse GeoJSON file
+        # Load federal constituencies
         self.constituencies = []
         with open(geojson_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
 
-        # Parse each feature and store geometry with properties
+        # Parse federal features
         for feature in data.get('features', []):
             properties = feature.get('properties', {})
             wkr_nr = properties.get('WKR_NR')
@@ -264,9 +270,36 @@ class WahlkreisLocator:
             # Store as tuple: (wkr_nr, wkr_name, land_name, geometry)
             self.constituencies.append((wkr_nr, wkr_name, land_name, geometry))
 
+        # Load available state files
+        self.state_constituencies = {}
+
+        state_codes = ['BW', 'BY', 'BE', 'HB', 'NI', 'NW', 'ST', 'SH', 'TH']
+        for state_code in state_codes:
+            state_file = data_dir / f'wahlkreise_{state_code.lower()}.geojson'
+
+            if state_file.exists():
+                state_data = []
+                with open(state_file, 'r', encoding='utf-8') as f:
+                    state_geojson = json.load(f)
+
+                for feature in state_geojson.get('features', []):
+                    properties = feature.get('properties', {})
+                    wkr_nr = properties.get('WKR_NR')
+                    wkr_name = properties.get('WKR_NAME', '')
+                    land_code = properties.get('LAND_CODE', state_code)
+                    land_name = properties.get('LAND_NAME', '')
+
+                    geometry = shape(feature['geometry'])
+
+                    # Store: (wkr_nr, wkr_name, land_code, land_name, geometry)
+                    state_data.append((wkr_nr, wkr_name, land_code, land_name, geometry))
+
+                self.state_constituencies[state_code] = state_data
+
         # Cache the parsed constituencies
         WahlkreisLocator._cached_constituencies = self.constituencies
-        WahlkreisLocator._cached_path = geojson_path
+        WahlkreisLocator._cached_state_constituencies = self.state_constituencies
+        WahlkreisLocator._cached_path = str(geojson_path)
 
     def locate(self, latitude, longitude):
         """
