@@ -55,7 +55,6 @@ class RepresentativeSyncService:
             'photos_downloaded': 0,
         }
         self._politician_cache: Dict[str, Dict[str, Any]] = {}
-        self._photo_url_cache: Dict[str, Optional[str]] = {}
 
     # --------------------------------------
     @classmethod
@@ -208,26 +207,7 @@ class RepresentativeSyncService:
         for candidate in candidates:
             if candidate:
                 return candidate
-
-        profile_url = politician.get('abgeordnetenwatch_url') or politician.get('url')
-        if not profile_url:
-            return None
-        if profile_url in self._photo_url_cache:
-            return self._photo_url_cache[profile_url]
-        try:
-            response = requests.get(profile_url, timeout=30)
-            response.raise_for_status()
-        except requests.RequestException:
-            logger.debug("Failed to load profile page for %s", profile_url, exc_info=True)
-            self._photo_url_cache[profile_url] = None
-            return None
-
-        match = re.search(r'<meta[^>]+property="og:image"[^>]+content="([^"]+)"', response.text)
-        if not match:
-            match = re.search(r'<meta[^>]+content="([^"]+)"[^>]+property="og:image"', response.text)
-        photo_url = match.group(1) if match else None
-        self._photo_url_cache[profile_url] = photo_url
-        return photo_url
+        return None
 
     def _download_representative_image(self, photo_url: Optional[str], representative: Representative) -> Optional[str]:
         if not photo_url:

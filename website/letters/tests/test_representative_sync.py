@@ -108,4 +108,83 @@ class SyncParliamentMethodTests(TestCase):
         self.assertEqual(parliament.region, 'BW')
 
 
+class FindPhotoUrlTests(TestCase):
+    """Test the _find_photo_url method without HTML scraping fallback."""
+
+    def setUp(self):
+        """Set up test service instance."""
+        self.service = RepresentativeSyncService(dry_run=True)
+
+    def test_finds_photo_url_from_image_dict(self):
+        """Test that photo URL is extracted from image dict."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person',
+            'image': {
+                'url': 'https://example.com/photo.jpg'
+            }
+        }
+        result = self.service._find_photo_url(politician)
+        self.assertEqual(result, 'https://example.com/photo.jpg')
+
+    def test_finds_photo_url_from_image_original(self):
+        """Test that photo URL is extracted from image original field."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person',
+            'image': {
+                'original': 'https://example.com/original.jpg'
+            }
+        }
+        result = self.service._find_photo_url(politician)
+        self.assertEqual(result, 'https://example.com/original.jpg')
+
+    def test_finds_photo_url_from_image_versions(self):
+        """Test that photo URL is extracted from image versions."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person',
+            'image': {
+                'versions': {
+                    'large': 'https://example.com/large.jpg',
+                    'small': {'url': 'https://example.com/small.jpg'}
+                }
+            }
+        }
+        result = self.service._find_photo_url(politician)
+        self.assertIn(result, ['https://example.com/large.jpg', 'https://example.com/small.jpg'])
+
+    def test_returns_none_when_no_image_data(self):
+        """Test that None is returned when no image data exists."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person'
+        }
+        result = self.service._find_photo_url(politician)
+        self.assertIsNone(result)
+
+    def test_returns_none_when_no_valid_url_in_image_dict(self):
+        """Test that None is returned when image dict has no valid URL."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person',
+            'image': {
+                'caption': 'Some caption'
+            }
+        }
+        result = self.service._find_photo_url(politician)
+        self.assertIsNone(result)
+
+    def test_does_not_scrape_html_when_profile_url_exists(self):
+        """Test that HTML scraping is not performed even when profile URL exists."""
+        politician = {
+            'id': 123,
+            'label': 'Test Person',
+            'abgeordnetenwatch_url': 'https://example.com/profile'
+        }
+        # Should return None without making HTTP requests
+        result = self.service._find_photo_url(politician)
+        self.assertIsNone(result)
+
+
 # End of file
