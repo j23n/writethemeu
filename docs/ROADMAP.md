@@ -1,9 +1,9 @@
-# MVP Vision
+# MVP Roadmap
 
 ## Mission
 Empower citizens to participate in democracy by writing impactful open letters to the representatives best positioned to act, and by allowing others to rally behind those letters with signatures. Verified identities add credibility; when a letter clears a signature threshold, we commit to printing, signing, and delivering it to the relevant office.
 
-## Core Feature Set
+## MVP Feature Set
 1. **Accounts & Profiles**
    - Email/password registration & login.
    - Profile page showing authored letters, signed letters, and verification status.
@@ -39,178 +39,184 @@ Empower citizens to participate in democracy by writing impactful open letters t
     - Public “How it works” page, privacy policy, terms.
     - README covering setup, architecture, deployment.
 
-## 1-Month Sprint to 39C3 (December 2024)
+## Implementation Phases
 
-### **Week 1-2: Core Functionality** (Days 1-10)
+### Phase 1: Foundation & Core Letter Flow
+**Core functionality for writing, publishing, and signing letters**
 
-#### Track 1: Accurate Constituency Matching (Days 1-5) ⚠️ CRITICAL
-**Day 1: OSM Nominatim Integration**
-- [ ] Set up OSM Nominatim API client (requests-based, with rate limiting)
-- [ ] Add address geocoding service (`AddressGeocoder`)
-- [ ] Cache geocoding results in database to minimize API calls
-- [ ] Write tests for address → lat/lng conversion
+- [x] Account Management (Completed: 2024-10-11, pre-roadmap work)
+  - Email/password registration & login
+  - Password reset functionality
+  - Account deletion
+  - Double opt-in email verification
 
-**Day 2: GeoJSON Point-in-Polygon Lookup**
-- [ ] Download full Bundestag Wahlkreis GeoJSON (via existing management command)
-- [ ] Build `WahlkreisLocator` using shapely for point-in-polygon
-- [ ] Load GeoJSON into memory at startup (or cache in Redis)
-- [ ] Test coordinate → Wahlkreis lookup with sample points
+- [x] Representative Data Infrastructure (Completed: 2024-10-14, PR #4)
+  - Representative metadata sync (photos, committees, focus areas)
+  - Parliament/Term/Constituency models
+  - Committee-to-topic automatic mapping
+  - Abgeordnetenwatch API integration
+  - Support for EU, Bundestag, and Landtag levels
 
-**Day 3: Integration & Service Layer**
-- [ ] Replace `ConstituencyLocator` with new address-based lookup
-- [ ] Update `LocationContext` to accept full addresses
-- [ ] Maintain PLZ prefix fallback for partial data
-- [ ] Add comprehensive error handling and logging
+- [x] Letter Authoring & Publishing (Completed: 2024-10-11, pre-roadmap work)
+  - Draft and publish open letters
+  - Auto-sign on publish
+  - Letter detail page with full content
+  - HTMX-based representative suggestions
 
-**Day 4: Representative Matching Validation**
-- [ ] Test matching with 20 real German addresses
-- [ ] Verify direct representatives are correctly suggested
-- [ ] Test topic + geography combined matching
-- [ ] Document matching algorithm for transparency
+- [x] Signature Flow (Completed: 2024-10-11, pre-roadmap work)
+  - One-click signing for logged-in users
+  - Signature display with verification badges
+  - Basic signature counting
 
-**Day 5: Performance & Edge Cases**
-- [ ] Add caching layer for expensive operations
-- [ ] Handle border constituencies and ambiguous addresses
-- [ ] Performance test with 100+ concurrent requests
-- [ ] Add monitoring/logging for matching accuracy
+- [x] Topic Matching (Completed: 2024-10-11, pre-roadmap work)
+  - TopicArea taxonomy with keyword matching
+  - Topic analysis for letters
+  - Committee-to-topic mapping
 
-#### Track 2: UX Polish (Days 3-8)
+- [ ] Draft Management
+  - Save unpublished drafts
+  - Edit drafts before publishing
+  - Draft list in user profile
+  - Delete drafts
 
-**Day 3-4: Gov.uk-Inspired Branding**
-- [ ] Define color palette (inspired by gov.uk: blues, blacks, whites)
-- [ ] Choose typography (gov.uk uses: Transport/Arial for headings, system fonts for body)
-- [ ] Create CSS design system with variables
-- [ ] Update base template with new styles
-- [ ] Design simple wordmark/logo
+### Phase 2: Accurate Constituency Matching
+**Geographic precision for representative recommendations**
 
-**Day 5-6: Letter List Improvements**
-- [ ] Add sorting controls (newest, most signatures, most verified)
-- [ ] Add TopicArea filtering (multi-select chips)
-- [ ] Improve letter card design (hierarchy, spacing, affordances)
-- [ ] Add empty states with helpful CTAs
-- [ ] Mobile responsive improvements
+- [x] Geocoding Infrastructure (Completed: 2024-10-15, pre-roadmap work)
+  - OSM Nominatim API integration with rate limiting
+  - AddressGeocoder service
+  - GeocodeCache model for performance
+  - Address → lat/lng conversion
 
-**Day 6-7: Letter Authoring Flow**
-- [ ] Add character counter (500 char minimum)
-- [ ] Add prominent immutability warning before publish
-- [ ] Show representative suggestion reasoning
-- [ ] Add preview step before publishing
-- [ ] Improve auto-signature confirmation messaging
+- [x] Wahlkreis Boundary Lookup (Completed: 2024-10-15, pre-roadmap work)
+  - WahlkreisLocator using Shapely for point-in-polygon
+  - GeoJSON boundary data loading and caching
+  - Coordinate → Wahlkreis mapping
 
-**Day 7-8: Letter Detail & Sharing**
-- [ ] Add prominent "Copy link" button with visual feedback
-- [ ] Add social share buttons (Twitter, Bluesky with pre-filled text)
-- [ ] Clarify signature removal instructions
-- [ ] Improve verified/unverified signature badges
-- [ ] Polish report button and modal
+- [ ] Integration & Validation
+  - Integrate geocoding into representative suggestions
+  - Test with 20+ real German addresses
+  - Verify direct representatives correctly suggested
+  - Document matching algorithm for transparency
+  - Handle edge cases (border areas, ambiguous addresses)
+  - Performance testing with concurrent requests
 
-#### Track 3: Localization Foundation (Days 6-8)
+### Phase 3: Internationalization
+**Multi-language support with German as primary**
 
-**Day 6-7: Django i18n Setup**
-- [ ] Wrap all strings in `gettext()` / `_()` calls
-- [ ] Generate German .po files
-- [ ] Add language switcher infrastructure (even if only DE works)
-- [ ] Document translation workflow
+- [x] i18n Infrastructure (Completed: 2024-10-14, PR #2)
+  - Django i18n configuration (German/English)
+  - All templates wrapped with translation tags
+  - German and English .po files generated
+  - Language switcher component
+  - Translation management command
 
-**Day 8: Content Audit**
-- [ ] Audit templates for hardcoded strings
-- [ ] Review German tone/voice consistency
-- [ ] Ensure error messages are clear and helpful
-- [ ] Proofread all user-facing content
+- [ ] Content Refinement
+  - Audit all user-facing strings for completeness
+  - Review German tone/voice consistency
+  - Ensure error messages are clear and helpful
+  - Complete any missing translations
 
-#### Track 4: Automated Testing (Days 8-10)
+### Phase 4: User Experience & Polish
+**Visual design and usability improvements**
 
-**Day 8: Integration Tests**
-- [ ] Test full flow: Register → Create Letter → Suggestions → Publish → Sign
-- [ ] Test with 10 real German addresses
-- [ ] Test with 5 different topics
-- [ ] Test email flows (registration, password reset)
+- [ ] Design System
+  - Define color palette (gov.uk-inspired)
+  - Typography system
+  - CSS design system with variables
+  - Simple wordmark/logo
 
-**Day 9: Matching Tests**
-- [ ] Unit tests for geocoding service
-- [ ] Unit tests for GeoJSON lookup
-- [ ] Integration tests for address → representative matching
-- [ ] Test edge cases (border areas, ambiguous addresses)
+- [ ] Letter Discovery
+  - Sorting controls (newest, most signatures, most verified)
+  - TopicArea filtering (multi-select)
+  - Improved letter card design
+  - Empty states with helpful CTAs
+  - Mobile responsive improvements
 
-**Day 10: System Tests**
-- [ ] Browser automation tests (Playwright/Selenium)
-- [ ] Mobile responsive tests
-- [ ] Performance tests (response times, concurrent users)
-- [ ] Create bug fix punch list
+- [ ] Letter Authoring Experience
+  - Character counter (500 char minimum)
+  - Prominent immutability warning
+  - Representative suggestion reasoning display
+  - Preview step before publishing
+  - Improved auto-signature confirmation
 
-### **Week 3-4: Deployment & Polish** (Days 11-20)
+- [ ] Sharing & Engagement
+  - Prominent "Copy link" button
+  - Social share buttons (Twitter, Bluesky)
+  - Improved verified/unverified badges
+  - Enhanced report functionality
 
-#### Track 5: Production Deployment (Days 11-14)
+### Phase 5: Content & Documentation
+**Landing pages, legal docs, and transparency**
 
-**Day 11-12: VPS Setup**
-- [ ] Provision VPS with cloud-init template
-- [ ] Configure Gunicorn + Nginx
-- [ ] Set up SSL/TLS certificates (Let's Encrypt)
-- [ ] Configure static file serving
+- [ ] Public-Facing Content
+  - Compelling homepage with mission and stats
+  - "How It Works" page explaining matching
+  - FAQ section
+  - Example letters or testimonials
 
-**Day 13: Production Configuration**
-- [ ] Environment-based settings (secrets, database)
-- [ ] Configure email backend (SMTP/SendGrid/SES)
-- [ ] Set up error tracking (Sentry/Rollbar)
-- [ ] Configure logging (structured logs)
+- [ ] Legal & Privacy
+  - Privacy Policy (GDPR-compliant)
+  - Terms of Service
+  - Impressum (German legal requirement)
+  - Cookie consent if needed
 
-**Day 14: Deployment Automation**
-- [ ] Create deployment script (simple rsync/git pull based)
-- [ ] Test rollback procedure
-- [ ] Document deployment process
-- [ ] Set up basic monitoring/health checks
+### Phase 6: Production Deployment
+**Infrastructure and monitoring**
 
-#### Track 6: Content & Documentation (Days 15-17)
+- [ ] VPS Infrastructure
+  - Provision VPS with cloud-init
+  - Configure Gunicorn + Nginx
+  - SSL/TLS certificates (Let's Encrypt)
+  - Static file serving
 
-**Day 15-16: Landing & How It Works**
-- [ ] Create compelling homepage (mission, stats, CTA)
-- [ ] Write "How It Works" page (transparency about matching)
-- [ ] Create FAQ section
-- [ ] Add example letters / testimonials
+- [ ] Production Configuration
+  - Environment-based settings (secrets, database)
+  - Email backend (SMTP/SendGrid/SES)
+  - Error tracking (Sentry/Rollbar)
+  - Structured logging
 
-**Day 17: Legal & Privacy**
-- [ ] Write basic Privacy Policy (GDPR-compliant)
-- [ ] Write Terms of Service
-- [ ] Add cookie consent if needed
-- [ ] Create Impressum (legal requirement in Germany)
+- [ ] Deployment Automation
+  - Deployment script (rsync/git-based)
+  - Rollback procedure
+  - Deployment documentation
+  - Health checks and monitoring
 
-#### Track 7: Final Testing & Launch Prep (Days 18-20)
+### Phase 7: Testing & Launch Readiness
+**Comprehensive validation before launch**
 
-**Day 18: User Acceptance Testing**
-- [ ] Run through entire flow with fresh eyes
-- [ ] Test on multiple devices and browsers
-- [ ] Verify all links and forms work
-- [ ] Check for typos and formatting issues
+- [ ] Automated Testing
+  - End-to-end flow tests (Register → Create → Publish → Sign)
+  - Geocoding and matching tests with real addresses
+  - Email flow tests
+  - Edge case testing (border areas, ambiguous data)
 
-**Day 19: Performance & Security Audit**
-- [ ] Load testing (how many concurrent users can it handle?)
-- [ ] Security review (XSS, CSRF, SQL injection protections)
-- [ ] Check all forms have proper validation
-- [ ] Review admin permissions
+- [ ] User Acceptance Testing
+  - Manual testing of complete flows
+  - Multi-device and browser testing
+  - Link and form verification
+  - Content proofreading
 
-**Day 20: Launch Preparation**
-- [ ] Create launch checklist
-- [ ] Prepare 39C3 demo script
-- [ ] Set up analytics/monitoring dashboards
-- [ ] Plan initial outreach (Twitter, mailing lists, etc.)
+- [ ] Security & Performance
+  - Load testing (concurrent users)
+  - Security review (XSS, CSRF, SQL injection)
+  - Form validation audit
+  - Admin permissions review
 
-## Completed Features (From Previous Work)
-- [x] Account Management (registration, login, password reset, deletion)
-- [x] Double opt-in email verification
-- [x] TopicArea taxonomy with keyword matching
-- [x] Representative metadata sync (photos, committees, focus areas)
-- [x] Committee-to-topic automatic mapping
-- [x] Self-declared constituency verification
-- [x] HTMX-based representative suggestions
-- [x] Basic letter authoring and signing flow
+- [ ] Launch Preparation
+  - Launch checklist creation
+  - Demo script preparation
+  - Analytics/monitoring dashboards
+  - Initial outreach planning
 
-## Explicitly Deferred (Post-39C3)
+## Future Work
+**Features deferred until post-MVP**
+
 - Third-party identity verification (Verimi, yes®)
-- Analytics/feedback systems (basic monitoring only for MVP)
-- EU Parliament & Landtag levels (Bundestag only for MVP)
+- Advanced analytics and feedback systems
 - Draft auto-save functionality
 - Advanced admin moderation tools
-- Multiple language support (German only for MVP, i18n structure ready)
+- Additional language support beyond German/English
 
 ## Out of Scope for MVP
 - Local municipality reps, party-wide campaigns.
