@@ -125,14 +125,14 @@ class ConstituencyLocator:
 
         Strategy:
         1. If full address provided (street + postal_code + city):
-           - Geocode address to coordinates
-           - Use WahlkreisLocator to find constituency
-           - Return matching Constituency objects
+           - Use WahlkreisResolver to get Wahlkreis identifiers and constituencies
+           - Return constituencies
         2. Fallback to PLZ-prefix matching if:
            - No street provided
-           - Geocoding fails
-           - WahlkreisLocator returns no result
+           - WahlkreisResolver returns no constituencies
         """
+        from .wahlkreis import WahlkreisResolver
+
         street = (street or '').strip()
         postal_code = (postal_code or '').strip()
         city = (city or '').strip()
@@ -140,41 +140,22 @@ class ConstituencyLocator:
         # Try full address-based lookup if we have all components
         if street and postal_code and city:
             try:
-                lat, lon, success, error = self.geocoder.geocode(street, postal_code, city, country)
+                resolver = WahlkreisResolver()
+                result = resolver.resolve(street, postal_code, city, country)
 
-                if success and lat is not None and lon is not None:
-                    # Find constituency using coordinates
-                    result = self.wahlkreis_locator.locate(lat, lon)
-
-                    if result:
-                        wkr_nr, wkr_name, land_name = result
-                        logger.info(
-                            "Address geocoded to constituency: %s (WK %s, %s)",
-                            wkr_name, wkr_nr, land_name
-                        )
-
-                        # Find Constituencies for this Wahlkreis
-                        constituencies = self._find_constituencies_by_wahlkreis(
-                            wkr_nr, wkr_name, land_name
-                        )
-
-                        if constituencies:
-                            return constituencies
-
-                        # If no constituencies found for direct wahlkreis,
-                        # fall through to PLZ-based lookup
-                        logger.warning(
-                            "No constituencies found for WK %s, falling back to PLZ",
-                            wkr_nr
-                        )
-                else:
-                    logger.debug(
-                        "Geocoding failed for %s, %s %s: %s",
-                        street, postal_code, city, error
+                if result['constituencies']:
+                    logger.info(
+                        "Address resolved to %d constituencies via WahlkreisResolver",
+                        len(result['constituencies'])
                     )
+                    return result['constituencies']
+
+                logger.warning(
+                    "WahlkreisResolver found no constituencies, falling back to PLZ"
+                )
             except Exception as e:
                 logger.warning(
-                    "Error during address-based lookup for %s, %s %s: %s",
+                    "Error during WahlkreisResolver lookup for %s, %s %s: %s",
                     street, postal_code, city, e
                 )
 

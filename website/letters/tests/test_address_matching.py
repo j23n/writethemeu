@@ -5,6 +5,7 @@ import os
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
+from letters.services.wahlkreis import WahlkreisResolver
 from letters.models import GeocodeCache
 
 
@@ -195,50 +196,46 @@ class WahlkreisLocationTests(TestCase):
 class FullAddressMatchingTests(TestCase):
     """Integration tests for full address → constituency matching."""
 
-    @patch('letters.services.WahlkreisLocator.locate')
-    @patch('letters.services.AddressGeocoder.geocode')
-    def test_locate_returns_constituencies_not_representatives(self, mock_geocode, mock_wahlkreis):
-        """Test that ConstituencyLocator.locate() returns constituencies, not representatives."""
+    @patch('letters.services.wahlkreis.WahlkreisResolver.resolve')
+    def test_locate_returns_correct_constituency(self, mock_resolve):
+        """Test that ConstituencyLocator.locate() returns constituencies."""
         from letters.models import Parliament, ParliamentTerm, Constituency
 
         # Create test data
-        bundestag = Parliament.objects.create(
+        parliament = Parliament.objects.create(
             name='Bundestag',
             level='FEDERAL',
             legislative_body='Bundestag',
             region='DE'
         )
         term = ParliamentTerm.objects.create(
-            parliament=bundestag,
+            parliament=parliament,
             name='20. Wahlperiode'
         )
-        federal_const = Constituency.objects.create(
+        constituency = Constituency.objects.create(
             parliament_term=term,
             name='Berlin-Mitte',
-            external_id='83',
             scope='FEDERAL_DISTRICT',
-            metadata={'WKR_NR': 83, 'state': 'Berlin'}
+            wahlkreis_id='075'
         )
 
-        # Mock geocoding to return Bundestag coordinates
-        mock_geocode.return_value = (52.5186, 13.3761, True, None)
-
-        # Mock WahlkreisLocator to return Berlin constituency
-        mock_wahlkreis.return_value = (83, 'Berlin-Mitte', 'Berlin')
+        # Mock WahlkreisResolver to return our test constituency
+        mock_resolve.return_value = {
+            'federal_wahlkreis_number': '075',
+            'state_wahlkreis_number': '075',
+            'eu_wahlkreis': 'DE',
+            'constituencies': [constituency]
+        }
 
         locator = ConstituencyLocator()
-        result = locator.locate(
-            street='Platz der Republik 1',
-            postal_code='11011',
+        constituencies = locator.locate(
+            street='Unter den Linden 1',
+            postal_code='10117',
             city='Berlin'
         )
 
-        # Should return list of Constituency objects
-        self.assertIsInstance(result, list)
-        self.assertGreater(len(result), 0)
-        self.assertIsInstance(result[0], Constituency)
-        self.assertEqual(result[0].name, 'Berlin-Mitte')
-        mock_geocode.assert_called_once()
+        self.assertEqual(len(constituencies), 1)
+        self.assertEqual(constituencies[0].id, constituency.id)
 
     @patch('letters.services.AddressGeocoder.geocode')
     def test_plz_fallback_returns_constituencies(self, mock_geocode):
