@@ -39,10 +39,6 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
         verification = IdentityVerification.objects.create(
             user=self.user,
             status='VERIFIED',
-            postal_code='10115',
-            city='Berlin',
-            state='Berlin',
-            country='DE',
             constituency=self.constituency_direct,
             federal_constituency=self.constituency_direct,
             verification_type='THIRD_PARTY',
@@ -139,19 +135,24 @@ class IdentityVerificationFormTests(TestCase):
         )
         self.assertTrue(form.is_valid())
 
-    def test_form_prefills_existing_address(self):
-        """Test that form prefills existing address from verification."""
-        # Create verification with address
-        _ = IdentityVerification.objects.create(
-            user=self.user,
+
+
+class TestIdentityVerificationWithoutAddress(ParliamentFixtureMixin, TestCase):
+    """Test that IdentityVerification works without address fields."""
+
+    def test_verification_works_without_address_fields(self):
+        """IdentityVerification should work with only constituency foreign keys"""
+        user = User.objects.create_user(username='testuser', password='testpass')
+
+        verification = IdentityVerification.objects.create(
+            user=user,
             status='SELF_DECLARED',
-            street_address='Unter den Linden 77',
-            postal_code='10117',
-            city='Berlin',
+            verification_type='SELF_DECLARED',
+            federal_constituency=self.constituency_direct
         )
 
-        form = IdentityVerificationForm(user=self.user)
-
-        self.assertEqual(form.fields['street_address'].initial, 'Unter den Linden 77')
-        self.assertEqual(form.fields['postal_code'].initial, '10117')
-        self.assertEqual(form.fields['city'].initial, 'Berlin')
+        self.assertTrue(verification.is_verified)
+        self.assertEqual(verification.federal_constituency, self.constituency_direct)
+        constituencies = verification.get_constituencies()
+        self.assertEqual(len(constituencies), 1)
+        self.assertEqual(constituencies[0], self.constituency_direct)

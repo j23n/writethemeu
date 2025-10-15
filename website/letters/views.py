@@ -667,8 +667,6 @@ def analyze_letter_title(request):
             constituency_states = verification.get_constituency_states()
             if constituency_states:
                 user_location.setdefault('state', next(iter(constituency_states)))
-            elif verification.state:
-                user_location.setdefault('state', verification.state)
 
     # Analyze with ConstituencySuggestionService
     suggestion_result = ConstituencySuggestionService.suggest_from_concern(

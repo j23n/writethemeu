@@ -46,11 +46,6 @@ class IdentityVerificationService:
         defaults = {
             'status': 'VERIFIED',
             'provider': verification_data.get('provider', 'stub_provider'),
-            'street_address': verification_data.get('street', ''),
-            'postal_code': postal_code,
-            'city': verification_data.get('city', ''),
-            'state': verification_data.get('state', ''),
-            'country': (verification_data.get('country') or 'DE').upper(),
             'verification_data': verification_data,
             'verified_at': timezone.now(),
             'expires_at': expires_at,
@@ -69,11 +64,6 @@ class IdentityVerificationService:
         verification.save(update_fields=[
             'provider',
             'status',
-            'street_address',
-            'postal_code',
-            'city',
-            'state',
-            'country',
             'verification_data',
             'verified_at',
             'expires_at',
@@ -105,17 +95,6 @@ class IdentityVerificationService:
         verification.federal_constituency = federal_constituency
         verification.state_constituency = state_constituency
         verification.constituency = federal_constituency or state_constituency
-
-        state_value = verification.state
-        for constituency in filter(None, [federal_constituency, state_constituency]):
-            metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
-            if metadata_state:
-                state_value = metadata_state
-                break
-
-        if state_value:
-            verification.state = state_value
-        verification.country = verification.country or 'DE'
         verification.verified_at = timezone.now()
         verification.expires_at = None
 

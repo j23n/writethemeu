@@ -244,7 +244,7 @@ class Representative(models.Model):
             self._constituency_cache = constituencies
 
         if self.parliament.level == 'EU':
-            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
+            return bool(verification.get_constituencies())
 
         verification_constituencies = verification.get_constituencies()
         verification_constituency_ids = {c.id for c in verification_constituencies}
@@ -262,7 +262,7 @@ class Representative(models.Model):
         }
 
         if self.election_mode == 'FEDERAL_LIST':
-            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
+            return bool(verification.get_constituencies())
 
         if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
             if verification_states & rep_states:
@@ -583,11 +583,6 @@ class IdentityVerification(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='identity_verification')
     provider = models.CharField(max_length=100, default='stub_provider')
     status = models.CharField(max_length=20, choices=VERIFICATION_STATUS_CHOICES, default='PENDING')
-    street_address = models.CharField(max_length=255, blank=True)
-    postal_code = models.CharField(max_length=20, blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    state = models.CharField(max_length=100, blank=True)
-    country = models.CharField(max_length=32, blank=True, default='DE')
     parliament = models.ForeignKey(
         Parliament,
         on_delete=models.SET_NULL,
@@ -658,7 +653,9 @@ class IdentityVerification(models.Model):
 
     @property
     def normalized_state(self):
-        return normalize_german_state(self.state)
+        """Get normalized state from linked constituencies"""
+        states = self.get_constituency_states()
+        return next(iter(states)) if states else None
 
     def link_constituency(self, constituency: Constituency, scope: Optional[str] = None) -> None:
         """Attach the verification to a specific constituency and infer parliament links."""
@@ -707,9 +704,6 @@ class IdentityVerification(models.Model):
 
     def get_constituency_states(self) -> Set[str]:
         states: Set[str] = set()
-        normalized = self.normalized_state
-        if normalized:
-            states.add(normalized)
         for constituency in self.get_constituencies():
             metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
             if metadata_state:

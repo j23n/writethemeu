@@ -278,17 +278,6 @@ class IdentityVerificationForm(forms.Form):
         self.user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        # Pre-fill with existing address if available
-        if self.user and hasattr(self.user, 'identity_verification'):
-            verification = getattr(self.user, 'identity_verification', None)
-            if verification:
-                if verification.street_address:
-                    self.fields['street_address'].initial = verification.street_address
-                if verification.postal_code:
-                    self.fields['postal_code'].initial = verification.postal_code
-                if verification.city:
-                    self.fields['city'].initial = verification.city
-
     def clean(self):
         cleaned_data = super().clean()
         street_address = cleaned_data.get('street_address')
