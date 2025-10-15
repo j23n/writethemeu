@@ -110,9 +110,9 @@ class ConstituencyLocator:
         postal_code: Optional[str] = None,
         city: Optional[str] = None,
         country: str = 'DE'
-    ) -> List[Representative]:
+    ) -> List[Constituency]:
         """
-        Locate representatives by address or postal code.
+        Locate constituencies by address or postal code.
 
         Args:
             street: Street name and number (optional)
@@ -121,13 +121,13 @@ class ConstituencyLocator:
             country: Country code (default: 'DE')
 
         Returns:
-            List of Representative objects for the located constituency
+            List of Constituency objects for the located area
 
         Strategy:
         1. If full address provided (street + postal_code + city):
            - Geocode address to coordinates
            - Use WahlkreisLocator to find constituency
-           - Return Representatives for that constituency
+           - Return matching Constituency objects
         2. Fallback to PLZ-prefix matching if:
            - No street provided
            - Geocoding fails
@@ -153,18 +153,18 @@ class ConstituencyLocator:
                             wkr_name, wkr_nr, land_name
                         )
 
-                        # Find Representatives for this Wahlkreis
-                        representatives = self._find_representatives_by_wahlkreis(
+                        # Find Constituencies for this Wahlkreis
+                        constituencies = self._find_constituencies_by_wahlkreis(
                             wkr_nr, wkr_name, land_name
                         )
 
-                        if representatives:
-                            return representatives
+                        if constituencies:
+                            return constituencies
 
-                        # If no representatives found for direct constituency,
+                        # If no constituencies found for direct wahlkreis,
                         # fall through to PLZ-based lookup
                         logger.warning(
-                            "No representatives found for WK %s, falling back to PLZ",
+                            "No constituencies found for WK %s, falling back to PLZ",
                             wkr_nr
                         )
                 else:
@@ -185,63 +185,55 @@ class ConstituencyLocator:
         # No parameters provided
         return []
 
-    def _find_representatives_by_wahlkreis(
+    def _find_constituencies_by_wahlkreis(
         self,
         wkr_nr: int,
         wkr_name: str,
         land_name: str
-    ) -> List[Representative]:
+    ) -> List[Constituency]:
         """
-        Find representatives for a given Wahlkreis.
+        Find constituencies for a given Wahlkreis.
 
         Strategy:
         1. Look for constituencies with matching WKR_NR in metadata
         2. Look for constituencies with matching name
-        3. Return active representatives from matched constituencies
+        3. Return matching Constituency objects
         """
         # Try to find constituency by WKR_NR in metadata
         constituencies = Constituency.objects.filter(
             metadata__WKR_NR=wkr_nr,
             scope='FEDERAL_DISTRICT'
-        ).prefetch_related('representatives')
+        )
 
-        if not constituencies.exists():
-            # Try by name matching
+        if constituencies.exists():
+            return list(constituencies)
+
+        # Try by name matching
+        constituencies = Constituency.objects.filter(
+            name__icontains=str(wkr_nr),
+            scope='FEDERAL_DISTRICT'
+        )
+
+        if constituencies.exists():
+            return list(constituencies)
+
+        # Try finding by state and scope
+        normalized_state = normalize_german_state(land_name)
+        if normalized_state:
             constituencies = Constituency.objects.filter(
-                name__icontains=str(wkr_nr),
-                scope='FEDERAL_DISTRICT'
-            ).prefetch_related('representatives')
+                metadata__state=normalized_state,
+                scope__in=['FEDERAL_DISTRICT', 'FEDERAL_STATE_LIST']
+            )
+            if constituencies.exists():
+                return list(constituencies)
 
-        if not constituencies.exists():
-            # Try finding by state and scope
-            normalized_state = normalize_german_state(land_name)
-            if normalized_state:
-                constituencies = Constituency.objects.filter(
-                    metadata__state=normalized_state,
-                    scope__in=['FEDERAL_DISTRICT', 'FEDERAL_STATE_LIST']
-                ).prefetch_related('representatives')
+        return []
 
-        # Collect all representatives from matched constituencies
-        representatives = []
-        for constituency in constituencies:
-            reps = list(constituency.representatives.filter(is_active=True))
-            representatives.extend(reps)
-
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_reps = []
-        for rep in representatives:
-            if rep.id not in seen:
-                seen.add(rep.id)
-                unique_reps.append(rep)
-
-        return unique_reps
-
-    def _locate_by_plz(self, postal_code: str) -> List[Representative]:
+    def _locate_by_plz(self, postal_code: str) -> List[Constituency]:
         """
-        Fallback: Locate representatives using PLZ-prefix matching.
+        Fallback: Locate constituencies using PLZ-prefix matching.
 
-        Returns list of Representatives instead of LocatedConstituencies.
+        Returns list of Constituency objects.
         """
         if len(postal_code) < 2:
             return []
@@ -253,22 +245,13 @@ class ConstituencyLocator:
         federal = self._match_federal(normalized_state)
         state = self._match_state(normalized_state)
 
-        # Convert constituencies to representatives
-        representatives = []
+        # Collect constituencies, remove None values
+        constituencies = []
         for constituency in [federal, state]:
             if constituency:
-                reps = list(constituency.representatives.filter(is_active=True))
-                representatives.extend(reps)
+                constituencies.append(constituency)
 
-        # Remove duplicates
-        seen = set()
-        unique_reps = []
-        for rep in representatives:
-            if rep.id not in seen:
-                seen.add(rep.id)
-                unique_reps.append(rep)
-
-        return unique_reps
+        return constituencies
 
     @classmethod
     def locate_legacy(cls, postal_code: str) -> LocatedConstituencies:
@@ -432,32 +415,18 @@ class ConstituencySuggestionService:
         if not constituencies:
             locator = ConstituencyLocator()
 
-            # Try full address lookup if available
+            # Try address lookup (full address or PLZ)
             if street and postal_code and city:
-                # Use new address-based API
-                representatives = locator.locate(
+                # Use full address lookup
+                constituencies = locator.locate(
                     street=street,
                     postal_code=postal_code,
                     city=city,
                     country=country
                 )
-
-                # Extract unique constituencies from representatives
-                constituency_ids_seen = set()
-                for rep in representatives:
-                    for constituency in rep.constituencies.all():
-                        if constituency.id not in constituency_ids_seen:
-                            constituencies.append(constituency)
-                            constituency_ids_seen.add(constituency.id)
-
-            # Fallback to PLZ-only if no full address or if address lookup failed
-            if not constituencies and postal_code:
-                located = ConstituencyLocator.locate_legacy(postal_code)
-                constituencies.extend(
-                    constituency
-                    for constituency in (located.local, located.state, located.federal)
-                    if constituency
-                )
+            elif postal_code:
+                # Fallback to PLZ-only lookup
+                constituencies = locator.locate(postal_code=postal_code)
 
         # Determine state from various sources
         explicit_state = normalize_german_state(user_location.get('state')) if user_location.get('state') else None

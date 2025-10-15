@@ -193,38 +193,88 @@ class WahlkreisLocationTests(TestCase):
 
 
 class FullAddressMatchingTests(TestCase):
-    """Integration tests for full address → constituency → representatives pipeline."""
+    """Integration tests for full address → constituency matching."""
 
+    @patch('letters.services.WahlkreisLocator.locate')
     @patch('letters.services.AddressGeocoder.geocode')
-    def test_address_to_constituency_pipeline(self, mock_geocode):
-        """Test full pipeline from address to constituency with mocked geocoding."""
+    def test_locate_returns_constituencies_not_representatives(self, mock_geocode, mock_wahlkreis):
+        """Test that ConstituencyLocator.locate() returns constituencies, not representatives."""
+        from letters.models import Parliament, ParliamentTerm, Constituency
+
+        # Create test data
+        bundestag = Parliament.objects.create(
+            name='Bundestag',
+            level='FEDERAL',
+            legislative_body='Bundestag',
+            region='DE'
+        )
+        term = ParliamentTerm.objects.create(
+            parliament=bundestag,
+            name='20. Wahlperiode'
+        )
+        federal_const = Constituency.objects.create(
+            parliament_term=term,
+            name='Berlin-Mitte',
+            external_id='83',
+            scope='FEDERAL_DISTRICT',
+            metadata={'WKR_NR': 83, 'state': 'Berlin'}
+        )
+
         # Mock geocoding to return Bundestag coordinates
         mock_geocode.return_value = (52.5186, 13.3761, True, None)
 
+        # Mock WahlkreisLocator to return Berlin constituency
+        mock_wahlkreis.return_value = (83, 'Berlin-Mitte', 'Berlin')
+
         locator = ConstituencyLocator()
-        representatives = locator.locate(
+        result = locator.locate(
             street='Platz der Republik 1',
             postal_code='11011',
             city='Berlin'
         )
 
-        # Should return representatives (even if list is empty due to no DB data)
-        self.assertIsInstance(representatives, list)
+        # Should return list of Constituency objects
+        self.assertIsInstance(result, list)
+        self.assertGreater(len(result), 0)
+        self.assertIsInstance(result[0], Constituency)
+        self.assertEqual(result[0].name, 'Berlin-Mitte')
         mock_geocode.assert_called_once()
 
-    def test_plz_fallback_when_geocoding_fails(self):
-        """Test PLZ prefix fallback when geocoding fails."""
-        with patch('letters.services.AddressGeocoder.geocode') as mock_geocode:
-            # Mock geocoding failure
-            mock_geocode.return_value = (None, None, False, "Geocoding failed")
+    @patch('letters.services.AddressGeocoder.geocode')
+    def test_plz_fallback_returns_constituencies(self, mock_geocode):
+        """Test PLZ prefix fallback returns constituencies."""
+        from letters.models import Parliament, ParliamentTerm, Constituency
 
-            locator = ConstituencyLocator()
-            representatives = locator.locate(
-                postal_code='10115'  # Berlin postal code
-            )
+        # Create test data
+        bundestag = Parliament.objects.create(
+            name='Bundestag',
+            level='FEDERAL',
+            legislative_body='Bundestag',
+            region='DE'
+        )
+        term = ParliamentTerm.objects.create(
+            parliament=bundestag,
+            name='20. Wahlperiode'
+        )
+        federal_const = Constituency.objects.create(
+            parliament_term=term,
+            name='Berlin',
+            scope='FEDERAL_STATE_LIST',
+            metadata={'state': 'Berlin'}
+        )
 
-            # Should still return list (using PLZ fallback)
-            self.assertIsInstance(representatives, list)
+        # Mock geocoding failure
+        mock_geocode.return_value = (None, None, False, "Geocoding failed")
+
+        locator = ConstituencyLocator()
+        result = locator.locate(
+            postal_code='10115'  # Berlin postal code
+        )
+
+        # Should return list of Constituency objects (using PLZ fallback)
+        self.assertIsInstance(result, list)
+        if result:  # May be empty if no DB match, but should be list
+            self.assertIsInstance(result[0], Constituency)
 
 
 # End of file
