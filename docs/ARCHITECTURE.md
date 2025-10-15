@@ -77,12 +77,4 @@ uv run python manage.py test letters
 - `letters/templates/letters/` – HTML templates; partials share UI across pages.
 - `letters/forms.py` – letter creation form (with PLZ filtering), signature and report forms.
 - `letters/management/commands/` – representative sync, topic/constituency testers, wahlkreis fetcher.
-- `vision/matching.md` – long-term roadmap for accurate recipient matching and profile enrichment.
 
-## Known Gaps / TODOs
-- Integrate Wahlkreis GeoJSON to replace prefix-based constituency mapping (`TODO.md`).
-- Build `RepresentativeProfile` importers (Abgeordnetenwatch detailed topics, Bundestag biographies, Landtag feeds) per `vision/matching.md`.
-- Improve localization coverage (templates/forms still contain untranslated strings; see `letters/templates`).
-- Replace identity stub with real provider when ready.
-
-Keep this document up to date when you add cross-cutting features or change major workflows—it’s the quickest way for future agents to gain context.
