@@ -120,6 +120,11 @@ class Command(BaseCommand):
             f"Created {stats['created']} and updated {stats['updated']} constituencies"
         ))
 
+        # Update wahlkreis_id on existing constituencies
+        self.stdout.write("Updating wahlkreis_id fields on constituencies...")
+        updated = self._update_wahlkreis_ids(geojson_data)
+        self.stdout.write(self.style.SUCCESS(f"Updated {updated} constituencies with wahlkreis_id"))
+
     def _zip_contains_shapefile(self, data: bytes) -> bool:
         """Check if ZIP contains Shapefile components (.shp)."""
         try:
@@ -260,3 +265,34 @@ class Command(BaseCommand):
                 stats['updated'] += 1
 
         return stats
+
+    def _update_wahlkreis_ids(self, geojson_data: dict) -> int:
+        """Update wahlkreis_id field on existing constituencies from GeoJSON."""
+        updated_count = 0
+
+        for feature in geojson_data.get('features', []):
+            properties = feature.get('properties', {})
+            wkr_nr = properties.get('WKR_NR')
+
+            if not wkr_nr:
+                continue
+
+            # Normalize to 3-digit string
+            wahlkreis_id = str(wkr_nr).zfill(3)
+
+            # Find constituencies by metadata WKR_NR
+            constituencies = Constituency.objects.filter(
+                metadata__WKR_NR=wkr_nr,
+                scope='FEDERAL_DISTRICT'
+            )
+
+            for constituency in constituencies:
+                if constituency.wahlkreis_id != wahlkreis_id:
+                    constituency.wahlkreis_id = wahlkreis_id
+                    constituency.save(update_fields=['wahlkreis_id'])
+                    updated_count += 1
+                    self.stdout.write(
+                        f"Updated {constituency.name} with wahlkreis_id={wahlkreis_id}"
+                    )
+
+        return updated_count
