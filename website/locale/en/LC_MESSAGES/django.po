@@ -1,16 +1,18 @@
-# German translations for WriteThem.eu
-# Copyright (C) 2025
-# This file is distributed under the same license as the WriteThem.eu package.
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
 #
+#, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: WriteThem.eu\n"
+"Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2025-10-15 09:56+0200\n"
-"PO-Revision-Date: 2025-01-10 12:00+0100\n"
-"Last-Translator: \n"
-"Language-Team: German\n"
-"Language: de\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -18,137 +20,135 @@ msgstr ""
 
 #: letters/admin.py:75
 msgid "Mandate Details"
-msgstr "Mandatsdetails"
+msgstr "Mandate Details"
 
 #: letters/admin.py:78
 msgid "Focus Areas"
-msgstr "Schwerpunktbereiche"
+msgstr "Focus Areas"
 
 #: letters/admin.py:81 letters/admin.py:95
 msgid "Photo"
-msgstr "Foto"
+msgstr "Photo"
 
 #: letters/admin.py:85
 msgid "Metadata"
-msgstr "Metadaten"
+msgstr "Metadata"
 
 #: letters/admin.py:94
 msgid "No photo"
-msgstr "Kein Foto"
+msgstr "No photo"
 
 #: letters/admin.py:167
 msgid "Topic Areas"
-msgstr "Themenbereiche"
+msgstr "Topic Areas"
 
 #: letters/forms.py:25
 msgid ""
 "An account with this email already exists. If you registered before, please "
 "check your inbox for the activation link or reset your password."
 msgstr ""
-"Ein Konto mit dieser E-Mail-Adresse existiert bereits. Falls Sie sich zuvor "
-"registriert haben, prüfen Sie Ihren Posteingang auf den Aktivierungslink "
-"oder setzen Sie Ihr Passwort zurück."
+"An account with this email already exists. If you registered before, please "
+"check your inbox for the activation link or reset your password."
 
 #: letters/forms.py:37
 msgid "Title"
-msgstr "Titel"
+msgstr "Title"
 
 #: letters/forms.py:38
 msgid "Letter Body"
-msgstr "Brieftext"
+msgstr "Letter Body"
 
 #: letters/forms.py:39
 msgid "To Representative"
-msgstr "An Abgeordnete"
+msgstr "To Representative"
 
 #: letters/forms.py:42
 msgid "Describe your concern briefly"
-msgstr "Beschreiben Sie Ihr Anliegen kurz"
+msgstr "Describe your concern briefly"
 
 #: letters/forms.py:43
 msgid ""
 "Write your letter here. Markdown formatting (e.g. **bold**, _italic_) is "
 "supported."
 msgstr ""
-"Schreiben Sie hier Ihren Brief. Markdown-Formatierung (z.B. **fett**, "
-"_kursiv_) wird unterstützt."
+"Write your letter here. Markdown formatting (e.g. **bold**, _italic_) is "
+"supported."
 
 #: letters/forms.py:46
 msgid "Letter title"
-msgstr "Brieftitel"
+msgstr "Letter title"
 
 #: letters/forms.py:50
 msgid "Write your letter here..."
-msgstr "Schreiben Sie hier Ihren Brief..."
+msgstr "Write your letter here..."
 
 #: letters/forms.py:110
 msgid "Comment (optional)"
-msgstr "Kommentar (optional)"
+msgstr "Comment (optional)"
 
 #: letters/forms.py:113
 msgid "Add a personal note to your signature"
-msgstr "Fügen Sie Ihrer Unterschrift eine persönliche Notiz hinzu"
+msgstr "Add a personal note to your signature"
 
 #: letters/forms.py:119
 msgid "Optional: Add your comment..."
-msgstr "Optional: Fügen Sie Ihren Kommentar hinzu..."
+msgstr "Optional: Add your comment..."
 
 #: letters/forms.py:131
 msgid "Reason"
-msgstr "Grund"
+msgstr "Reason"
 
 #: letters/forms.py:132
 msgid "Description"
-msgstr "Beschreibung"
+msgstr "Description"
 
 #: letters/forms.py:135
 msgid "Please provide details about why you are reporting this letter"
-msgstr "Bitte geben Sie Details an, warum Sie diesen Brief melden"
+msgstr "Please provide details about why you are reporting this letter"
 
 #: letters/forms.py:142
 msgid "Please describe the issue..."
-msgstr "Bitte beschreiben Sie das Problem..."
+msgstr "Please describe the issue..."
 
 #: letters/forms.py:152 letters/templates/letters/letter_list.html:19
 msgid "Search"
-msgstr "Suchen"
+msgstr "Search"
 
 #: letters/forms.py:155 letters/templates/letters/letter_list.html:18
 msgid "Search letters..."
-msgstr "Briefe suchen..."
+msgstr "Search letters..."
 
 #: letters/forms.py:161
 msgid "Tag"
-msgstr "Schlagwort"
+msgstr "Tag"
 
 #: letters/forms.py:164
 msgid "Filter by tag..."
-msgstr "Nach Schlagwort filtern..."
+msgstr "Filter by tag..."
 
 #: letters/forms.py:180
 msgid "Bundestag constituency"
-msgstr "Bundestags-Wahlkreis"
+msgstr "Bundestag constituency"
 
 #: letters/forms.py:181
 msgid "Pick your Bundestag direct mandate constituency (Wahlkreis)."
-msgstr "Wählen Sie Ihren Bundestags-Direktwahlkreis (Wahlkreis)."
+msgstr "Pick your Bundestag direct mandate constituency (Wahlkreis)."
 
 #: letters/forms.py:182 letters/forms.py:189
 msgid "Select constituency"
-msgstr "Wahlkreis auswählen"
+msgstr "Select constituency"
 
 #: letters/forms.py:187
 msgid "State parliament constituency"
-msgstr "Landtags-Wahlkreis"
+msgstr "State parliament constituency"
 
 #: letters/forms.py:188
 msgid "Optionally pick your Landtag constituency if applicable."
-msgstr "Wählen Sie optional Ihren Landtags-Wahlkreis, falls zutreffend."
+msgstr "Optionally pick your Landtag constituency if applicable."
 
 #: letters/forms.py:240
 msgid "Please select at least one constituency to save your profile."
-msgstr ""
-"Bitte wählen Sie mindestens einen Wahlkreis aus, um Ihr Profil zu speichern."
+msgstr "Please select at least one constituency to save your profile."
 
 #: letters/forms.py:252
 msgid "Straße und Hausnummer"
@@ -182,252 +182,246 @@ msgstr ""
 "Bitte geben Sie eine vollständige Adresse ein (Straße, PLZ und Stadt) oder "
 "lassen Sie alle Felder leer."
 
-# Model choices - Constituency
 #: letters/models.py:15
 msgid "European Union"
-msgstr "Europäische Union"
+msgstr "European Union"
 
 #: letters/models.py:16
 msgid "Federal"
-msgstr "Bund"
+msgstr "Federal"
 
 #: letters/models.py:17
 msgid "State"
-msgstr "Land"
+msgstr "State"
 
 #: letters/models.py:18
 msgid "Local"
-msgstr "Kommune"
+msgstr "Local"
 
 #: letters/models.py:21
 msgid "Name of the parliament"
-msgstr "Name des Parlaments"
+msgstr "Name of the parliament"
 
 #: letters/models.py:25
 msgid "e.g., 'Bundestag', 'Bayerischer Landtag', 'Gemeinderat München'"
-msgstr "z.B. 'Bundestag', 'Bayerischer Landtag', 'Gemeinderat München'"
+msgstr "e.g., 'Bundestag', 'Bayerischer Landtag', 'Gemeinderat München'"
 
 #: letters/models.py:29
 msgid "Geographic identifier (state code, municipality code, etc.)"
-msgstr "Geografische Kennung (Bundeslandkürzel, Gemeindeschlüssel, etc.)"
+msgstr "Geographic identifier (state code, municipality code, etc.)"
 
 #: letters/models.py:37
 msgid "For hierarchical relationships (e.g., local within state)"
-msgstr ""
-"Für hierarchische Beziehungen (z.B. Kommune innerhalb eines Bundeslandes)"
+msgstr "For hierarchical relationships (e.g., local within state)"
 
 #: letters/models.py:43 letters/models.py:70 letters/models.py:105
 #: letters/models.py:165 letters/models.py:372 letters/models.py:421
 msgid "Last time this was synced from external API"
-msgstr "Zeitpunkt der letzten Synchronisierung von externer API"
+msgstr "Last time this was synced from external API"
 
 #: letters/models.py:47 letters/templates/letters/committee_detail.html:70
 msgid "Parliament"
-msgstr "Parlament"
+msgstr "Parliament"
 
 #: letters/models.py:48
 msgid "Parliaments"
-msgstr "Parlamente"
+msgstr "Parliaments"
 
 #: letters/models.py:84
 msgid "Federal electoral district"
-msgstr "Bundeswahlkreis"
+msgstr "Federal electoral district"
 
 #: letters/models.py:85
 msgid "Bundestag state list"
-msgstr "Bundestag-Landesliste"
+msgstr "Bundestag state list"
 
 #: letters/models.py:86
 msgid "Bundestag federal list"
-msgstr "Bundestag-Bundesliste"
+msgstr "Bundestag federal list"
 
 #: letters/models.py:87
 msgid "State electoral district"
-msgstr "Landeswahlkreis"
+msgstr "State electoral district"
 
 #: letters/models.py:88
 msgid "State regional list"
-msgstr "Regionale Landesliste"
+msgstr "State regional list"
 
 #: letters/models.py:89
 msgid "State wide list"
-msgstr "Landesweite Liste"
+msgstr "State wide list"
 
 #: letters/models.py:90
 msgid "EU at large"
-msgstr "EU insgesamt"
+msgstr "EU at large"
 
 #: letters/models.py:119
 msgid "Direct mandate"
-msgstr "Direktmandat"
+msgstr "Direct mandate"
 
 #: letters/models.py:120
 msgid "State list mandate"
-msgstr "Landeslisten-Mandat"
+msgstr "State list mandate"
 
 #: letters/models.py:121
 msgid "State regional list mandate"
-msgstr "Regionales Landeslisten-Mandat"
+msgstr "State regional list mandate"
 
 #: letters/models.py:122
 msgid "Federal list mandate"
-msgstr "Bundeslisten-Mandat"
+msgstr "Federal list mandate"
 
 #: letters/models.py:123
 msgid "EU list mandate"
-msgstr "EU-Listen-Mandat"
+msgstr "EU list mandate"
 
-# Model choices - Letter
 #: letters/models.py:444
 msgid "Draft"
-msgstr "Entwurf"
+msgstr "Draft"
 
 #: letters/models.py:445
 msgid "Published"
-msgstr "Veröffentlicht"
+msgstr "Published"
 
 #: letters/models.py:446
 msgid "Flagged for Review"
-msgstr "Zur Überprüfung markiert"
+msgstr "Flagged for Review"
 
 #: letters/models.py:447
 msgid "Removed"
-msgstr "Entfernt"
+msgstr "Removed"
 
 #: letters/models.py:487
 msgid "Deleted user"
-msgstr "Gelöschter Benutzer"
+msgstr "Deleted user"
 
 #: letters/services/constituency.py:1007
 #, python-format
 msgid "Detected policy area: %(topic)s."
-msgstr "Erkannter Politikbereich: %(topic)s."
+msgstr "Detected policy area: %(topic)s."
 
 #: letters/services/constituency.py:1012
 #, python-format
 msgid "Prioritising representatives for %(constituencies)s."
-msgstr "Priorisiere Abgeordnete für %(constituencies)s."
+msgstr "Prioritising representatives for %(constituencies)s."
 
 #: letters/services/constituency.py:1017
 #, python-format
 msgid "Filtering by state %(state)s."
-msgstr "Filtere nach Bundesland %(state)s."
+msgstr "Filtering by state %(state)s."
 
 #: letters/services/constituency.py:1021
 #, python-format
 msgid ""
 "Postal code %(plz)s had no direct match; showing broader representatives."
 msgstr ""
-"Postleitzahl %(plz)s hatte keine direkte Übereinstimmung; zeige allgemeinere "
-"Abgeordnete."
+"Postal code %(plz)s had no direct match; showing broader representatives."
 
 #: letters/services/constituency.py:1025
 msgid "Showing generally relevant representatives."
-msgstr "Zeige allgemein relevante Abgeordnete."
+msgstr "Showing generally relevant representatives."
 
 #: letters/templates/letters/account_activation_invalid.html:4
 #: letters/templates/letters/account_activation_invalid.html:8
 msgid "Activation link invalid"
-msgstr "Aktivierungslink ungültig"
+msgstr "Activation link invalid"
 
 #: letters/templates/letters/account_activation_invalid.html:10
 msgid ""
 "We could not verify your activation link. It may have already been used or "
 "expired."
 msgstr ""
-"Wir konnten Ihren Aktivierungslink nicht verifizieren. Er wurde "
-"möglicherweise bereits verwendet oder ist abgelaufen."
+"We could not verify your activation link. It may have already been used or "
+"expired."
 
 #: letters/templates/letters/account_activation_invalid.html:13
 msgid ""
 "If you still cannot access your account, try registering again or contact "
 "support."
 msgstr ""
-"Falls Sie weiterhin nicht auf Ihr Konto zugreifen können, versuchen Sie sich "
-"erneut zu registrieren oder kontaktieren Sie den Support."
+"If you still cannot access your account, try registering again or contact "
+"support."
 
 #: letters/templates/letters/account_activation_invalid.html:15
 msgid "Register again"
-msgstr "Erneut registrieren"
+msgstr "Register again"
 
 #: letters/templates/letters/account_activation_sent.html:4
 msgid "Activate your account"
-msgstr "Aktivieren Sie Ihr Konto"
+msgstr "Activate your account"
 
 #: letters/templates/letters/account_activation_sent.html:8
 #: letters/templates/letters/password_reset_done.html:8
 msgid "Check your inbox"
-msgstr "Prüfen Sie Ihren Posteingang"
+msgstr "Check your inbox"
 
 #: letters/templates/letters/account_activation_sent.html:10
 msgid ""
 "We sent you an email with a confirmation link. Please click it to activate "
 "your account."
 msgstr ""
-"Wir haben Ihnen eine E-Mail mit einem Bestätigungslink gesendet. Bitte "
-"klicken Sie darauf, um Ihr Konto zu aktivieren."
+"We sent you an email with a confirmation link. Please click it to activate "
+"your account."
 
 #: letters/templates/letters/account_activation_sent.html:13
 msgid ""
 "If you do not receive the email within a few minutes, check your spam folder "
 "or try registering again."
 msgstr ""
-"Falls Sie die E-Mail nicht innerhalb weniger Minuten erhalten, prüfen Sie "
-"Ihren Spam-Ordner oder versuchen Sie sich erneut zu registrieren."
+"If you do not receive the email within a few minutes, check your spam folder "
+"or try registering again."
 
 #: letters/templates/letters/account_activation_sent.html:15
 msgid "Back to homepage"
-msgstr "Zurück zur Startseite"
+msgstr "Back to homepage"
 
 #: letters/templates/letters/account_delete_confirm.html:4
 #: letters/templates/letters/profile.html:142
 msgid "Delete account"
-msgstr "Konto löschen"
+msgstr "Delete account"
 
 #: letters/templates/letters/account_delete_confirm.html:8
 msgid "Delete your account"
-msgstr "Löschen Sie Ihr Konto"
+msgstr "Delete your account"
 
 #: letters/templates/letters/account_delete_confirm.html:10
 msgid ""
 "Deleting your account will remove your personal data and signatures. Letters "
 "you have published stay online but are shown without your name."
 msgstr ""
-"Das Löschen Ihres Kontos entfernt Ihre persönlichen Daten und "
-"Unterschriften. Von Ihnen veröffentlichte Briefe bleiben online, werden aber "
-"ohne Ihren Namen angezeigt."
+"Deleting your account will remove your personal data and signatures. Letters "
+"you have published stay online but are shown without your name."
 
 #: letters/templates/letters/account_delete_confirm.html:14
 msgid "Yes, delete my account"
-msgstr "Ja, mein Konto löschen"
+msgstr "Yes, delete my account"
 
 #: letters/templates/letters/account_delete_confirm.html:15
 #: letters/templates/letters/letter_form.html:61
 msgid "Cancel"
-msgstr "Abbrechen"
+msgstr "Cancel"
 
-# Navigation
 #: letters/templates/letters/base.html:140
 msgid "Letters"
-msgstr "Briefe"
+msgstr "Letters"
 
 #: letters/templates/letters/base.html:141
 msgid "Competencies"
-msgstr "Kompetenzen"
+msgstr "Competencies"
 
 #: letters/templates/letters/base.html:143
 #: letters/templates/letters/representative_detail.html:149
 msgid "Write Letter"
-msgstr "Brief schreiben"
+msgstr "Write Letter"
 
 #: letters/templates/letters/base.html:144
 #: letters/templates/letters/profile.html:4
 msgid "Profile"
-msgstr "Profil"
+msgstr "Profile"
 
 #: letters/templates/letters/base.html:145
 msgid "Logout"
-msgstr "Abmelden"
+msgstr "Logout"
 
 #: letters/templates/letters/base.html:147
 #: letters/templates/letters/letter_detail.html:47
@@ -436,14 +430,14 @@ msgstr "Abmelden"
 #: letters/templates/letters/login.html:8
 #: letters/templates/letters/login.html:33
 msgid "Login"
-msgstr "Anmelden"
+msgstr "Login"
 
 #: letters/templates/letters/base.html:148
 #: letters/templates/letters/register.html:4
 #: letters/templates/letters/register.html:8
 #: letters/templates/letters/register.html:66
 msgid "Register"
-msgstr "Registrieren"
+msgstr "Register"
 
 #: letters/templates/letters/base.html:151
 msgid "Admin"
@@ -451,397 +445,386 @@ msgstr "Admin"
 
 #: letters/templates/letters/base.html:157
 msgid "Select language"
-msgstr "Sprache auswählen"
+msgstr "Select language"
 
-# Footer
 #: letters/templates/letters/base.html:182
 msgid "Empowering citizens to write to their representatives"
-msgstr "Bürgern ermöglichen, an ihre Abgeordneten zu schreiben"
+msgstr "Empowering citizens to write to their representatives"
 
 #: letters/templates/letters/committee_detail.html:22
 msgid "Related Topics"
-msgstr "Verwandte Themen"
+msgstr "Related Topics"
 
 #: letters/templates/letters/committee_detail.html:36
 msgid "Members"
-msgstr "Mitglieder"
+msgstr "Members"
 
 #: letters/templates/letters/committee_detail.html:46
 msgid "Role"
-msgstr "Rolle"
+msgstr "Role"
 
 #: letters/templates/letters/committee_detail.html:48
 #: letters/templates/letters/representative_detail.html:61
 msgid "Active"
-msgstr "Aktiv"
+msgstr "Active"
 
 #: letters/templates/letters/committee_detail.html:51
 #: letters/templates/letters/partials/representative_card.html:29
 msgid "Since"
-msgstr "Seit"
+msgstr "Since"
 
 #: letters/templates/letters/committee_detail.html:58
 msgid "No members recorded for this committee."
-msgstr "Für diesen Ausschuss sind keine Mitglieder verzeichnet."
+msgstr "No members recorded for this committee."
 
 #: letters/templates/letters/committee_detail.html:67
 msgid "Committee Info"
-msgstr "Ausschussinformationen"
+msgstr "Committee Info"
 
 #: letters/templates/letters/committee_detail.html:71
 msgid "Term"
-msgstr "Amtszeit"
+msgstr "Term"
 
 #: letters/templates/letters/committee_detail.html:74
 #: letters/templates/letters/representative_detail.html:105
 msgid "View on Abgeordnetenwatch"
-msgstr "Auf Abgeordnetenwatch ansehen"
+msgstr "View on Abgeordnetenwatch"
 
 #: letters/templates/letters/letter_detail.html:10
 #: letters/templates/letters/partials/letter_card.html:5
 msgid "By"
-msgstr "Von"
+msgstr "By"
 
 #: letters/templates/letters/letter_detail.html:29
 #, python-format
 msgid "Signatures (%(counter)s)"
 msgid_plural "Signatures (%(counter)s)"
-msgstr[0] "Unterschrift (%(counter)s)"
-msgstr[1] "Unterschriften (%(counter)s)"
+msgstr[0] "Signatures (%(counter)s)"
+msgstr[1] "Signatures (%(counter)s)"
 
 #: letters/templates/letters/letter_detail.html:31
 #, python-format
 msgid "%(counter)s constituent of %(constituency_name)s"
 msgid_plural "%(counter)s constituents of %(constituency_name)s"
-msgstr[0] "%(counter)s Wähler aus %(constituency_name)s"
-msgstr[1] "%(counter)s Wähler aus %(constituency_name)s"
+msgstr[0] "%(counter)s constituent of %(constituency_name)s"
+msgstr[1] "%(counter)s constituents of %(constituency_name)s"
 
 #: letters/templates/letters/letter_detail.html:32
 #, python-format
 msgid "%(counter)s other verified"
 msgid_plural "%(counter)s other verified"
-msgstr[0] "%(counter)s weitere verifiziert"
-msgstr[1] "%(counter)s weitere verifiziert"
+msgstr[0] "%(counter)s other verified"
+msgstr[1] "%(counter)s other verified"
 
 #: letters/templates/letters/letter_detail.html:33
 #, python-format
 msgid "%(counter)s unverified"
 msgid_plural "%(counter)s unverified"
-msgstr[0] "%(counter)s nicht verifiziert"
-msgstr[1] "%(counter)s nicht verifiziert"
+msgstr[0] "%(counter)s unverified"
+msgstr[1] "%(counter)s unverified"
 
 #: letters/templates/letters/letter_detail.html:41
 msgid "Sign this letter"
-msgstr "Brief unterzeichnen"
+msgstr "Sign this letter"
 
 #: letters/templates/letters/letter_detail.html:44
 msgid "You have signed this letter"
-msgstr "Sie haben diesen Brief unterzeichnet"
+msgstr "You have signed this letter"
 
 #: letters/templates/letters/letter_detail.html:47
 msgid "to sign this letter"
-msgstr "um diesen Brief zu unterzeichnen"
+msgstr "to sign this letter"
 
 #: letters/templates/letters/letter_detail.html:58
 msgid "✓ Verified Constituent"
-msgstr "✓ Verifizierter Wähler"
+msgstr "✓ Verified Constituent"
 
 #: letters/templates/letters/letter_detail.html:60
 msgid "✓ Verified"
-msgstr "✓ Verifiziert"
+msgstr "✓ Verified"
 
 #: letters/templates/letters/letter_detail.html:70
 msgid "No signatures yet. Be the first to sign!"
-msgstr "Noch keine Unterschriften. Seien Sie der Erste!"
+msgstr "No signatures yet. Be the first to sign!"
 
 #: letters/templates/letters/letter_detail.html:75
 #: letters/templates/letters/letter_detail.html:79
 msgid "Report this letter"
-msgstr "Brief melden"
+msgstr "Report this letter"
 
 #: letters/templates/letters/letter_detail.html:76
 msgid "If you believe this letter violates our guidelines, please report it."
-msgstr ""
-"Falls Sie glauben, dass dieser Brief gegen unsere Richtlinien verstößt, "
-"melden Sie ihn bitte."
+msgstr "If you believe this letter violates our guidelines, please report it."
 
 #: letters/templates/letters/letter_detail.html:81
 msgid "to report this letter"
-msgstr "um diesen Brief zu melden"
+msgstr "to report this letter"
 
 #: letters/templates/letters/letter_detail.html:86
 msgid "Back to all letters"
-msgstr "Zurück zu allen Briefen"
+msgstr "Back to all letters"
 
 #: letters/templates/letters/letter_form.html:4
 #: letters/templates/letters/representative_detail.html:143
 msgid "Write a Letter"
-msgstr "Brief schreiben"
+msgstr "Write a Letter"
 
-# Letter form
 #: letters/templates/letters/letter_form.html:10
 msgid "Write an Open Letter"
-msgstr "Einen offenen Brief schreiben"
+msgstr "Write an Open Letter"
 
 #: letters/templates/letters/letter_form.html:12
 msgid ""
 "Write an open letter to a political representative. Your letter will be "
 "published publicly so others can read and sign it."
 msgstr ""
-"Schreiben Sie einen offenen Brief an einen Abgeordneten. Ihr Brief wird "
-"öffentlich veröffentlicht, damit andere ihn lesen und unterzeichnen können."
+"Write an open letter to a political representative. Your letter will be "
+"published publicly so others can read and sign it."
 
 #: letters/templates/letters/letter_form.html:16
 msgid "Before you write"
-msgstr "Bevor Sie schreiben"
+msgstr "Before you write"
 
 #: letters/templates/letters/letter_form.html:18
 msgid "Be thoughtful but feel free to be critical."
-msgstr "Seien Sie nachdenklich, aber scheuen Sie sich nicht, kritisch zu sein."
+msgstr "Be thoughtful but feel free to be critical."
 
 #: letters/templates/letters/letter_form.html:19
 msgid "Representatives are humans too—stay respectful."
-msgstr "Abgeordnete sind auch Menschen – bleiben Sie respektvoll."
+msgstr "Representatives are humans too—stay respectful."
 
 #: letters/templates/letters/letter_form.html:20
 msgid "Keep your arguments clear and concise."
-msgstr "Halten Sie Ihre Argumente klar und prägnant."
+msgstr "Keep your arguments clear and concise."
 
 #: letters/templates/letters/letter_form.html:21
 msgid "No insults or hate speech."
-msgstr "Keine Beleidigungen oder Hassrede."
+msgstr "No insults or hate speech."
 
 #: letters/templates/letters/letter_form.html:22
 msgid "Stay within the bounds of the Grundgesetz when making demands."
-msgstr "Bleiben Sie bei Forderungen im Rahmen des Grundgesetzes."
+msgstr "Stay within the bounds of the Grundgesetz when making demands."
 
 #: letters/templates/letters/letter_form.html:30
 msgid "Title:"
-msgstr "Titel:"
+msgstr "Title:"
 
 #: letters/templates/letters/letter_form.html:36
 msgid ""
 "Describe your concern in a sentence; we'll use it to suggest representatives."
 msgstr ""
-"Beschreiben Sie Ihr Anliegen in einem Satz; wir verwenden ihn, um Ihnen "
-"Abgeordnete vorzuschlagen."
+"Describe your concern in a sentence; we'll use it to suggest representatives."
 
 #: letters/templates/letters/letter_form.html:41
 msgid "To Representative:"
-msgstr "An Abgeordnete:"
+msgstr "To Representative:"
 
 #: letters/templates/letters/letter_form.html:47
 msgid ""
 "Already know who to address? Pick them here. Otherwise, use the suggestions "
 "below."
 msgstr ""
-"Wissen Sie bereits, wen Sie ansprechen möchten? Wählen Sie hier aus. "
-"Andernfalls nutzen Sie die Vorschläge unten."
+"Already know who to address? Pick them here. Otherwise, use the suggestions "
+"below."
 
 #: letters/templates/letters/letter_form.html:53
 msgid "Letter Body:"
-msgstr "Brieftext:"
+msgstr "Letter Body:"
 
 #: letters/templates/letters/letter_form.html:60
 msgid "Publish Letter"
-msgstr "Brief veröffentlichen"
+msgstr "Publish Letter"
 
 #: letters/templates/letters/letter_form.html:67
 msgid "Smart Suggestions"
-msgstr "Intelligente Vorschläge"
+msgstr "Smart Suggestions"
 
 #: letters/templates/letters/letter_form.html:69
 msgid ""
 "Type your title and we'll use your verified profile to suggest "
 "representatives, topics, and related letters."
 msgstr ""
-"Geben Sie Ihren Titel ein und wir verwenden Ihr verifiziertes Profil, um "
-"Ihnen Abgeordnete, Themen und verwandte Briefe vorzuschlagen."
+"Type your title and we'll use your verified profile to suggest "
+"representatives, topics, and related letters."
 
 #: letters/templates/letters/letter_form.html:81
 msgid "Loading..."
-msgstr "Lädt..."
+msgstr "Loading..."
 
 #: letters/templates/letters/letter_form.html:83
 msgid "Analyzing your title..."
-msgstr "Analysiere Ihren Titel..."
+msgstr "Analyzing your title..."
 
-# Letter list page
 #: letters/templates/letters/letter_list.html:4
 msgid "Browse Letters"
-msgstr "Briefe durchsuchen"
+msgstr "Browse Letters"
 
 #: letters/templates/letters/letter_list.html:8
 msgid "About This"
-msgstr "Über diese Seite"
+msgstr "About This"
 
 #: letters/templates/letters/letter_list.html:9
 msgid ""
 "Make your voice heard, reach out to your representative, participate in "
 "democracy."
 msgstr ""
-"Lassen Sie Ihre Stimme hören, wenden Sie sich an Ihren Abgeordneten, "
-"beteiligen Sie sich an der Demokratie."
+"Make your voice heard, reach out to your representative, participate in "
+"democracy."
 
 #: letters/templates/letters/letter_list.html:10
 msgid "Open letters authored and signed by fellow citizens."
-msgstr "Offene Briefe, verfasst und unterzeichnet von Mitbürgern."
+msgstr "Open letters authored and signed by fellow citizens."
 
 #: letters/templates/letters/letter_list.html:11
 msgid ""
 "Physical letters mailed to representatives when number of verified "
 "signatures > 100."
 msgstr ""
-"Physische Briefe werden an Abgeordnete verschickt, wenn mehr als 100 "
-"verifizierte Unterschriften vorliegen."
+"Physical letters mailed to representatives when number of verified "
+"signatures > 100."
 
 #: letters/templates/letters/letter_list.html:15
 msgid "Browse Open Letters"
-msgstr "Offene Briefe durchsuchen"
+msgstr "Browse Open Letters"
 
 #: letters/templates/letters/letter_list.html:25
 msgid "Popular tags:"
-msgstr "Beliebte Schlagwörter:"
+msgstr "Popular tags:"
 
 #: letters/templates/letters/letter_list.html:41
 msgid "Previous"
-msgstr "Zurück"
+msgstr "Previous"
 
 #: letters/templates/letters/letter_list.html:43
 #, python-format
 msgid "Page %(page)s of %(total)s"
-msgstr "Seite %(page)s von %(total)s"
+msgstr "Page %(page)s of %(total)s"
 
 #: letters/templates/letters/letter_list.html:45
 msgid "Next"
-msgstr "Weiter"
+msgstr "Next"
 
 #: letters/templates/letters/letter_list.html:51
 msgid "No letters found."
-msgstr "Keine Briefe gefunden."
+msgstr "No letters found."
 
 #: letters/templates/letters/letter_list.html:51
 msgid "Be the first to write one!"
-msgstr "Schreiben Sie den ersten!"
+msgstr "Be the first to write one!"
 
-# Login page
 #: letters/templates/letters/login.html:14
 #: letters/templates/letters/register.html:15
 msgid "Username:"
-msgstr "Benutzername:"
+msgstr "Username:"
 
 #: letters/templates/letters/login.html:22
 #: letters/templates/letters/register.html:47
 msgid "Password:"
-msgstr "Passwort:"
+msgstr "Password:"
 
 #: letters/templates/letters/login.html:37
 msgid "Forgot your password?"
-msgstr "Passwort vergessen?"
+msgstr "Forgot your password?"
 
 #: letters/templates/letters/login.html:41
 msgid "Don't have an account?"
-msgstr "Noch kein Konto?"
+msgstr "Don't have an account?"
 
 #: letters/templates/letters/login.html:41
 msgid "Register here"
-msgstr "Hier registrieren"
+msgstr "Register here"
 
 #: letters/templates/letters/partials/letter_card.html:6
 msgid "To"
-msgstr "An"
+msgstr "To"
 
-# Plurals for signatures
 #: letters/templates/letters/partials/letter_card.html:20
 #, python-format
 msgid "%(counter)s signature"
 msgid_plural "%(counter)s signatures"
-msgstr[0] "%(counter)s Unterschrift"
-msgstr[1] "%(counter)s Unterschriften"
+msgstr[0] "%(counter)s signature"
+msgstr[1] "%(counter)s signatures"
 
 #: letters/templates/letters/partials/letter_card.html:20
 #, python-format
 msgid "%(counter)s verified"
 msgid_plural "%(counter)s verified"
-msgstr[0] "%(counter)s verifiziert"
-msgstr[1] "%(counter)s verifiziert"
+msgstr[0] "%(counter)s verified"
+msgstr[1] "%(counter)s verified"
 
 #: letters/templates/letters/partials/representative_card.html:21
 #: letters/templates/letters/partials/representative_card.html:23
 msgid "Constituency"
-msgstr "Wahlkreis"
+msgstr "Constituency"
 
 #: letters/templates/letters/partials/representative_card.html:27
 msgid "Mandate"
-msgstr "Mandat"
+msgstr "Mandate"
 
 #: letters/templates/letters/partials/representative_card.html:34
 msgid "Focus"
-msgstr "Schwerpunkt"
+msgstr "Focus"
 
 #: letters/templates/letters/partials/representative_card.html:34
 msgid "self-declared"
-msgstr "selbst erklärt"
+msgstr "self-declared"
 
 #: letters/templates/letters/partials/representative_card.html:45
 msgid "Committees"
-msgstr "Ausschüsse"
+msgstr "Committees"
 
 #: letters/templates/letters/partials/representative_card.html:57
 msgid "Email"
-msgstr "E-Mail"
+msgstr "Email"
 
 #: letters/templates/letters/partials/representative_card.html:60
 msgid "Website"
-msgstr "Webseite"
+msgstr "Website"
 
 #: letters/templates/letters/partials/representative_card.html:66
 msgid "View profile"
-msgstr "Profil ansehen"
+msgstr "View profile"
 
 #: letters/templates/letters/partials/suggestions.html:10
 msgid ""
 "We couldn't match you to a constituency yet. Update your profile "
 "verification to see local representatives."
 msgstr ""
-"Wir konnten Sie noch keinem Wahlkreis zuordnen. Aktualisieren Sie Ihre "
-"Profilverifizierung, um lokale Abgeordnete zu sehen."
+"We couldn't match you to a constituency yet. Update your profile "
+"verification to see local representatives."
 
-# Suggestions partial
 #: letters/templates/letters/partials/suggestions.html:16
 msgid "Our Interpretation"
-msgstr "Unsere Interpretation"
+msgstr "Our Interpretation"
 
 #: letters/templates/letters/partials/suggestions.html:21
 msgid "Topic:"
-msgstr "Thema:"
+msgstr "Topic:"
 
 #: letters/templates/letters/partials/suggestions.html:28
 msgid "No specific policy area detected. Try adding more keywords."
-msgstr ""
-"Kein spezifischer Politikbereich erkannt. Versuchen Sie, mehr "
-"Schlüsselwörter hinzuzufügen."
+msgstr "No specific policy area detected. Try adding more keywords."
 
 #: letters/templates/letters/partials/suggestions.html:37
 msgid "Related Keywords"
-msgstr "Verwandte Schlagwörter"
+msgstr "Related Keywords"
 
 #: letters/templates/letters/partials/suggestions.html:51
 msgid "Your Direct Representatives"
-msgstr "Ihre direkten Abgeordneten"
+msgstr "Your Direct Representatives"
 
 #: letters/templates/letters/partials/suggestions.html:56
 msgid "These representatives directly represent your constituency:"
-msgstr "Diese Abgeordneten vertreten Ihren Wahlkreis direkt:"
+msgstr "These representatives directly represent your constituency:"
 
 #: letters/templates/letters/partials/suggestions.html:67
 #: letters/templates/letters/partials/suggestions.html:102
 msgid "Select"
-msgstr "Auswählen"
+msgstr "Select"
 
 #: letters/templates/letters/partials/suggestions.html:81
 msgid "Topic Experts"
-msgstr "Themenexperten"
+msgstr "Topic Experts"
 
 #: letters/templates/letters/partials/suggestions.html:86
 #, python-format
@@ -849,122 +832,119 @@ msgid ""
 "These representatives are experts on \"%(topic)s\" based on their committee "
 "memberships:"
 msgstr ""
-"Diese Abgeordneten sind Experten für \"%(topic)s\" basierend auf ihren "
-"Ausschussmitgliedschaften:"
+"These representatives are experts on \"%(topic)s\" based on their committee "
+"memberships:"
 
 #: letters/templates/letters/partials/suggestions.html:95
 msgid "of"
-msgstr "von"
+msgstr "of"
 
 #: letters/templates/letters/partials/suggestions.html:116
 msgid "Suggested Representatives"
-msgstr "Vorgeschlagene Abgeordnete"
+msgstr "Suggested Representatives"
 
 #: letters/templates/letters/partials/suggestions.html:119
 msgid ""
 "No representatives found. Representatives may need to be synced for this "
 "governmental level."
 msgstr ""
-"Keine Abgeordneten gefunden. Abgeordnete müssen möglicherweise für diese "
-"Verwaltungsebene synchronisiert werden."
+"No representatives found. Representatives may need to be synced for this "
+"governmental level."
 
 #: letters/templates/letters/partials/suggestions.html:148
 msgid "Selected:"
-msgstr "Ausgewählt:"
+msgstr "Selected:"
 
 #: letters/templates/letters/password_reset_complete.html:4
 #: letters/templates/letters/password_reset_complete.html:8
 msgid "Password updated"
-msgstr "Passwort aktualisiert"
+msgstr "Password updated"
 
 #: letters/templates/letters/password_reset_complete.html:9
 msgid "You can now sign in using your new password."
-msgstr "Sie können sich jetzt mit Ihrem neuen Passwort anmelden."
+msgstr "You can now sign in using your new password."
 
 #: letters/templates/letters/password_reset_complete.html:10
 msgid "Go to login"
-msgstr "Zur Anmeldung"
+msgstr "Go to login"
 
 #: letters/templates/letters/password_reset_confirm.html:4
 #: letters/templates/letters/password_reset_confirm.html:9
 msgid "Choose a new password"
-msgstr "Wählen Sie ein neues Passwort"
+msgstr "Choose a new password"
 
 #: letters/templates/letters/password_reset_confirm.html:13
 msgid "New password"
-msgstr "Neues Passwort"
+msgstr "New password"
 
 #: letters/templates/letters/password_reset_confirm.html:20
 msgid "Confirm password"
-msgstr "Passwort bestätigen"
+msgstr "Confirm password"
 
 #: letters/templates/letters/password_reset_confirm.html:26
 msgid "Update password"
-msgstr "Passwort aktualisieren"
+msgstr "Update password"
 
 #: letters/templates/letters/password_reset_confirm.html:29
 msgid "Reset link invalid"
-msgstr "Zurücksetzungslink ungültig"
+msgstr "Reset link invalid"
 
 #: letters/templates/letters/password_reset_confirm.html:30
 msgid "This password reset link is no longer valid. Please request a new one."
-msgstr ""
-"Dieser Passwort-Zurücksetzungslink ist nicht mehr gültig. Bitte fordern Sie "
-"einen neuen an."
+msgstr "This password reset link is no longer valid. Please request a new one."
 
 #: letters/templates/letters/password_reset_confirm.html:31
 msgid "Request new link"
-msgstr "Neuen Link anfordern"
+msgstr "Request new link"
 
 #: letters/templates/letters/password_reset_done.html:4
 msgid "Reset email sent"
-msgstr "Zurücksetzungs-E-Mail gesendet"
+msgstr "Reset email sent"
 
 #: letters/templates/letters/password_reset_done.html:9
 msgid ""
 "If an account exists for that email address, we just sent you instructions "
 "to choose a new password."
 msgstr ""
-"Falls ein Konto für diese E-Mail-Adresse existiert, haben wir Ihnen gerade "
-"Anweisungen zum Festlegen eines neuen Passworts gesendet."
+"If an account exists for that email address, we just sent you instructions "
+"to choose a new password."
 
 #: letters/templates/letters/password_reset_done.html:10
 msgid "The link will stay valid for a limited time."
-msgstr "Der Link bleibt für eine begrenzte Zeit gültig."
+msgstr "The link will stay valid for a limited time."
 
 #: letters/templates/letters/password_reset_done.html:11
 msgid "Back to login"
-msgstr "Zurück zur Anmeldung"
+msgstr "Back to login"
 
 #: letters/templates/letters/password_reset_form.html:4
 msgid "Reset password"
-msgstr "Passwort zurücksetzen"
+msgstr "Reset password"
 
 #: letters/templates/letters/password_reset_form.html:8
 msgid "Reset your password"
-msgstr "Setzen Sie Ihr Passwort zurück"
+msgstr "Reset your password"
 
 #: letters/templates/letters/password_reset_form.html:9
 msgid ""
 "Enter the email address you used during registration. We will send you a "
 "link to create a new password."
 msgstr ""
-"Geben Sie die E-Mail-Adresse ein, die Sie bei der Registrierung verwendet "
-"haben. Wir senden Ihnen einen Link zum Erstellen eines neuen Passworts."
+"Enter the email address you used during registration. We will send you a "
+"link to create a new password."
 
 #: letters/templates/letters/password_reset_form.html:17
 msgid "Send reset link"
-msgstr "Zurücksetzungslink senden"
+msgstr "Send reset link"
 
-# Profile page
 #: letters/templates/letters/profile.html:13
 #, python-format
 msgid "%(username)s's Profile"
-msgstr "Profil von %(username)s"
+msgstr "%(username)s's Profile"
 
 #: letters/templates/letters/profile.html:16
 msgid "Identity & Constituency"
-msgstr "Identität & Wahlkreis"
+msgstr "Identity & Constituency"
 
 #: letters/templates/letters/profile.html:19
 msgid "Status:"
@@ -972,54 +952,51 @@ msgstr "Status:"
 
 #: letters/templates/letters/profile.html:21
 msgid "Type:"
-msgstr "Typ:"
+msgstr "Type:"
 
 #: letters/templates/letters/profile.html:28
 msgid ""
 "You self-declared your constituency. Representatives will see your "
 "signatures as self-declared constituents."
 msgstr ""
-"Sie haben Ihren Wahlkreis selbst angegeben. Abgeordnete werden Ihre "
-"Unterschriften als selbst angegebene Wähler sehen."
+"You self-declared your constituency. Representatives will see your "
+"signatures as self-declared constituents."
 
 #: letters/templates/letters/profile.html:30
 msgid "Start third-party verification"
-msgstr "Drittanbieter-Verifizierung starten"
+msgstr "Start third-party verification"
 
 #: letters/templates/letters/profile.html:33
 msgid ""
 "Your identity was verified via a third-party provider. Signatures will "
 "appear as verified constituents."
 msgstr ""
-"Ihre Identität wurde über einen Drittanbieter verifiziert. Unterschriften "
-"werden als verifizierte Wähler angezeigt."
+"Your identity was verified via a third-party provider. Signatures will "
+"appear as verified constituents."
 
 #: letters/templates/letters/profile.html:38
 msgid "Your verification is being processed."
-msgstr "Ihre Verifizierung wird bearbeitet."
+msgstr "Your verification is being processed."
 
 #: letters/templates/letters/profile.html:39
 msgid "Complete Verification (Stub)"
-msgstr "Verifizierung abschließen (Stub)"
+msgstr "Complete Verification (Stub)"
 
 #: letters/templates/letters/profile.html:43
 msgid "Verification failed. Please try again or contact support."
-msgstr ""
-"Verifizierung fehlgeschlagen. Bitte versuchen Sie es erneut oder "
-"kontaktieren Sie den Support."
+msgstr "Verification failed. Please try again or contact support."
 
 #: letters/templates/letters/profile.html:48
 msgid ""
 "You can self-declare your constituency below or start a verification with a "
 "trusted provider. Verified signatures carry more weight."
 msgstr ""
-"Sie können Ihren Wahlkreis unten selbst angeben oder eine Verifizierung mit "
-"einem vertrauenswürdigen Anbieter starten. Verifizierte Unterschriften haben "
-"mehr Gewicht."
+"You can self-declare your constituency below or start a verification with a "
+"trusted provider. Verified signatures carry more weight."
 
 #: letters/templates/letters/profile.html:50
 msgid "Start Third-party Verification"
-msgstr "Drittanbieter-Verifizierung starten"
+msgstr "Start Third-party Verification"
 
 #: letters/templates/letters/profile.html:55
 msgid "Ihre Adresse"
@@ -1043,88 +1020,87 @@ msgstr "Adresse speichern"
 
 #: letters/templates/letters/profile.html:88
 msgid "Self-declare your constituency"
-msgstr "Geben Sie Ihren Wahlkreis selbst an"
+msgstr "Self-declare your constituency"
 
 #: letters/templates/letters/profile.html:90
 msgid ""
 "Select the constituencies you live in so we can prioritise the right "
 "representatives."
 msgstr ""
-"Wählen Sie die Wahlkreise aus, in denen Sie leben, damit wir die richtigen "
-"Abgeordneten priorisieren können."
+"Select the constituencies you live in so we can prioritise the right "
+"representatives."
 
 #: letters/templates/letters/profile.html:109
 msgid "Save constituencies"
-msgstr "Wahlkreise speichern"
+msgstr "Save constituencies"
 
 #: letters/templates/letters/profile.html:114
 msgid "Your Letters"
-msgstr "Ihre Briefe"
+msgstr "Your Letters"
 
 #: letters/templates/letters/profile.html:120
 msgid "You haven't written any letters yet."
-msgstr "Sie haben noch keine Briefe geschrieben."
+msgstr "You haven't written any letters yet."
 
 #: letters/templates/letters/profile.html:120
 msgid "Write one now!"
-msgstr "Schreiben Sie jetzt einen!"
+msgstr "Write one now!"
 
 #: letters/templates/letters/profile.html:125
 msgid "Letters You've Signed"
-msgstr "Briefe, die Sie unterzeichnet haben"
+msgstr "Letters You've Signed"
 
 #: letters/templates/letters/profile.html:133
 msgid "You haven't signed any letters yet."
-msgstr "Sie haben noch keine Briefe unterzeichnet."
+msgstr "You haven't signed any letters yet."
 
 #: letters/templates/letters/profile.html:133
 msgid "Browse letters"
-msgstr "Briefe durchsuchen"
+msgstr "Browse letters"
 
 #: letters/templates/letters/profile.html:138
 msgid "Account"
-msgstr "Konto"
+msgstr "Account"
 
 #: letters/templates/letters/profile.html:140
 msgid ""
 "Need a fresh start? You can delete your account at any time. Your letters "
 "stay visible but without your name."
 msgstr ""
-"Brauchen Sie einen Neuanfang? Sie können Ihr Konto jederzeit löschen. Ihre "
-"Briefe bleiben sichtbar, aber ohne Ihren Namen."
+"Need a fresh start? You can delete your account at any time. Your letters "
+"stay visible but without your name."
 
 #: letters/templates/letters/register.html:9
 msgid ""
 "After registration we'll send you an email to confirm your address before "
 "you can sign in."
 msgstr ""
-"Nach der Registrierung senden wir Ihnen eine E-Mail, um Ihre Adresse zu "
-"bestätigen, bevor Sie sich anmelden können."
+"After registration we'll send you an email to confirm your address before "
+"you can sign in."
 
 #: letters/templates/letters/register.html:23
 msgid "Email:"
-msgstr "E-Mail:"
+msgstr "Email:"
 
-# Register page
 #: letters/templates/letters/register.html:31
 msgid "First Name (optional):"
-msgstr "Vorname (optional):"
+msgstr "First Name (optional):"
 
 #: letters/templates/letters/register.html:39
 msgid "Last Name (optional):"
-msgstr "Nachname (optional):"
+msgstr "Last Name (optional):"
 
 #: letters/templates/letters/register.html:55
 msgid "Confirm Password:"
-msgstr "Passwort bestätigen:"
+msgstr "Confirm Password:"
 
 #: letters/templates/letters/register.html:70
 msgid "Already have an account?"
-msgstr "Bereits ein Konto?"
+msgstr "Already have an account?"
 
 #: letters/templates/letters/register.html:70
 msgid "Login here"
-msgstr "Hier anmelden"
+msgstr "Login here"
 
 #: letters/templates/letters/representative_detail.html:19
 msgid "Über"
@@ -1132,50 +1108,49 @@ msgstr "Über"
 
 #: letters/templates/letters/representative_detail.html:30
 msgid "Committee Memberships"
-msgstr "Ausschussmitgliedschaften"
+msgstr "Committee Memberships"
 
 #: letters/templates/letters/representative_detail.html:75
 msgid "Open Letters"
-msgstr "Offene Briefe"
+msgstr "Open Letters"
 
 #: letters/templates/letters/representative_detail.html:83
 msgid "No letters have been written to this representative yet."
-msgstr "An diesen Abgeordneten wurden noch keine Briefe geschrieben."
+msgstr "No letters have been written to this representative yet."
 
 #: letters/templates/letters/representative_detail.html:85
 msgid "Write the First Letter"
-msgstr "Ersten Brief schreiben"
+msgstr "Write the First Letter"
 
 #: letters/templates/letters/representative_detail.html:95
 msgid "External Resources"
-msgstr "Externe Ressourcen"
+msgstr "External Resources"
 
 #: letters/templates/letters/representative_detail.html:100
 msgid "Abgeordnetenwatch Profile"
-msgstr "Abgeordnetenwatch-Profil"
+msgstr "Abgeordnetenwatch Profile"
 
 #: letters/templates/letters/representative_detail.html:102
 msgid ""
 "View voting record, questions, and detailed profile on Abgeordnetenwatch.de"
 msgstr ""
-"Abstimmungsverhalten, Fragen und detailliertes Profil auf Abgeordnetenwatch."
-"de ansehen"
+"View voting record, questions, and detailed profile on Abgeordnetenwatch.de"
 
 #: letters/templates/letters/representative_detail.html:112
 msgid "Wikipedia Article"
-msgstr "Wikipedia-Artikel"
+msgstr "Wikipedia Article"
 
 #: letters/templates/letters/representative_detail.html:114
 msgid "Read more about this representative on Wikipedia"
-msgstr "Mehr über diesen Abgeordneten auf Wikipedia lesen"
+msgstr "Read more about this representative on Wikipedia"
 
 #: letters/templates/letters/representative_detail.html:117
 msgid "View on Wikipedia"
-msgstr "Auf Wikipedia ansehen"
+msgstr "View on Wikipedia"
 
 #: letters/templates/letters/representative_detail.html:123
 msgid "No external resources available for this representative."
-msgstr "Keine externen Ressourcen für diesen Abgeordneten verfügbar."
+msgstr "No external resources available for this representative."
 
 #: letters/templates/letters/representative_detail.html:130
 msgid "Kontakt"
@@ -1184,49 +1159,47 @@ msgstr "Kontakt"
 #: letters/templates/letters/representative_detail.html:145
 #, python-format
 msgid "Start a new open letter to %(name)s"
-msgstr "Einen neuen offenen Brief an %(name)s beginnen"
+msgstr "Start a new open letter to %(name)s"
 
 #: letters/templates/letters/representative_detail.html:153
 msgid "Login to Write Letter"
-msgstr "Anmelden um Brief zu schreiben"
+msgstr "Login to Write Letter"
 
 #: letters/views.py:52
 msgid "Confirm your WriteThem.eu account"
-msgstr "Bestätigen Sie Ihr WriteThem.eu-Konto"
+msgstr "Confirm your WriteThem.eu account"
 
-# Flash messages
 #: letters/views.py:184
 msgid "Your letter has been published and your signature has been added!"
-msgstr ""
-"Ihr Brief wurde veröffentlicht und Ihre Unterschrift wurde hinzugefügt!"
+msgstr "Your letter has been published and your signature has been added!"
 
 #: letters/views.py:197
 msgid "You have already signed this letter."
-msgstr "Sie haben diesen Brief bereits unterzeichnet."
+msgstr "You have already signed this letter."
 
 #: letters/views.py:207
 msgid "Your signature has been added!"
-msgstr "Ihre Unterschrift wurde hinzugefügt!"
+msgstr "Your signature has been added!"
 
 #: letters/views.py:225
 msgid "Thank you for your report. Our team will review it."
-msgstr "Vielen Dank für Ihre Meldung. Unser Team wird sie überprüfen."
+msgstr "Thank you for your report. Our team will review it."
 
 #: letters/views.py:259
 msgid ""
 "Please confirm your email address. We sent you a link to activate your "
 "account."
 msgstr ""
-"Bitte bestätigen Sie Ihre E-Mail-Adresse. Wir haben Ihnen einen Link zum "
-"Aktivieren Ihres Kontos gesendet."
+"Please confirm your email address. We sent you a link to activate your "
+"account."
 
 #: letters/views.py:289
 msgid "Your account has been activated. You can now log in."
-msgstr "Ihr Konto wurde aktiviert. Sie können sich jetzt anmelden."
+msgstr "Your account has been activated. You can now log in."
 
 #: letters/views.py:292
 msgid "Your account is already active."
-msgstr "Ihr Konto ist bereits aktiv."
+msgstr "Your account is already active."
 
 #: letters/views.py:347
 msgid "Ihre Adresse wurde gespeichert."
@@ -1234,192 +1207,12 @@ msgstr "Ihre Adresse wurde gespeichert."
 
 #: letters/views.py:363
 msgid "Your constituency information has been updated."
-msgstr "Ihre Wahlkreisinformationen wurden aktualisiert."
+msgstr "Your constituency information has been updated."
 
 #: letters/views.py:391
 msgid ""
 "Your account has been deleted. Your published letters remain available to "
 "the public."
 msgstr ""
-"Ihr Konto wurde gelöscht. Ihre veröffentlichten Briefe bleiben für die "
-"Öffentlichkeit verfügbar."
-
-# Forms
-#~ msgid "Postal code (PLZ)"
-#~ msgstr "Postleitzahl (PLZ)"
-
-#, fuzzy
-#~| msgid "Use your PLZ to narrow down representatives from your constituency."
-#~ msgid "Use your PLZ to narrow down representatives from your parliament."
-#~ msgstr ""
-#~ "Verwenden Sie Ihre PLZ, um Abgeordnete aus Ihrem Wahlkreis einzugrenzen."
-
-#~ msgid "Comma-separated tags (e.g., \"climate, transport, education\")"
-#~ msgstr "Komma-getrennte Schlagwörter (z.B. \"Klima, Verkehr, Bildung\")"
-
-#~ msgid "climate, transport, education"
-#~ msgstr "Klima, Verkehr, Bildung"
-
-#~ msgid "Write your letter here"
-#~ msgstr "Schreiben Sie hier Ihren Brief"
-
-#, fuzzy
-#~| msgid "Federal"
-#~ msgid "Federal district"
-#~ msgstr "Bund"
-
-#~ msgid "Your postal code (PLZ):"
-#~ msgstr "Ihre Postleitzahl (PLZ):"
-
-#~ msgid "Or select from suggestions on the right →"
-#~ msgstr "Oder wählen Sie aus den Vorschlägen rechts →"
-
-#~ msgid "Tags (optional):"
-#~ msgstr "Schlagwörter (optional):"
-
-#, python-format
-#~ msgid ""
-#~ "Based on the topic \"%(topic)s\", we suggest contacting representatives "
-#~ "from the %(level)s:"
-#~ msgstr ""
-#~ "Basierend auf dem Thema \"%(topic)s\" empfehlen wir, Abgeordnete des "
-#~ "%(level)s zu kontaktieren:"
-
-#, fuzzy
-#~| msgid "Suggested Representatives"
-#~ msgid "Suggested Tags"
-#~ msgstr "Vorgeschlagene Abgeordnete"
-
-#~ msgid "Similar Letters"
-#~ msgstr "Ähnliche Briefe"
-
-#~ msgid "Others have written about similar topics:"
-#~ msgstr "Andere haben über ähnliche Themen geschrieben:"
-
-#, fuzzy
-#~| msgid "To"
-#~ msgid "To:"
-#~ msgstr "An"
-
-#~ msgid "Identity Verification"
-#~ msgstr "Identitätsverifizierung"
-
-#~ msgid "Your signatures will be marked as verified constituent signatures."
-#~ msgstr ""
-#~ "Ihre Unterschriften werden als verifizierte Wählerunterschriften markiert."
-
-#~ msgid "Verification Pending"
-#~ msgstr "Verifizierung ausstehend"
-
-#~ msgid "Verification Failed"
-#~ msgstr "Verifizierung fehlgeschlagen"
-
-# Letter detail page
-#~ msgid "Signed on"
-#~ msgstr "Unterzeichnet am"
-
-#~ msgid "Your comment:"
-#~ msgstr "Ihr Kommentar:"
-
-# Representative detail
-#~ msgid "Party:"
-#~ msgstr "Partei:"
-
-#~ msgid "Legislative Body:"
-#~ msgstr "Parlament:"
-
-#~ msgid "Present"
-#~ msgstr "Heute"
-
-#~ msgid "Inactive"
-#~ msgstr "Inaktiv"
-
-#~ msgid ""
-#~ "Based on committee memberships, this representative works on the "
-#~ "following policy areas:"
-#~ msgstr ""
-#~ "Basierend auf Ausschussmitgliedschaften arbeitet dieser Abgeordnete in "
-#~ "folgenden Politikbereichen:"
-
-#, python-format
-#~ msgid "Welcome, %(username)s! Your account has been created."
-#~ msgstr "Willkommen, %(username)s! Ihr Konto wurde erstellt."
-
-#, python-format
-#~ msgid "<strong>%(counter)s</strong> other verified"
-#~ msgstr "<strong>%(counter)s</strong> weitere verifiziert"
-
-#, python-format
-#~ msgid "<strong>%(counter)s</strong> unverified"
-#~ msgstr "<strong>%(counter)s</strong> nicht verifiziert"
-
-#~ msgid "Quick Stats"
-#~ msgstr "Schnellstatistik"
-
-#~ msgid "Letters Received:"
-#~ msgstr "Erhaltene Briefe:"
-
-#~ msgid "Committee Memberships:"
-#~ msgstr "Ausschussmitgliedschaften:"
-
-# Services explanations
-#~ msgid "No matching policy areas found. Please try different keywords."
-#~ msgstr ""
-#~ "Keine passenden Politikbereiche gefunden. Bitte versuchen Sie andere "
-#~ "Schlüsselwörter."
-
-#, python-format
-#~ msgid "Your concern relates to **%(topic)s** (%(type)s)."
-#~ msgstr "Ihr Anliegen betrifft **%(topic)s** (%(type)s)."
-
-#, python-format
-#~ msgid "Legal basis: %(basis)s"
-#~ msgstr "Rechtsgrundlage: %(basis)s"
-
-#~ msgid ""
-#~ "This is a **federal (Bund) responsibility**. You should contact federal "
-#~ "representatives in the Bundestag."
-#~ msgstr ""
-#~ "Dies ist eine **Bundesangelegenheit**. Sie sollten Bundestagsabgeordnete "
-#~ "kontaktieren."
-
-#~ msgid ""
-#~ "This is a **state (Land) responsibility**. Provide your state or postal "
-#~ "code for tailored suggestions."
-#~ msgstr ""
-#~ "Dies ist eine **Landesangelegenheit**. Geben Sie Ihr Bundesland oder PLZ "
-#~ "für maßgeschneiderte Vorschläge an."
-
-#~ msgid ""
-#~ "We could not map your PLZ to a local body. Please verify it or provide "
-#~ "more address detail."
-#~ msgstr ""
-#~ "Wir konnten Ihre PLZ keiner lokalen Verwaltung zuordnen. Bitte überprüfen "
-#~ "Sie sie oder geben Sie mehr Adressdetails an."
-
-#~ msgid ""
-#~ "This is a **local (municipal) responsibility**. Provide your PLZ for "
-#~ "precise matches."
-#~ msgstr ""
-#~ "Dies ist eine **kommunale Angelegenheit**. Geben Sie Ihre PLZ für genaue "
-#~ "Treffer an."
-
-#~ msgid ""
-#~ "This topic has **mixed competency** across multiple governmental levels."
-#~ msgstr ""
-#~ "Dieses Thema hat **gemischte Zuständigkeiten** über mehrere "
-#~ "Regierungsebenen."
-
-#~ msgid ""
-#~ "This is an **EU-level responsibility**. You should contact Members of the "
-#~ "European Parliament (MEPs)."
-#~ msgstr ""
-#~ "Dies ist eine **EU-Angelegenheit**. Sie sollten Mitglieder des "
-#~ "Europäischen Parlaments (MEPs) kontaktieren."
-
-#, python-format
-#~ msgid ""
-#~ "Showing %(count)d representative(s) with relevant committee assignments "
-#~ "first."
-#~ msgstr ""
-#~ "Zeige zuerst %(count)d Abgeordnete mit relevanten Ausschusszuweisungen."
+"Your account has been deleted. Your published letters remain available to "
+"the public."
