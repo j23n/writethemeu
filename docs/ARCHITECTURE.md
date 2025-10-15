@@ -10,7 +10,13 @@ WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`)
   - **writethem/** – Project settings, URL routing, ASGI/WSGI configs
   - **letters/** – Core application
     - **models.py** – Domain schema (13 models)
-    - **services.py** – Business logic, API clients, recommendation engine
+    - **services/** – Business logic organized by domain
+      - **abgeordnetenwatch_api_client.py** – API client for Abgeordnetenwatch
+      - **constituency.py** – Constituency matching and suggestion engine
+      - **geocoding.py** – Address geocoding and GeoJSON lookups
+      - **identity.py** – Identity verification (stub)
+      - **representative_sync.py** – Representative data import
+      - **topics.py** – Topic matching and committee mapping
     - **views.py** – Letter list/detail/create, representative/committee detail, profile
     - **forms.py** – Letter creation, signatures, reports, verification
     - **templates/** – Django templates (base, letters, auth, partials)
@@ -36,7 +42,7 @@ WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`)
 The application is bilingual (German/English) using Django's i18n framework. URL patterns include language prefixes (`/de/`, `/en/`). All UI strings use translation functions (`{% trans %}` in templates, `gettext_lazy()` in Python). Translation files are in `website/locale/{de,en}/LC_MESSAGES/django.po`. A language switcher in the base template toggles between languages. The `check_translations` management command verifies translation completeness.
 
 ## Representative Data Sync
-`RepresentativeSyncService` (in `letters/services.py`) imports data from the Abgeordnetenwatch v2 API:
+`RepresentativeSyncService` (in `letters/services/representative_sync.py`) imports data from the Abgeordnetenwatch v2 API:
 - Parliaments (EU Parliament, Bundestag, 16 Landtage) and their terms
 - Electoral districts and constituencies (direct mandates vs. list seats)
 - Representatives with contact metadata, party affiliation, election mode
@@ -59,7 +65,7 @@ Query commands for debugging:
 - `query_representatives` – Find representatives by location/topics
 
 ## Representative Recommendation Engine
-`ConstituencySuggestionService` (in `letters/services.py`) analyzes letter titles and user location to suggest relevant representatives:
+`ConstituencySuggestionService` (in `letters/services/constituency.py`) analyzes letter titles and user location to suggest relevant representatives:
 1. **Topic Analysis** – Tokenizes text and maps keywords to `TopicArea` taxonomy
 2. **Geographic Matching** – Resolves addresses/postal codes to constituencies using accurate geocoding
 3. **Representative Scoring** – Scores candidates by constituency proximity, topic overlap (committees/issues), and election mode (direct vs. list)
@@ -162,7 +168,7 @@ uv run python manage.py db_snapshot load my_snapshot    # Restore database state
 
 ## Key Design Decisions
 - **Single app architecture** – All domain logic in `letters` app for simplicity
-- **Service layer** – Business logic in `services.py` separate from views
+- **Service layer** – Business logic in `services/` module organized by domain, separate from views
 - **Accurate geocoding** – OSM Nominatim + GeoJSON for precise constituency matching
 - **Immutable letters** – Letters cannot be edited after first signature
 - **Auto-signature** – Authors automatically sign their own letters
