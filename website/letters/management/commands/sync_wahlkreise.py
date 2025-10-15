@@ -27,15 +27,112 @@ DEFAULT_WAHLKREIS_URL = (
     "btw25_geometrie_wahlkreise_vg250_shp_geo.zip"
 )
 
+# State-level Landtagswahlen data sources (9 states with direct downloads)
+STATE_SOURCES = {
+    'BW': {
+        'name': 'Baden-Württemberg',
+        'url': 'https://www.statistik-bw.de/fileadmin/user_upload/medien/bilder/Karten_und_Geometrien_der_Wahlkreise/LTWahlkreise2026-BW_GEOJSON.zip',
+        'format': 'geojson_zip',
+        'count': 70,
+        'attribution': '© Statistisches Landesamt Baden-Württemberg, 2026',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2026,
+    },
+    'BY': {
+        'name': 'Bavaria',
+        'url': 'https://fragdenstaat.de/anfrage/geometrien-der-stimmkreiseinteilung-zur-landtagswahl-2023-in-bayern/274642/anhang/stimmkreise-2023shp.zip',
+        'format': 'shapefile_zip',
+        'count': 91,
+        'attribution': '© Bayerisches Landesamt für Statistik, 2023',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2023,
+        'note': 'Stimmkreise structure (91 districts)',
+    },
+    'BE': {
+        'name': 'Berlin',
+        'url': 'https://daten.berlin.de/datensaetze/geometrien-der-wahlkreise-für-die-wahl-zum-abgeordnetenhaus-von-berlin-2021',
+        'format': 'shapefile_zip',
+        'count': 78,
+        'attribution': '© Amt für Statistik Berlin-Brandenburg, 2021',
+        'license': 'CC BY 3.0 DE',
+        'license_url': 'https://creativecommons.org/licenses/by/3.0/de/',
+        'election_year': 2021,
+    },
+    'HB': {
+        'name': 'Bremen',
+        'url': 'http://gdi2.geo.bremen.de/inspire/download/Wahlbezirke/data/Wahlbezirke_HB.zip',
+        'format': 'shapefile_zip',
+        'count': None,
+        'attribution': '© GeoInformation Bremen, 2023',
+        'license': 'CC BY 4.0',
+        'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+        'election_year': 2023,
+        'note': 'Wahlbezirke (polling districts)',
+    },
+    'NI': {
+        'name': 'Lower Saxony',
+        'url': 'https://www.statistik.niedersachsen.de/download/182342',
+        'format': 'shapefile_zip',
+        'count': 87,
+        'attribution': '© Landesamt für Statistik Niedersachsen, 2022',
+        'license': 'CC BY 4.0',
+        'license_url': 'https://creativecommons.org/licenses/by/4.0/',
+        'election_year': 2022,
+    },
+    'NW': {
+        'name': 'North Rhine-Westphalia',
+        'url': 'https://www.wahlergebnisse.nrw/landtagswahlen/2022/wahlkreiskarten/16_LW2022_NRW_Wahlkreise.zip',
+        'format': 'shapefile_zip',
+        'count': 128,
+        'attribution': '© IT.NRW, 2022',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2022,
+    },
+    'ST': {
+        'name': 'Saxony-Anhalt',
+        'url': 'https://wahlergebnisse.sachsen-anhalt.de/wahlen/lt21/wahlkreiseinteilung/downloads/download.php',
+        'format': 'shapefile_zip',
+        'count': 41,
+        'attribution': '© Statistisches Landesamt Sachsen-Anhalt, 2021',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2021,
+    },
+    'SH': {
+        'name': 'Schleswig-Holstein',
+        'url': 'https://geodienste.hamburg.de/download?url=https://geodienste.hamburg.de/SH_WFS_Wahlen&f=json',
+        'format': 'geojson_direct',
+        'count': 35,
+        'attribution': '© Statistik Nord, 2022',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2022,
+    },
+    'TH': {
+        'name': 'Thuringia',
+        'url': 'https://wahlen.thueringen.de/landtagswahlen/informationen/vektor/2024/16TH_L24_Wahlkreiseinteilung.zip',
+        'format': 'geopackage_zip',
+        'count': 44,
+        'attribution': '© Thüringer Landesamt für Statistik, 2024',
+        'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
+        'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+        'election_year': 2024,
+    },
+}
+
 
 class Command(BaseCommand):
     """Download Wahlkreis geodata and sync all constituencies to database."""
 
     help = (
-        "Fetch Bundestag constituency (Wahlkreis) boundary data from bundeswahlleiterin.de, "
-        "convert from Shapefile to GeoJSON if needed, store for shapely-based lookup, "
-        "and populate all 299 constituencies in the database. "
-        "This ensures constituencies exist independent of whether they have representatives."
+        "Fetch German electoral district (Wahlkreis) boundary data. "
+        "Downloads federal Bundestag boundaries by default and syncs all 299 constituencies to the database, "
+        "or state Landtag boundaries with --state flag (GeoJSON only, no DB sync). "
+        "Converts Shapefiles/GeoPackages to GeoJSON and normalizes properties. "
+        "Use --list to see available states. Use --all-states to download all 9 available state datasets."
     )
 
     def add_arguments(self, parser):
@@ -62,8 +159,40 @@ class Command(BaseCommand):
             action="store_true",
             help="Overwrite existing file without prompting.",
         )
+        parser.add_argument(
+            "--state",
+            choices=list(STATE_SOURCES.keys()),
+            help="Fetch data for a specific German state (Landtagswahl boundaries).",
+        )
+        parser.add_argument(
+            "--all-states",
+            action="store_true",
+            help="Fetch data for all available states.",
+        )
+        parser.add_argument(
+            "--list",
+            action="store_true",
+            help="List available states and their configuration.",
+        )
 
     def handle(self, *args, **options):
+        # Handle --list flag
+        if options.get('list'):
+            self._list_states()
+            return
+
+        # Handle --all-states flag
+        if options.get('all_states'):
+            self._fetch_all_states(options['force'])
+            return
+
+        # Handle --state flag
+        if options.get('state'):
+            state_code = options['state']
+            self._fetch_state(state_code, options['force'])
+            return
+
+        # Default: fetch federal data and sync to database
         url: str = options["url"]
         output_path = Path(options["output"]).expanduser().resolve()
         zip_member: Optional[str] = options["zip_member"]
@@ -347,3 +476,193 @@ class Command(BaseCommand):
                 eu_constituency.wahlkreis_id = 'DE'
                 eu_constituency.save(update_fields=['wahlkreis_id'])
                 self.stdout.write(f"Updated EU constituency with wahlkreis_id=DE")
+
+    def _list_states(self):
+        """Display available state configurations."""
+        self.stdout.write(self.style.SUCCESS("\nAvailable State Data Sources:"))
+        self.stdout.write("=" * 80)
+
+        for code, config in STATE_SOURCES.items():
+            self.stdout.write(f"\n{code} - {config['name']}")
+            self.stdout.write(f"  Election: {config['election_year']}")
+            self.stdout.write(f"  Districts: {config.get('count', 'N/A')}")
+            self.stdout.write(f"  Format: {config['format']}")
+            self.stdout.write(f"  License: {config['license']}")
+            if config.get('note'):
+                self.stdout.write(f"  Note: {config['note']}")
+            self.stdout.write(f"  URL: {config['url'][:70]}...")
+
+        self.stdout.write("\n" + "=" * 80)
+        self.stdout.write(f"\nTotal: {len(STATE_SOURCES)} states with direct downloads\n")
+
+    def _fetch_state(self, state_code: str, force: bool):
+        """Fetch data for a single state."""
+        config = STATE_SOURCES[state_code]
+
+        self.stdout.write(
+            self.style.SUCCESS(f"\nFetching {config['name']} ({state_code}) Landtagswahl data...")
+        )
+        self.stdout.write(f"  Source: {config['url']}")
+        self.stdout.write(f"  Expected districts: {config.get('count', 'Unknown')}")
+
+        # Determine output path
+        data_dir = Path(getattr(settings, 'CONSTITUENCY_BOUNDARIES_PATH', 'wahlkreise.geojson')).parent
+        output_path = data_dir / f"wahlkreise_{state_code.lower()}.geojson"
+
+        if output_path.exists() and not force:
+            raise CommandError(
+                f"Output file {output_path} already exists. Use --force to overwrite."
+            )
+
+        # Download data
+        try:
+            response = requests.get(config['url'], timeout=60)
+            response.raise_for_status()
+        except requests.RequestException as exc:
+            raise CommandError(f"Failed to download {state_code} data: {exc}") from exc
+
+        data_bytes = response.content
+
+        # Process based on format
+        format_type = config['format']
+
+        if format_type == 'geojson_direct':
+            geojson_text = data_bytes.decode('utf-8')
+        elif format_type == 'geojson_zip':
+            geojson_bytes = self._extract_from_zip(data_bytes, None)
+            geojson_text = geojson_bytes.decode('utf-8')
+        elif format_type == 'shapefile_zip':
+            self.stdout.write("  Converting Shapefile to GeoJSON...")
+            geojson_text = self._convert_shapefile_to_geojson(data_bytes)
+        elif format_type == 'geopackage_zip':
+            self.stdout.write("  Converting GeoPackage to GeoJSON...")
+            geojson_text = self._convert_geopackage_to_geojson(data_bytes)
+        else:
+            raise CommandError(f"Unsupported format: {format_type}")
+
+        # Normalize properties
+        geojson_text = self._normalize_state_geojson(
+            geojson_text,
+            state_code,
+            config['name']
+        )
+
+        # Validate
+        try:
+            geojson_data = json.loads(geojson_text)
+            feature_count = len(geojson_data.get("features", []))
+            self.stdout.write(f"  Validated GeoJSON with {feature_count} features")
+
+            if config.get('count') and feature_count != config['count']:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"  Warning: Expected {config['count']} features but got {feature_count}"
+                    )
+                )
+        except json.JSONDecodeError as exc:
+            raise CommandError("Downloaded data is not valid GeoJSON") from exc
+
+        # Save
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(geojson_text, encoding="utf-8")
+
+        self.stdout.write(
+            self.style.SUCCESS(f"✓ Saved {state_code} data to {output_path}")
+        )
+
+    def _fetch_all_states(self, force: bool):
+        """Fetch data for all available states."""
+        self.stdout.write(
+            self.style.SUCCESS(f"\nFetching all {len(STATE_SOURCES)} states...")
+        )
+
+        success_count = 0
+        failed = []
+
+        for state_code in STATE_SOURCES.keys():
+            try:
+                self._fetch_state(state_code, force)
+                success_count += 1
+            except (CommandError, Exception) as e:
+                failed.append((state_code, str(e)))
+                self.stdout.write(
+                    self.style.ERROR(f"✗ Failed to fetch {state_code}: {e}")
+                )
+
+        # Summary
+        self.stdout.write("\n" + "=" * 80)
+        self.stdout.write(f"Completed: {success_count}/{len(STATE_SOURCES)} states")
+
+        if failed:
+            self.stdout.write(self.style.WARNING("\nFailed states:"))
+            for code, error in failed:
+                self.stdout.write(f"  {code}: {error[:100]}")
+
+        self.stdout.write("")
+
+    def _convert_geopackage_to_geojson(self, data: bytes) -> str:
+        """Convert GeoPackage in ZIP to GeoJSON using fiona."""
+        try:
+            import fiona
+        except ImportError:
+            raise CommandError(
+                "fiona library is required to convert GeoPackage files. "
+                "Install with: uv add --dev fiona"
+            )
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Extract GPKG file from ZIP
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                gpkg_files = [name for name in archive.namelist() if name.lower().endswith('.gpkg')]
+                if not gpkg_files:
+                    raise CommandError("No .gpkg file found in ZIP archive")
+
+                gpkg_file = gpkg_files[0]
+                archive.extract(gpkg_file, tmpdir_path)
+
+            # Convert using fiona
+            gpkg_path = tmpdir_path / gpkg_file
+
+            features = []
+            with fiona.open(str(gpkg_path)) as src:
+                for feature in src:
+                    features.append({
+                        "type": "Feature",
+                        "geometry": feature["geometry"],
+                        "properties": dict(feature["properties"])
+                    })
+
+            geojson = {
+                "type": "FeatureCollection",
+                "features": features
+            }
+
+            return json.dumps(geojson, ensure_ascii=False, indent=None)
+
+    def _normalize_state_geojson(self, geojson_text: str, state_code: str, state_name: str) -> str:
+        """Add standardized properties to state GeoJSON features."""
+        data = json.loads(geojson_text)
+
+        for feature in data.get("features", []):
+            props = feature.get("properties", {})
+
+            # Ensure standard fields exist
+            if "LAND_CODE" not in props:
+                props["LAND_CODE"] = state_code
+            if "LAND_NAME" not in props:
+                props["LAND_NAME"] = state_name
+            if "LEVEL" not in props:
+                props["LEVEL"] = "STATE"
+
+            # Normalize WKR_NR to integer if it's a string
+            if "WKR_NR" in props and isinstance(props["WKR_NR"], str):
+                try:
+                    props["WKR_NR"] = int(props["WKR_NR"])
+                except ValueError:
+                    pass  # Keep as string if not numeric
+
+            feature["properties"] = props
+
+        return json.dumps(data, ensure_ascii=False, indent=None)
