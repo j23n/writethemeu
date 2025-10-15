@@ -1,6 +1,7 @@
 # ABOUTME: Test address-based constituency matching with geocoding and point-in-polygon lookup.
 # ABOUTME: Covers AddressGeocoder, WahlkreisLocator, and ConstituencyLocator services.
 
+import os
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
@@ -148,9 +149,19 @@ class AddressGeocodingTests(TestCase):
 class WahlkreisLocationTests(TestCase):
     """Test point-in-polygon constituency matching."""
 
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        # Use test fixture instead of production data
+        cls.fixture_path = os.path.join(
+            os.path.dirname(__file__),
+            'fixtures',
+            'wahlkreise.geojson'
+        )
+
     def test_locate_bundestag_coordinates(self):
         """Test that Bundestag coordinates find correct Berlin constituency."""
-        locator = WahlkreisLocator()
+        locator = WahlkreisLocator(self.fixture_path)
         result = locator.locate(52.5186, 13.3761)
 
         self.assertIsNotNone(result)
@@ -160,7 +171,7 @@ class WahlkreisLocationTests(TestCase):
 
     def test_locate_hamburg_coordinates(self):
         """Test that Hamburg coordinates find correct constituency."""
-        locator = WahlkreisLocator()
+        locator = WahlkreisLocator(self.fixture_path)
         result = locator.locate(53.5511, 9.9937)
 
         self.assertIsNotNone(result)
@@ -170,7 +181,7 @@ class WahlkreisLocationTests(TestCase):
 
     def test_coordinates_outside_germany(self):
         """Test that coordinates outside Germany return None."""
-        locator = WahlkreisLocator()
+        locator = WahlkreisLocator(self.fixture_path)
 
         # Paris coordinates
         result = locator.locate(48.8566, 2.3522)
