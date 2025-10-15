@@ -4,7 +4,7 @@
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
 from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
-from letters.models import GeocodeCache, Representative
+from letters.models import GeocodeCache
 
 
 # Test addresses covering all German states

@@ -4,7 +4,6 @@ Uses keyword matching to suggest mappings between committees and topic areas.
 """
 
 from django.core.management.base import BaseCommand
-from django.db.models import Q
 from letters.models import Committee, TopicArea
 
 

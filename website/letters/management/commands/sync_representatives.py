@@ -66,6 +66,6 @@ class Command(BaseCommand):
             for key, value in stats.items():
                 self.stdout.write(self.style.SUCCESS(f"  {key.replace('_', ' ').title()}: {value}"))
             self.stdout.write(self.style.SUCCESS('Sync completed successfully'))
-        except Exception as exc:
+        except Exception:
             logger.exception("Sync failed")
             raise
