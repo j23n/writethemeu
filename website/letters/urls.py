@@ -16,6 +16,9 @@ urlpatterns = [
     path('representative/<int:pk>/', views.RepresentativeDetailView.as_view(), name='representative_detail'),
     path('committee/<int:pk>/', views.CommitteeDetailView.as_view(), name='committee_detail'),
 
+    # Information pages
+    path('data-sources/', views.data_sources, name='data_sources'),
+
     # HTMX endpoints
     path('api/analyze-title/', views.analyze_letter_title, name='analyze_title'),
     path('api/search-wahlkreis/', views.search_wahlkreis, name='search_wahlkreis'),

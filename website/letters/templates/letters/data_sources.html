@@ -1,0 +1,86 @@
+{% extends 'letters/base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Data Sources & Attribution" %} - WriteThem.eu{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>{% trans "Electoral District Data Sources" %}</h2>
+
+    <p class="text-muted">
+        {% trans "WriteThem.eu uses official electoral district (Wahlkreis) boundary data from German statistical offices and electoral authorities. This page provides full attribution and license information for all data sources." %}
+    </p>
+
+    <h3 class="mt-4">{% trans "Available State Data" %}</h3>
+    <p class="text-muted">
+        {% trans "The following states provide direct downloads of Landtagswahl constituency boundaries:" %}
+    </p>
+
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>{% trans "State" %}</th>
+                    <th>{% trans "Districts" %}</th>
+                    <th>{% trans "Election Year" %}</th>
+                    <th>{% trans "License" %}</th>
+                    <th>{% trans "Attribution" %}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for state in available_states %}
+                <tr>
+                    <td>
+                        <strong>{{ state.name }}</strong> ({{ state.code }})
+                        {% if state.note %}
+                        <br><small class="text-muted">{{ state.note }}</small>
+                        {% endif %}
+                    </td>
+                    <td>{{ state.count }}</td>
+                    <td>{{ state.election_year }}</td>
+                    <td>
+                        {% if state.license_url %}
+                        <a href="{{ state.license_url }}" target="_blank" rel="noopener">{{ state.license }}</a>
+                        {% else %}
+                        {{ state.license }}
+                        {% endif %}
+                    </td>
+                    <td><small>{{ state.attribution }}</small></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3 class="mt-5">{% trans "States Without Direct Downloads" %}</h3>
+    <p class="text-muted">
+        {% trans "The following states do not provide direct downloads of constituency boundary data. Contact information is provided for data requests:" %}
+    </p>
+
+    <div class="list-group">
+        {% for state in unavailable_states %}
+        <div class="list-group-item">
+            <h5 class="mb-1">{{ state.name }}</h5>
+            <p class="mb-1"><strong>{% trans "Contact:" %}</strong> {{ state.contact }}</p>
+            <small class="text-muted">{{ state.note }}</small>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="alert alert-info mt-4">
+        <h4>{% trans "About Federal Data" %}</h4>
+        <p class="mb-0">
+            {% trans "Federal Bundestag constituency data is sourced from:" %}<br>
+            <strong>© Die Bundeswahlleiterin, Statistisches Bundesamt, Wiesbaden 2025</strong><br>
+            <small>{% trans "License: Official government data, freely available for reuse with attribution" %}</small>
+        </p>
+    </div>
+
+    <div class="mt-4">
+        <h4>{% trans "Data Usage Policy" %}</h4>
+        <p>
+            {% trans "All data is used in accordance with the respective licenses. Attribution is provided as required. If you believe any data is used incorrectly, please contact us." %}
+        </p>
+    </div>
+</div>
+{% endblock %}

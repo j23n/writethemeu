@@ -815,3 +815,72 @@ class CommitteeDetailView(DetailView):
         ).order_by('representative__last_name', 'representative__first_name')
         context['memberships'] = memberships
         return context
+
+
+def data_sources(request):
+    """Display data sources and attribution information."""
+    from .management.commands.fetch_wahlkreis_data import STATE_SOURCES
+
+    # States with data available
+    available_states = []
+    for code, config in STATE_SOURCES.items():
+        available_states.append({
+            'code': code,
+            'name': config['name'],
+            'attribution': config['attribution'],
+            'license': config['license'],
+            'license_url': config.get('license_url', ''),
+            'election_year': config['election_year'],
+            'count': config.get('count', 'N/A'),
+            'source_url': config['url'],
+            'note': config.get('note', ''),
+        })
+
+    # Sort by name
+    available_states.sort(key=lambda x: x['name'])
+
+    # States without direct downloads
+    unavailable_states = [
+        {
+            'name': 'Brandenburg',
+            'contact': 'Ministerium des Innern und für Kommunales, Potsdam',
+            'note': 'No state-wide Landtagswahl download. Municipal data available for some cities (e.g., Potsdam).'
+        },
+        {
+            'name': 'Hamburg',
+            'contact': 'WFS Service available',
+            'note': 'Data available via WFS service (requires GIS tools). Excellent detail with ~1,300 Stimmbezirke.'
+        },
+        {
+            'name': 'Hesse',
+            'contact': 'presse@statistik.hessen.de',
+            'note': 'Geodata not publicly available. Contact Hessisches Statistisches Landesamt to request.'
+        },
+        {
+            'name': 'Mecklenburg-Vorpommern',
+            'contact': 'LAIV-MV',
+            'note': 'Shapefiles referenced but require contact with LAIV-MV for downloads.'
+        },
+        {
+            'name': 'Rhineland-Palatinate',
+            'contact': 'Landeswahlleiter via wahlen.rlp.de',
+            'note': 'Only PDF maps available. No machine-readable geodata.'
+        },
+        {
+            'name': 'Saarland',
+            'contact': 'landeswahlleitung@innen.saarland.de',
+            'note': 'Special system with only 3 large regional constituencies. Contact required.'
+        },
+        {
+            'name': 'Saxony',
+            'contact': 'WMS Service',
+            'note': 'WMS service only (visualization, not vector data). May need to contact Statistisches Landesamt.'
+        },
+    ]
+
+    context = {
+        'available_states': available_states,
+        'unavailable_states': unavailable_states,
+    }
+
+    return render(request, 'letters/data_sources.html', context)
