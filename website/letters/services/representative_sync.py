@@ -328,6 +328,7 @@ class RepresentativeSyncService:
             'term_end': self._parse_date(mandate.get('end_date')) or term.end_date,
             'is_active': True,
             'metadata': metadata,
+            'focus_areas': ', '.join(focus_topics) if focus_topics else '',
         }
 
         rep, created = Representative.objects.update_or_create(
@@ -354,10 +355,6 @@ class RepresentativeSyncService:
                     rep.photo_path = photo_path
                     rep.photo_updated_at = timezone.now()
                     rep.save(update_fields=['photo_path', 'photo_updated_at'])
-
-        if focus_topics and not rep.focus_areas:
-            rep.focus_areas = ', '.join(focus_topics)
-            rep.save(update_fields=['focus_areas'])
 
     # --------------------------------------
     def _determine_constituencies(
