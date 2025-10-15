@@ -586,7 +586,7 @@ def complete_verification(request):
 def search_wahlkreis(request):
     """
     HTMX endpoint: Search for Wahlkreis by address.
-    Returns JSON with constituency data or error message.
+    Returns HTML fragment with constituency data or error message.
     """
     street_address = request.POST.get('street_address', '').strip()
     postal_code = request.POST.get('postal_code', '').strip()
@@ -594,7 +594,7 @@ def search_wahlkreis(request):
 
     # Validate required fields
     if not all([street_address, postal_code, city]):
-        return JsonResponse({
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
             'success': False,
             'error': 'Please provide street address, postal code, and city.'
         })
@@ -609,7 +609,7 @@ def search_wahlkreis(request):
     )
 
     if not success:
-        return JsonResponse({
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
             'success': False,
             'error': error_msg or 'Could not find address. Please check your input or select Wahlkreise manually.'
         })
@@ -620,7 +620,7 @@ def search_wahlkreis(request):
         result = locator.locate(lat, lon)
 
         if not result:
-            return JsonResponse({
+            return render(request, 'letters/partials/wahlkreis_search_result.html', {
                 'success': False,
                 'error': 'Could not determine Wahlkreis for this location. Please select manually.'
             })
@@ -638,21 +638,28 @@ def search_wahlkreis(request):
                 f'Address search found Wahlkreis {wkr_nr} ({wkr_name}) but no matching '
                 f'Constituency record exists in database. Run sync_representatives to import data.'
             )
-            return JsonResponse({
+            return render(request, 'letters/partials/wahlkreis_search_result.html', {
                 'success': False,
                 'error': 'Representative data not loaded. Please select constituencies manually or contact support.'
             })
 
-        return JsonResponse({
+        # Find state constituency by matching land_name
+        state_constituency = Constituency.objects.filter(
+            scope='STATE_DISTRICT',
+            name__icontains=land_name
+        ).first()
+
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
             'success': True,
-            'wahlkreis_nr': wkr_nr,
             'wahlkreis_name': wkr_name,
             'land_name': land_name,
+            'federal_constituency_id': federal_constituency.id,
+            'state_constituency_id': state_constituency.id if state_constituency else None,
         })
 
     except Exception as e:
         logger.exception('Unexpected error during wahlkreis search')
-        return JsonResponse({
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
             'success': False,
             'error': 'Search temporarily unavailable. Please select Wahlkreise manually.'
         })

@@ -42,8 +42,14 @@
                             <label for="search_city" class="form-label">{% trans "City" %}</label>
                             <input type="text" id="search_city" name="search_city" class="form-control" placeholder="Berlin">
                         </div>
-                        <div class="col-md-4 mb-2 d-flex align-items-end">
-                            <button type="button" id="search-button" class="btn btn-secondary w-100">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button"
+                                    hx-post="{% url 'search_wahlkreis' %}"
+                                    hx-include="[name='search_street'],[name='search_postal_code'],[name='search_city']"
+                                    hx-target="#search-message"
+                                    hx-swap="innerHTML"
+                                    class="btn btn-secondary w-100 d-block">
                                 {% trans "Search" %}
                             </button>
                         </div>
@@ -110,6 +116,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Tom Select on constituency dropdowns
@@ -126,86 +133,23 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 
-    // Handle address search
-    const searchButton = document.getElementById('search-button');
-    const searchMessage = document.getElementById('search-message');
+    // Handle HTMX response: update Tom Select dropdowns from data attributes
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'search-message') {
+            const alert = event.detail.target.querySelector('.alert-success');
+            if (alert) {
+                const federalId = alert.dataset.federalConstituencyId;
+                const stateId = alert.dataset.stateConstituencyId;
 
-    if (searchButton) {
-        searchButton.addEventListener('click', function() {
-            const street = document.getElementById('search_street').value.trim();
-            const postalCode = document.getElementById('search_postal_code').value.trim();
-            const city = document.getElementById('search_city').value.trim();
-
-            if (!street || !postalCode || !city) {
-                searchMessage.innerHTML = '<div class="alert alert-warning">{% trans "Please fill in all address fields." %}</div>';
-                return;
-            }
-
-            // Show loading state
-            searchButton.disabled = true;
-            searchButton.textContent = '{% trans "Searching..." %}';
-            searchMessage.innerHTML = '<div class="alert alert-info">{% trans "Searching for your Wahlkreis..." %}</div>';
-
-            // Make HTMX request
-            fetch('{% url "search_wahlkreis" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'X-CSRFToken': '{{ csrf_token }}',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: new URLSearchParams({
-                    'street_address': street,
-                    'postal_code': postalCode,
-                    'city': city
-                })
-            })
-            .then(response => response.json())
-            .then(data => {
-                searchButton.disabled = false;
-                searchButton.textContent = '{% trans "Search" %}';
-
-                if (data.success) {
-                    searchMessage.innerHTML = '<div class="alert alert-success">{% trans "Found:" %} ' + data.wahlkreis_name + ' (' + data.land_name + ')</div>';
-
-                    // Auto-populate dropdowns by finding matching options
-                    const federalSelect = selectInstances['id_federal_constituency'];
-                    const stateSelect = selectInstances['id_state_constituency'];
-
-                    if (federalSelect) {
-                        // Search for matching federal constituency
-                        const federalOptions = federalSelect.options;
-                        for (let key in federalOptions) {
-                            const option = federalOptions[key];
-                            if (option.text && option.text.includes(data.wahlkreis_name)) {
-                                federalSelect.setValue(option.value);
-                                break;
-                            }
-                        }
-                    }
-
-                    if (stateSelect) {
-                        // Search for matching state constituency
-                        const stateOptions = stateSelect.options;
-                        for (let key in stateOptions) {
-                            const option = stateOptions[key];
-                            if (option.text && option.text.includes(data.land_name)) {
-                                stateSelect.setValue(option.value);
-                                break;
-                            }
-                        }
-                    }
-                } else {
-                    searchMessage.innerHTML = '<div class="alert alert-danger">' + data.error + '</div>';
+                if (federalId && selectInstances['id_federal_constituency']) {
+                    selectInstances['id_federal_constituency'].setValue(federalId);
                 }
-            })
-            .catch(error => {
-                searchButton.disabled = false;
-                searchButton.textContent = '{% trans "Search" %}';
-                searchMessage.innerHTML = '<div class="alert alert-danger">{% trans "An error occurred. Please try again." %}</div>';
-            });
-        });
-    }
+                if (stateId && selectInstances['id_state_constituency']) {
+                    selectInstances['id_state_constituency'].setValue(stateId);
+                }
+            }
+        }
+    });
 });
 </script>
 {% endblock %}

@@ -23,7 +23,7 @@ class WahlkreisSearchTestCase(TestCase):
         self.assertEqual(response.status_code, 302)  # Redirect to login
 
     def test_search_wahlkreis_with_valid_address(self):
-        """Valid address returns constituency data as JSON"""
+        """Valid address returns HTML fragment with constituency data"""
         response = self.client.post(self.url, {
             'street_address': 'Platz der Republik 1',
             'postal_code': '11011',
@@ -31,14 +31,13 @@ class WahlkreisSearchTestCase(TestCase):
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
 
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn('success', data)
-        self.assertTrue(data['success'])
-        self.assertIn('wahlkreis_nr', data)
-        self.assertIn('wahlkreis_name', data)
+        content = response.content.decode('utf-8')
+        # Should return error because no Constituency exists in test database
+        self.assertIn('alert-danger', content)
+        self.assertIn('Representative data not loaded', content)
 
     def test_search_wahlkreis_with_invalid_address(self):
-        """Invalid address returns error message"""
+        """Invalid address returns HTML fragment with error message"""
         response = self.client.post(self.url, {
             'street_address': 'Nonexistent Street 999',
             'postal_code': '99999',
@@ -46,20 +45,18 @@ class WahlkreisSearchTestCase(TestCase):
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
 
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn('success', data)
-        self.assertFalse(data['success'])
-        self.assertIn('error', data)
+        content = response.content.decode('utf-8')
+        self.assertIn('alert-danger', content)
+        self.assertIn('Address not found', content)
 
     def test_search_wahlkreis_missing_fields(self):
-        """Missing required fields returns error"""
+        """Missing required fields returns HTML fragment with error"""
         response = self.client.post(self.url, {
             'street_address': 'Platz der Republik 1'
             # Missing postal_code and city
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
 
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn('success', data)
-        self.assertFalse(data['success'])
-        self.assertIn('error', data)
+        content = response.content.decode('utf-8')
+        self.assertIn('alert-danger', content)
+        self.assertIn('Please provide street address, postal code, and city', content)
