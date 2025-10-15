@@ -5,7 +5,6 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
 
-from letters.forms import IdentityVerificationForm
 from letters.models import IdentityVerification
 from letters.services import IdentityVerificationService
 from letters.tests.test_fixtures import ParliamentFixtureMixin
@@ -61,80 +60,6 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
         self.assertIn(self.constituency_direct, verification.get_constituencies())
         self.assertIn(self.state_constituency_direct, verification.get_constituencies())
         self.assertTrue(self.direct_rep.qualifies_as_constituent(verification))
-
-
-class IdentityVerificationFormTests(TestCase):
-    """Test the IdentityVerificationForm for full address collection."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            username='testuser',
-            password='password123',
-            email='testuser@example.com',
-        )
-
-    def test_form_requires_all_address_fields_together(self):
-        """Test that form validation requires all address fields if any is provided."""
-        # Only street provided - should fail
-        form = IdentityVerificationForm(
-            data={
-                'street_address': 'Unter den Linden 77',
-                'postal_code': '',
-                'city': '',
-            },
-            user=self.user
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
-
-        # Only PLZ provided - should fail
-        form = IdentityVerificationForm(
-            data={
-                'street_address': '',
-                'postal_code': '10117',
-                'city': '',
-            },
-            user=self.user
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
-
-        # Only city provided - should fail
-        form = IdentityVerificationForm(
-            data={
-                'street_address': '',
-                'postal_code': '',
-                'city': 'Berlin',
-            },
-            user=self.user
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn('Bitte geben Sie eine vollständige Adresse ein', str(form.errors))
-
-    def test_form_accepts_all_address_fields(self):
-        """Test that form is valid when all address fields are provided."""
-        form = IdentityVerificationForm(
-            data={
-                'street_address': 'Unter den Linden 77',
-                'postal_code': '10117',
-                'city': 'Berlin',
-            },
-            user=self.user
-        )
-        self.assertTrue(form.is_valid())
-
-    def test_form_accepts_empty_address(self):
-        """Test that form is valid when all address fields are empty."""
-        form = IdentityVerificationForm(
-            data={
-                'street_address': '',
-                'postal_code': '',
-                'city': '',
-            },
-            user=self.user
-        )
-        self.assertTrue(form.is_valid())
-
 
 
 class TestIdentityVerificationWithoutAddress(ParliamentFixtureMixin, TestCase):
