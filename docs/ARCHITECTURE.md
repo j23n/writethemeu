@@ -1,80 +1,170 @@
-# Repository Guide for Coding Agents
+# Architecture Overview
 
 ## Project Overview
-WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`) that lets citizens draft open letters to political representatives at EU, federal, and state level. The single Django app `letters` owns all domain logic: data imports, recommendation services, identity stubs, and presentation.
+WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`) that enables citizens to draft open letters to political representatives at EU, federal, and state level. The application is bilingual (German/English) using Django's i18n framework. The single Django app `letters` owns all domain logic: data imports, recommendation services, identity verification, and presentation.
 
-## Directory Layout
-- **pyproject.toml / uv.lock** – dependency metadata (install via `uv sync`).
-- **main.py** – thin CLI entrypoint (mostly unused during normal development).
-- **vision/** – forward-looking design notes (e.g. `vision/matching.md`).
-- **TODO.md** – active follow-up items (e.g. integrate Wahlkreis GeoJSON).
-- **website/** – Django project root.
-  - **manage.py** – run Django management commands (always execute from `website/`).
-  - **writethem/** – Django settings, URL routing, ASGI/WSGI configs.
-  - **letters/** – core app: models, services, views, forms, templates, tests, management commands, constants, geo helpers, fixtures.
+## Directory Structure
+- **pyproject.toml / uv.lock** – Python dependency metadata (managed by `uv`)
+- **website/** – Django project root
+  - **manage.py** – Django management commands (always execute from `website/`)
+  - **writethem/** – Project settings, URL routing, ASGI/WSGI configs
+  - **letters/** – Core application
+    - **models.py** – Domain schema (13 models)
+    - **services.py** – Business logic, API clients, recommendation engine
+    - **views.py** – Letter list/detail/create, representative/committee detail, profile
+    - **forms.py** – Letter creation, signatures, reports, verification
+    - **templates/** – Django templates (base, letters, auth, partials)
+    - **management/commands/** – Data sync, queries, utilities
+    - **tests.py** – Comprehensive test suite
+    - **admin.py** – Django admin customizations
+    - **data/** – GeoJSON boundaries, database snapshots
+    - **fixtures/** – Seed data for development
+  - **locale/** – Translation files (de/en)
 
-## Key Workflows
-### Representative Sync
-- `letters/services.py::RepresentativeSyncService` calls the Abgeordnetenwatch v2 API to import:
-  - **Parliaments** (EU / Bundestag / Landtage) + terms
-  - **Electoral districts & constituencies** (direct vs list scope)
-  - **Representatives** with contact metadata, election mode, term dates
-  - **Committees & memberships**
-- Management command: `uv run python manage.py sync_representatives --level [eu|federal|state|all] [--state "Bayern"] [--dry-run]`
-- Imported representatives store API payloads under `Representative.metadata` (`mandate`, `politician_id`, links, etc.).
-- After imports we snapshot data for development in `letters/fixtures/` and `letters/data/db_snapshot.sqlite3`.
+## Core Domain Models
+- **Parliament** → **ParliamentTerm** → **Constituency** – Hierarchical government structure
+- **Representative** – Members of parliament with contact details, committees, metadata
+- **Committee** ← **CommitteeMembership** → **Representative** – Committee assignments
+- **Letter** → **Representative** – Open letters with title, content, publication date
+- **Signature** → **Letter** + **User** – User signatures on letters
+- **Tag** / **TopicArea** – Categorization and topic taxonomy
+- **IdentityVerification** → **User** – Optional verification status and constituency
+- **Report** → **Letter** – User-submitted reports for moderation
+- **GeocodeCache** – Cached address-to-coordinates lookups
 
-### Suggestion Engine
-- `ConstituencySuggestionService` (in `letters/services.py`) analyses letter titles + optional PLZ:
-  1. Tokenises the text, maps keywords to `TopicArea` taxonomy.
-  2. Resolves postal codes to state/federal constituencies (currently via prefix heuristics; TODO: GeoJSON boundaries).
-  3. Scores representatives by constituency proximity, topic overlap (committees/issues), and returns the top candidates plus suggested tags/keywords.
-- HTMX partial `letters/templates/letters/partials/suggestions.html` renders live recommendations on the letter form.
-- Regression tests in `letters/tests.py::SuggestionServiceTests` ensure PLZ- and keyword-driven picks behave as expected.
+## Internationalization
+The application is bilingual (German/English) using Django's i18n framework. URL patterns include language prefixes (`/de/`, `/en/`). All UI strings use translation functions (`{% trans %}` in templates, `gettext_lazy()` in Python). Translation files are in `website/locale/{de,en}/LC_MESSAGES/django.po`. A language switcher in the base template toggles between languages. The `check_translations` management command verifies translation completeness.
 
-### Letters & Signatures
-- `Letter` model links to a single representative; `Signature` records user participation.
-- `Letter.signature_breakdown()` computes constituent/non-constituent counts using verified identity data.
-- Letter author auto-signs on creation (`LetterCreateView`), and `letters/templates/letters/partials/letter_card.html` is the shared card view for lists, profiles, and suggestions.
+## Representative Data Sync
+`RepresentativeSyncService` (in `letters/services.py`) imports data from the Abgeordnetenwatch v2 API:
+- Parliaments (EU Parliament, Bundestag, 16 Landtage) and their terms
+- Electoral districts and constituencies (direct mandates vs. list seats)
+- Representatives with contact metadata, party affiliation, election mode
+- Committees and committee memberships
 
-### Identity Verification (Stub)
-- `IdentityVerificationService` provides demo endpoints: `initiate_verification()` and `complete_verification()` (currently mark every attempt `VERIFIED`).
-- Verification records capture street/PLZ/city/state, inferred constituency/parliament, and expiration timestamps.
-- In production, swap the stubbed methods with a real provider (eID, POSTIDENT, etc.) then re-use the same storage and constituency linking.
+Management command: `sync_representatives --level [eu|federal|state|all] [--state "Bayern"] [--dry-run]`
 
-### Admin, Fixtures, Tests
-- Admin customisations live in `letters/admin.py`, exposing parliaments, representatives, committees, signatures, verification status, etc.
-- Tests (`letters/tests.py`) cover letter flows, identity behaviour, and suggestion scoring. Run with `uv run python manage.py test letters`.
-- Large representative datasets are stored as JSON fixture `letters/fixtures/parliament_seed.json`; keep it updated after major syncs if test data relies on it.
+Imported representatives store full API payloads in `Representative.metadata` for future enrichment. Development snapshots are saved in `letters/fixtures/parliament_seed.json` and `letters/data/db_snapshot.sqlite3`.
 
-## Data Sources & Integrations
-- **Abgeordnetenwatch API** – canonical source for parliaments, mandates, committees, response stats.
-- **Bundestag vita JSON** (planned) – to enrich biographies/focus areas (see `vision/matching.md`).
-- **Bundeswahlleiter Wahlkreis GeoJSON** (planned) – replace PLZ-prefix routing with true spatial lookups (`TODO.md`).
-- Additional Landtag/EU feeds can slot into the planned `RepresentativeProfile` architecture.
+## Accurate Constituency Matching
+Constituency matching uses a two-stage process:
+1. **AddressGeocoder** converts German addresses to lat/lng coordinates via OSM Nominatim API with database caching (`GeocodeCache` model)
+2. **WahlkreisLocator** performs point-in-polygon queries against Bundestag GeoJSON boundaries (`letters/data/wahlkreise.geojson`) using shapely
 
-## Commands Cheat Sheet
+The `ConstituencyLocator.locate_from_address(street, postal_code, city)` method orchestrates the pipeline. Falls back to PLZ prefix heuristics when full address is unavailable. GeoJSON boundaries are downloaded via `fetch_wahlkreis_data` command (~2MB from Bundeswahlleiterin open data).
+
+Query commands for debugging:
+- `query_wahlkreis` – Find constituency by address or postal code
+- `query_topics` – Find matching topics for letter text
+- `query_representatives` – Find representatives by location/topics
+
+## Representative Recommendation Engine
+`ConstituencySuggestionService` (in `letters/services.py`) analyzes letter titles and user location to suggest relevant representatives:
+1. **Topic Analysis** – Tokenizes text and maps keywords to `TopicArea` taxonomy
+2. **Geographic Matching** – Resolves addresses/postal codes to constituencies using accurate geocoding
+3. **Representative Scoring** – Scores candidates by constituency proximity, topic overlap (committees/issues), and election mode (direct vs. list)
+
+Returns top candidates with explanations, suggested tags, and matched topics. HTMX partial `letters/templates/letters/partials/suggestions.html` renders live recommendations on the letter form.
+
+## Letter Lifecycle
+1. **Creation** – User drafts letter with title, content, and optional address
+2. **Suggestion** – System recommends representatives based on topic + location
+3. **Publication** – Letter is published (immutable after first signature)
+4. **Auto-signature** – Author automatically signs on publication
+5. **Signing** – Other users can add signatures
+6. **Signature Breakdown** – `Letter.signature_breakdown()` computes constituent/non-constituent counts using verified identity data
+
+Letter card component (`letters/templates/letters/partials/letter_card.html`) is shared across list views, profiles, and suggestions.
+
+## Identity Verification (Stub)
+`IdentityVerificationService` provides demo endpoints marking all attempts as `VERIFIED`. Verification records capture street/PLZ/city/state, inferred constituency/parliament, and expiration timestamps. Production implementation requires integrating third-party provider (see `docs/plans/2025-10-10-identity-verification.md`).
+
+## Authentication & User Management
+- Double opt-in email verification for new accounts
+- Password reset flow with email confirmation
+- User profile showing authored letters, signed letters, and verification status
+- Account deletion with confirmation step
+- All auth views use custom templates in `letters/templates/registration/`
+
+## Topic Taxonomy
+- `TopicArea` model stores hierarchical topic structure (federal/state/local levels)
+- `load_topic_taxonomy` command loads taxonomy from JSON/YAML
+- `map_committees_to_topics` automatically maps committee names to topics
+- Topics drive representative recommendations and letter categorization
+
+## Admin Interface
+Django admin (`letters/admin.py`) exposes all models with customizations:
+- Parliament/representative hierarchies
+- Letter/signature management
+- Committee assignments
+- Identity verification status
+- Report moderation
+
+## Testing Strategy
+Comprehensive test suite in `letters/tests.py`:
+- Address geocoding with mocked OSM Nominatim responses
+- Point-in-polygon constituency matching
+- Topic keyword matching and scoring
+- Representative suggestion integration tests
+- Letter creation, signing, and signature removal flows
+- Identity verification behavior
+- Internationalization configuration
+
+Run tests: `uv run python manage.py test letters`
+
+## Data Sources
+- **Abgeordnetenwatch API v2** – Representatives, parliaments, committees, mandates
+- **Bundeswahlleiterin GeoJSON** – Official Bundestag constituency boundaries
+- **OSM Nominatim** – Address geocoding (public API, cached in database)
+
+## Management Commands
+- `sync_representatives` – Import/update representative data from Abgeordnetenwatch
+- `fetch_wahlkreis_data` – Download constituency boundary GeoJSON
+- `load_topic_taxonomy` – Load topic hierarchy from file
+- `map_committees_to_topics` – Auto-map committees to topics
+- `query_wahlkreis` – Interactive constituency lookup
+- `query_topics` – Interactive topic matching
+- `query_representatives` – Interactive representative search
+- `check_translations` – Verify i18n completeness
+- `db_snapshot` – Save/load database snapshots for development
+
+## Common Development Tasks
+
+### Setup
 ```bash
-# Install dependencies
-uv sync
-
-# Apply migrations / run dev server
+uv sync                                    # Install dependencies
 cd website
-uv run python manage.py migrate
-uv run python manage.py runserver
-
-# Sync data
-uv run python manage.py sync_representatives --level all
-
-# Run tests
-uv run python manage.py test letters
+uv run python manage.py migrate           # Run migrations
+uv run python manage.py sync_representatives --level all  # Import data
+uv run python manage.py fetch_wahlkreis_data             # Download boundaries
+uv run python manage.py runserver         # Start dev server
 ```
 
-## Core Files to Know
-- `letters/models.py` – domain schema (parliaments → representatives → letters/signatures/verification).
-- `letters/services.py` – API clients, sync logic, suggestion engine, identity stubs.
-- `letters/views.py` – list/detail/create views for letters, representative detail, profile.
-- `letters/templates/letters/` – HTML templates; partials share UI across pages.
-- `letters/forms.py` – letter creation form (with PLZ filtering), signature and report forms.
-- `letters/management/commands/` – representative sync, topic/constituency testers, wahlkreis fetcher.
+### Testing
+```bash
+uv run python manage.py test letters      # Run all tests
+uv run python manage.py test letters.tests.test_i18n  # Specific test file
+```
 
+### Translations
+```bash
+uv run python manage.py makemessages -l de -l en  # Extract translatable strings
+# Edit locale/de/LC_MESSAGES/django.po and locale/en/LC_MESSAGES/django.po
+uv run python manage.py compilemessages            # Compile translations
+uv run python manage.py check_translations         # Verify completeness
+```
+
+### Data Management
+```bash
+uv run python manage.py db_snapshot save my_snapshot    # Save database state
+uv run python manage.py db_snapshot load my_snapshot    # Restore database state
+```
+
+## Key Design Decisions
+- **Single app architecture** – All domain logic in `letters` app for simplicity
+- **Service layer** – Business logic in `services.py` separate from views
+- **Accurate geocoding** – OSM Nominatim + GeoJSON for precise constituency matching
+- **Immutable letters** – Letters cannot be edited after first signature
+- **Auto-signature** – Authors automatically sign their own letters
+- **Stub verification** – Identity verification is stubbed for MVP, ready for production integration
+- **Bilingual from start** – i18n infrastructure in place for German/English
