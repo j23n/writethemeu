@@ -6,7 +6,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: WriteThem.eu\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2025-10-15 00:27+0200\n"
+"POT-Creation-Date: 2025-10-15 09:56+0200\n"
 "PO-Revision-Date: 2025-01-10 12:00+0100\n"
 "Last-Translator: \n"
 "Language-Team: German\n"
@@ -46,8 +46,8 @@ msgid ""
 "check your inbox for the activation link or reset your password."
 msgstr ""
 "Ein Konto mit dieser E-Mail-Adresse existiert bereits. Falls Sie sich zuvor "
-"registriert haben, prüfen Sie Ihren Posteingang auf den Aktivierungslink oder "
-"setzen Sie Ihr Passwort zurück."
+"registriert haben, prüfen Sie Ihren Posteingang auf den Aktivierungslink "
+"oder setzen Sie Ihr Passwort zurück."
 
 #: letters/forms.py:37
 msgid "Title"
@@ -70,8 +70,8 @@ msgid ""
 "Write your letter here. Markdown formatting (e.g. **bold**, _italic_) is "
 "supported."
 msgstr ""
-"Schreiben Sie hier Ihren Brief. Markdown-Formatierung (z.B. **fett**, _kursiv_) "
-"wird unterstützt."
+"Schreiben Sie hier Ihren Brief. Markdown-Formatierung (z.B. **fett**, "
+"_kursiv_) wird unterstützt."
 
 #: letters/forms.py:46
 msgid "Letter title"
@@ -147,7 +147,8 @@ msgstr "Wählen Sie optional Ihren Landtags-Wahlkreis, falls zutreffend."
 
 #: letters/forms.py:240
 msgid "Please select at least one constituency to save your profile."
-msgstr "Bitte wählen Sie mindestens einen Wahlkreis aus, um Ihr Profil zu speichern."
+msgstr ""
+"Bitte wählen Sie mindestens einen Wahlkreis aus, um Ihr Profil zu speichern."
 
 #: letters/forms.py:252
 msgid "Straße und Hausnummer"
@@ -212,7 +213,8 @@ msgstr "Geografische Kennung (Bundeslandkürzel, Gemeindeschlüssel, etc.)"
 
 #: letters/models.py:37
 msgid "For hierarchical relationships (e.g., local within state)"
-msgstr "Für hierarchische Beziehungen (z.B. Kommune innerhalb eines Bundeslandes)"
+msgstr ""
+"Für hierarchische Beziehungen (z.B. Kommune innerhalb eines Bundeslandes)"
 
 #: letters/models.py:43 letters/models.py:70 letters/models.py:105
 #: letters/models.py:165 letters/models.py:372 letters/models.py:421
@@ -296,29 +298,30 @@ msgstr "Entfernt"
 msgid "Deleted user"
 msgstr "Gelöschter Benutzer"
 
-#: letters/services.py:2451
+#: letters/services/constituency.py:1007
 #, python-format
 msgid "Detected policy area: %(topic)s."
 msgstr "Erkannter Politikbereich: %(topic)s."
 
-#: letters/services.py:2456
+#: letters/services/constituency.py:1012
 #, python-format
 msgid "Prioritising representatives for %(constituencies)s."
 msgstr "Priorisiere Abgeordnete für %(constituencies)s."
 
-#: letters/services.py:2461
+#: letters/services/constituency.py:1017
 #, python-format
 msgid "Filtering by state %(state)s."
 msgstr "Filtere nach Bundesland %(state)s."
 
-#: letters/services.py:2465
+#: letters/services/constituency.py:1021
 #, python-format
 msgid ""
 "Postal code %(plz)s had no direct match; showing broader representatives."
 msgstr ""
-"Postleitzahl %(plz)s hatte keine direkte Übereinstimmung; zeige allgemeinere Abgeordnete."
+"Postleitzahl %(plz)s hatte keine direkte Übereinstimmung; zeige allgemeinere "
+"Abgeordnete."
 
-#: letters/services.py:2469
+#: letters/services/constituency.py:1025
 msgid "Showing generally relevant representatives."
 msgstr "Zeige allgemein relevante Abgeordnete."
 
@@ -332,16 +335,16 @@ msgid ""
 "We could not verify your activation link. It may have already been used or "
 "expired."
 msgstr ""
-"Wir konnten Ihren Aktivierungslink nicht verifizieren. Er wurde möglicherweise bereits "
-"verwendet oder ist abgelaufen."
+"Wir konnten Ihren Aktivierungslink nicht verifizieren. Er wurde "
+"möglicherweise bereits verwendet oder ist abgelaufen."
 
 #: letters/templates/letters/account_activation_invalid.html:13
 msgid ""
 "If you still cannot access your account, try registering again or contact "
 "support."
 msgstr ""
-"Falls Sie weiterhin nicht auf Ihr Konto zugreifen können, versuchen Sie sich erneut zu "
-"registrieren oder kontaktieren Sie den Support."
+"Falls Sie weiterhin nicht auf Ihr Konto zugreifen können, versuchen Sie sich "
+"erneut zu registrieren oder kontaktieren Sie den Support."
 
 #: letters/templates/letters/account_activation_invalid.html:15
 msgid "Register again"
@@ -361,16 +364,16 @@ msgid ""
 "We sent you an email with a confirmation link. Please click it to activate "
 "your account."
 msgstr ""
-"Wir haben Ihnen eine E-Mail mit einem Bestätigungslink gesendet. Bitte klicken Sie "
-"darauf, um Ihr Konto zu aktivieren."
+"Wir haben Ihnen eine E-Mail mit einem Bestätigungslink gesendet. Bitte "
+"klicken Sie darauf, um Ihr Konto zu aktivieren."
 
 #: letters/templates/letters/account_activation_sent.html:13
 msgid ""
 "If you do not receive the email within a few minutes, check your spam folder "
 "or try registering again."
 msgstr ""
-"Falls Sie die E-Mail nicht innerhalb weniger Minuten erhalten, prüfen Sie Ihren "
-"Spam-Ordner oder versuchen Sie sich erneut zu registrieren."
+"Falls Sie die E-Mail nicht innerhalb weniger Minuten erhalten, prüfen Sie "
+"Ihren Spam-Ordner oder versuchen Sie sich erneut zu registrieren."
 
 #: letters/templates/letters/account_activation_sent.html:15
 msgid "Back to homepage"
@@ -390,8 +393,9 @@ msgid ""
 "Deleting your account will remove your personal data and signatures. Letters "
 "you have published stay online but are shown without your name."
 msgstr ""
-"Das Löschen Ihres Kontos entfernt Ihre persönlichen Daten und Unterschriften. Von Ihnen "
-"veröffentlichte Briefe bleiben online, werden aber ohne Ihren Namen angezeigt."
+"Das Löschen Ihres Kontos entfernt Ihre persönlichen Daten und "
+"Unterschriften. Von Ihnen veröffentlichte Briefe bleiben online, werden aber "
+"ohne Ihren Namen angezeigt."
 
 #: letters/templates/letters/account_delete_confirm.html:14
 msgid "Yes, delete my account"
@@ -557,7 +561,9 @@ msgstr "Brief melden"
 
 #: letters/templates/letters/letter_detail.html:76
 msgid "If you believe this letter violates our guidelines, please report it."
-msgstr "Falls Sie glauben, dass dieser Brief gegen unsere Richtlinien verstößt, melden Sie ihn bitte."
+msgstr ""
+"Falls Sie glauben, dass dieser Brief gegen unsere Richtlinien verstößt, "
+"melden Sie ihn bitte."
 
 #: letters/templates/letters/letter_detail.html:81
 msgid "to report this letter"
@@ -617,8 +623,8 @@ msgstr "Titel:"
 msgid ""
 "Describe your concern in a sentence; we'll use it to suggest representatives."
 msgstr ""
-"Beschreiben Sie Ihr Anliegen in einem Satz; wir verwenden ihn, um Ihnen Abgeordnete "
-"vorzuschlagen."
+"Beschreiben Sie Ihr Anliegen in einem Satz; wir verwenden ihn, um Ihnen "
+"Abgeordnete vorzuschlagen."
 
 #: letters/templates/letters/letter_form.html:41
 msgid "To Representative:"
@@ -629,8 +635,8 @@ msgid ""
 "Already know who to address? Pick them here. Otherwise, use the suggestions "
 "below."
 msgstr ""
-"Wissen Sie bereits, wen Sie ansprechen möchten? Wählen Sie hier aus. Andernfalls nutzen "
-"Sie die Vorschläge unten."
+"Wissen Sie bereits, wen Sie ansprechen möchten? Wählen Sie hier aus. "
+"Andernfalls nutzen Sie die Vorschläge unten."
 
 #: letters/templates/letters/letter_form.html:53
 msgid "Letter Body:"
@@ -649,8 +655,8 @@ msgid ""
 "Type your title and we'll use your verified profile to suggest "
 "representatives, topics, and related letters."
 msgstr ""
-"Geben Sie Ihren Titel ein und wir verwenden Ihr verifiziertes Profil, um Ihnen "
-"Abgeordnete, Themen und verwandte Briefe vorzuschlagen."
+"Geben Sie Ihren Titel ein und wir verwenden Ihr verifiziertes Profil, um "
+"Ihnen Abgeordnete, Themen und verwandte Briefe vorzuschlagen."
 
 #: letters/templates/letters/letter_form.html:81
 msgid "Loading..."
@@ -798,8 +804,8 @@ msgid ""
 "We couldn't match you to a constituency yet. Update your profile "
 "verification to see local representatives."
 msgstr ""
-"Wir konnten Sie noch keinem Wahlkreis zuordnen. Aktualisieren Sie Ihre Profilverifizierung, "
-"um lokale Abgeordnete zu sehen."
+"Wir konnten Sie noch keinem Wahlkreis zuordnen. Aktualisieren Sie Ihre "
+"Profilverifizierung, um lokale Abgeordnete zu sehen."
 
 # Suggestions partial
 #: letters/templates/letters/partials/suggestions.html:16
@@ -902,7 +908,9 @@ msgstr "Zurücksetzungslink ungültig"
 
 #: letters/templates/letters/password_reset_confirm.html:30
 msgid "This password reset link is no longer valid. Please request a new one."
-msgstr "Dieser Passwort-Zurücksetzungslink ist nicht mehr gültig. Bitte fordern Sie einen neuen an."
+msgstr ""
+"Dieser Passwort-Zurücksetzungslink ist nicht mehr gültig. Bitte fordern Sie "
+"einen neuen an."
 
 #: letters/templates/letters/password_reset_confirm.html:31
 msgid "Request new link"
@@ -917,8 +925,8 @@ msgid ""
 "If an account exists for that email address, we just sent you instructions "
 "to choose a new password."
 msgstr ""
-"Falls ein Konto für diese E-Mail-Adresse existiert, haben wir Ihnen gerade Anweisungen "
-"zum Festlegen eines neuen Passworts gesendet."
+"Falls ein Konto für diese E-Mail-Adresse existiert, haben wir Ihnen gerade "
+"Anweisungen zum Festlegen eines neuen Passworts gesendet."
 
 #: letters/templates/letters/password_reset_done.html:10
 msgid "The link will stay valid for a limited time."
@@ -941,8 +949,8 @@ msgid ""
 "Enter the email address you used during registration. We will send you a "
 "link to create a new password."
 msgstr ""
-"Geben Sie die E-Mail-Adresse ein, die Sie bei der Registrierung verwendet haben. Wir "
-"senden Ihnen einen Link zum Erstellen eines neuen Passworts."
+"Geben Sie die E-Mail-Adresse ein, die Sie bei der Registrierung verwendet "
+"haben. Wir senden Ihnen einen Link zum Erstellen eines neuen Passworts."
 
 #: letters/templates/letters/password_reset_form.html:17
 msgid "Send reset link"
@@ -971,8 +979,8 @@ msgid ""
 "You self-declared your constituency. Representatives will see your "
 "signatures as self-declared constituents."
 msgstr ""
-"Sie haben Ihren Wahlkreis selbst angegeben. Abgeordnete werden Ihre Unterschriften als "
-"selbst angegebene Wähler sehen."
+"Sie haben Ihren Wahlkreis selbst angegeben. Abgeordnete werden Ihre "
+"Unterschriften als selbst angegebene Wähler sehen."
 
 #: letters/templates/letters/profile.html:30
 msgid "Start third-party verification"
@@ -983,8 +991,8 @@ msgid ""
 "Your identity was verified via a third-party provider. Signatures will "
 "appear as verified constituents."
 msgstr ""
-"Ihre Identität wurde über einen Drittanbieter verifiziert. Unterschriften werden als "
-"verifizierte Wähler angezeigt."
+"Ihre Identität wurde über einen Drittanbieter verifiziert. Unterschriften "
+"werden als verifizierte Wähler angezeigt."
 
 #: letters/templates/letters/profile.html:38
 msgid "Your verification is being processed."
@@ -996,15 +1004,18 @@ msgstr "Verifizierung abschließen (Stub)"
 
 #: letters/templates/letters/profile.html:43
 msgid "Verification failed. Please try again or contact support."
-msgstr "Verifizierung fehlgeschlagen. Bitte versuchen Sie es erneut oder kontaktieren Sie den Support."
+msgstr ""
+"Verifizierung fehlgeschlagen. Bitte versuchen Sie es erneut oder "
+"kontaktieren Sie den Support."
 
 #: letters/templates/letters/profile.html:48
 msgid ""
 "You can self-declare your constituency below or start a verification with a "
 "trusted provider. Verified signatures carry more weight."
 msgstr ""
-"Sie können Ihren Wahlkreis unten selbst angeben oder eine Verifizierung mit einem "
-"vertrauenswürdigen Anbieter starten. Verifizierte Unterschriften haben mehr Gewicht."
+"Sie können Ihren Wahlkreis unten selbst angeben oder eine Verifizierung mit "
+"einem vertrauenswürdigen Anbieter starten. Verifizierte Unterschriften haben "
+"mehr Gewicht."
 
 #: letters/templates/letters/profile.html:50
 msgid "Start Third-party Verification"
@@ -1079,16 +1090,16 @@ msgid ""
 "Need a fresh start? You can delete your account at any time. Your letters "
 "stay visible but without your name."
 msgstr ""
-"Brauchen Sie einen Neuanfang? Sie können Ihr Konto jederzeit löschen. Ihre Briefe "
-"bleiben sichtbar, aber ohne Ihren Namen."
+"Brauchen Sie einen Neuanfang? Sie können Ihr Konto jederzeit löschen. Ihre "
+"Briefe bleiben sichtbar, aber ohne Ihren Namen."
 
 #: letters/templates/letters/register.html:9
 msgid ""
 "After registration we'll send you an email to confirm your address before "
 "you can sign in."
 msgstr ""
-"Nach der Registrierung senden wir Ihnen eine E-Mail, um Ihre Adresse zu bestätigen, "
-"bevor Sie sich anmelden können."
+"Nach der Registrierung senden wir Ihnen eine E-Mail, um Ihre Adresse zu "
+"bestätigen, bevor Sie sich anmelden können."
 
 #: letters/templates/letters/register.html:23
 msgid "Email:"
@@ -1186,7 +1197,8 @@ msgstr "Bestätigen Sie Ihr WriteThem.eu-Konto"
 # Flash messages
 #: letters/views.py:184
 msgid "Your letter has been published and your signature has been added!"
-msgstr "Ihr Brief wurde veröffentlicht und Ihre Unterschrift wurde hinzugefügt!"
+msgstr ""
+"Ihr Brief wurde veröffentlicht und Ihre Unterschrift wurde hinzugefügt!"
 
 #: letters/views.py:197
 msgid "You have already signed this letter."
@@ -1205,8 +1217,8 @@ msgid ""
 "Please confirm your email address. We sent you a link to activate your "
 "account."
 msgstr ""
-"Bitte bestätigen Sie Ihre E-Mail-Adresse. Wir haben Ihnen einen Link zum Aktivieren "
-"Ihres Kontos gesendet."
+"Bitte bestätigen Sie Ihre E-Mail-Adresse. Wir haben Ihnen einen Link zum "
+"Aktivieren Ihres Kontos gesendet."
 
 #: letters/views.py:289
 msgid "Your account has been activated. You can now log in."
