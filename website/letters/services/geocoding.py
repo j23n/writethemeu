@@ -301,9 +301,84 @@ class WahlkreisLocator:
         WahlkreisLocator._cached_state_constituencies = self.state_constituencies
         WahlkreisLocator._cached_path = str(geojson_path)
 
+    def _land_name_to_code(self, land_name: str) -> str:
+        """Map German state names to ISO codes."""
+        mapping = {
+            'Baden-Württemberg': 'BW',
+            'Bayern': 'BY',
+            'Berlin': 'BE',
+            'Brandenburg': 'BB',
+            'Bremen': 'HB',
+            'Hamburg': 'HH',
+            'Hessen': 'HE',
+            'Mecklenburg-Vorpommern': 'MV',
+            'Niedersachsen': 'NI',
+            'Nordrhein-Westfalen': 'NW',
+            'Rheinland-Pfalz': 'RP',
+            'Saarland': 'SL',
+            'Sachsen': 'SN',
+            'Sachsen-Anhalt': 'ST',
+            'Schleswig-Holstein': 'SH',
+            'Thüringen': 'TH',
+        }
+        return mapping.get(land_name, '')
+
+    def _locate_detailed(self, latitude, longitude):
+        """
+        Find both federal and state constituencies for given coordinates.
+
+        Returns:
+            dict with 'federal' and 'state' keys, each containing:
+            {
+                'wkr_nr': int,
+                'wkr_name': str,
+                'land_name': str,
+                'land_code': str
+            }
+            or None if not found.
+        """
+        from shapely.geometry import Point
+
+        point = Point(longitude, latitude)
+
+        # Find federal constituency
+        federal_result = None
+        for wkr_nr, wkr_name, land_name, geometry in self.constituencies:
+            if geometry.contains(point):
+                # Extract land_code from federal data (may need to map from land_name)
+                land_code = self._land_name_to_code(land_name)
+                federal_result = {
+                    'wkr_nr': wkr_nr,
+                    'wkr_name': wkr_name,
+                    'land_name': land_name,
+                    'land_code': land_code
+                }
+                break
+
+        # Find state constituency if federal found
+        state_result = None
+        if federal_result:
+            land_code = federal_result['land_code']
+
+            if land_code in self.state_constituencies:
+                for wkr_nr, wkr_name, state_land_code, land_name, geometry in self.state_constituencies[land_code]:
+                    if geometry.contains(point):
+                        state_result = {
+                            'wkr_nr': wkr_nr,
+                            'wkr_name': wkr_name,
+                            'land_name': land_name,
+                            'land_code': state_land_code
+                        }
+                        break
+
+        return {
+            'federal': federal_result,
+            'state': state_result
+        }
+
     def locate(self, latitude, longitude):
         """
-        Find constituency containing the given coordinates.
+        Find federal constituency containing the given coordinates.
 
         Args:
             latitude: Latitude coordinate
@@ -312,15 +387,10 @@ class WahlkreisLocator:
         Returns:
             tuple: (wkr_nr, wkr_name, land_name) or None if not found
         """
-        from shapely.geometry import Point
+        result = self._locate_detailed(latitude, longitude)
 
-        # Create point from coordinates
-        point = Point(longitude, latitude)
+        if result and result['federal']:
+            fed = result['federal']
+            return (fed['wkr_nr'], fed['wkr_name'], fed['land_name'])
 
-        # Iterate through constituencies and check containment
-        for wkr_nr, wkr_name, land_name, geometry in self.constituencies:
-            if geometry.contains(point):
-                return (wkr_nr, wkr_name, land_name)
-
-        # No match found
         return None

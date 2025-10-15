@@ -235,6 +235,80 @@ class WahlkreisLocationTests(TestCase):
             self.assertIn('BW', locator.state_constituencies)
             self.assertEqual(len(locator.state_constituencies['BW']), 1)
 
+    def test_locate_detailed_returns_both_federal_and_state(self):
+        """Test _locate_detailed finds both federal and state constituencies."""
+        import tempfile
+        import shutil
+        import json
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+
+            # Create federal data with Berlin
+            federal_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[13.3, 52.5], [13.4, 52.5], [13.4, 52.6], [13.3, 52.6], [13.3, 52.5]]]
+                    },
+                    "properties": {
+                        "WKR_NR": 83,
+                        "WKR_NAME": "Berlin-Mitte",
+                        "LAND_NAME": "Berlin",
+                        "LAND_CODE": "BE"
+                    }
+                }]
+            }
+
+            federal_path = tmpdir_path / 'wahlkreise_federal.geojson'
+            federal_path.write_text(json.dumps(federal_data))
+
+            # Create state data for Berlin
+            state_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[13.3, 52.5], [13.4, 52.5], [13.4, 52.6], [13.3, 52.6], [13.3, 52.5]]]
+                    },
+                    "properties": {
+                        "WKR_NR": 1,
+                        "WKR_NAME": "Mitte",
+                        "LAND_CODE": "BE",
+                        "LAND_NAME": "Berlin",
+                        "LEVEL": "STATE"
+                    }
+                }]
+            }
+
+            state_path = tmpdir_path / 'wahlkreise_be.geojson'
+            state_path.write_text(json.dumps(state_data))
+
+            locator = WahlkreisLocator(geojson_path=str(federal_path))
+
+            # Point inside Berlin
+            result = locator._locate_detailed(52.52, 13.35)
+
+            self.assertIsNotNone(result)
+            self.assertIn('federal', result)
+            self.assertIn('state', result)
+
+            # Check federal result
+            self.assertIsNotNone(result['federal'])
+            self.assertEqual(result['federal']['wkr_nr'], 83)
+            self.assertEqual(result['federal']['wkr_name'], 'Berlin-Mitte')
+            self.assertEqual(result['federal']['land_code'], 'BE')
+
+            # Check state result
+            self.assertIsNotNone(result['state'])
+            self.assertEqual(result['state']['wkr_nr'], 1)
+            self.assertEqual(result['state']['wkr_name'], 'Mitte')
+            self.assertEqual(result['state']['land_code'], 'BE')
+
 
 class FullAddressMatchingTests(TestCase):
     """Integration tests for full address → constituency matching."""
