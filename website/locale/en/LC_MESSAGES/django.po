@@ -585,10 +585,6 @@ msgstr ""
 msgid "Before you write"
 msgstr "Before you write"
 
-#: letters/templates/letters/letter_form.html:18
-msgid "Be thoughtful but feel free to be critical."
-msgstr "Be thoughtful but feel free to be critical."
-
 #: letters/templates/letters/letter_form.html:19
 msgid "Representatives are humans too—stay respectful."
 msgstr "Representatives are humans too—stay respectful."

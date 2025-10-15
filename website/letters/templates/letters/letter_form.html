@@ -15,7 +15,6 @@
             <div class="alert alert-info" role="note">
                 <h5 class="mb-2">{% trans "Before you write" %}</h5>
                 <ul class="mb-0 ps-3">
-                    <li>{% trans "Be thoughtful but feel free to be critical." %}</li>
                     <li>{% trans "Representatives are humans too—stay respectful." %}</li>
                     <li>{% trans "Keep your arguments clear and concise." %}</li>
                     <li>{% trans "No insults or hate speech." %}</li>
@@ -28,24 +27,24 @@
 
                 <div class="form-group">
                     <label for="id_title">{% trans "Title:" %}</label>
+                    <small class="form-text text-muted">
+                        {% trans "Describe your concern in a sentence; we'll use it to suggest representatives." %}
+                    </small>
                     {{ form.title }}
                     {% if form.title.errors %}
                         <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.title.errors }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">
-                        {% trans "Describe your concern in a sentence; we'll use it to suggest representatives." %}
-                    </small>
                 </div>
 
                 <div class="form-group">
                     <label for="id_representative">{% trans "To Representative:" %}</label>
+                    <small class="form-text text-muted">
+                        {% trans "Already know who to address? Pick them here. Otherwise, use the suggestions below." %}
+                    </small>
                     {{ form.representative }}
                     {% if form.representative.errors %}
                         <div style="color: #e74c3c; font-size: 0.9rem;">{{ form.representative.errors }}</div>
                     {% endif %}
-                    <small class="form-text text-muted">
-                        {% trans "Already know who to address? Pick them here. Otherwise, use the suggestions below." %}
-                    </small>
                     <div id="selected-rep-confirm" class="mt-2"></div>
                 </div>
 

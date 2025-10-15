@@ -45,8 +45,8 @@ msgid ""
 "An account with this email already exists. If you registered before, please "
 "check your inbox for the activation link or reset your password."
 msgstr ""
-"Ein Konto mit dieser E-Mail-Adresse existiert bereits. Falls Sie sich zuvor "
-"registriert haben, prüfen Sie Ihren Posteingang auf den Aktivierungslink "
+"Ein Konto mit dieser E-Mail-Adresse existiert bereits. Falls Sie sich bereits "
+"registriert haben, gucken Sie in Ihrer Mailbox nach dem Aktivierungslink "
 "oder setzen Sie Ihr Passwort zurück."
 
 #: letters/forms.py:37
@@ -59,7 +59,7 @@ msgstr "Brieftext"
 
 #: letters/forms.py:39
 msgid "To Representative"
-msgstr "An Abgeordnete"
+msgstr "An den Abgeordneten oder die Abgeordnete"
 
 #: letters/forms.py:42
 msgid "Describe your concern briefly"
@@ -70,12 +70,11 @@ msgid ""
 "Write your letter here. Markdown formatting (e.g. **bold**, _italic_) is "
 "supported."
 msgstr ""
-"Schreiben Sie hier Ihren Brief. Markdown-Formatierung (z.B. **fett**, "
-"_kursiv_) wird unterstützt."
+"Schreiben Sie hier Ihren Brief."
 
 #: letters/forms.py:46
 msgid "Letter title"
-msgstr "Brieftitel"
+msgstr "Worum geht es Ihnen?"
 
 #: letters/forms.py:50
 msgid "Write your letter here..."
@@ -103,7 +102,7 @@ msgstr "Beschreibung"
 
 #: letters/forms.py:135
 msgid "Please provide details about why you are reporting this letter"
-msgstr "Bitte geben Sie Details an, warum Sie diesen Brief melden"
+msgstr "Warum melden Sie diesen Brief?"
 
 #: letters/forms.py:142
 msgid "Please describe the issue..."
@@ -364,8 +363,8 @@ msgid ""
 "We sent you an email with a confirmation link. Please click it to activate "
 "your account."
 msgstr ""
-"Wir haben Ihnen eine E-Mail mit einem Bestätigungslink gesendet. Bitte "
-"klicken Sie darauf, um Ihr Konto zu aktivieren."
+"Wir haben Ihnen eine E-Mail mit einem Bestätigungslink geschickt. Bitte "
+"klicken Sie auf diesen, um Ihr Konto zu aktivieren."
 
 #: letters/templates/letters/account_activation_sent.html:13
 msgid ""
@@ -456,7 +455,7 @@ msgstr "Sprache auswählen"
 # Footer
 #: letters/templates/letters/base.html:182
 msgid "Empowering citizens to write to their representatives"
-msgstr "Bürgern ermöglichen, an ihre Abgeordneten zu schreiben"
+msgstr "Demokratie leben - tuen Sie ihre Meinung kund und schreiben Sie Ihren Abgeordneten."
 
 #: letters/templates/letters/committee_detail.html:22
 msgid "Related Topics"
@@ -589,15 +588,11 @@ msgid ""
 "published publicly so others can read and sign it."
 msgstr ""
 "Schreiben Sie einen offenen Brief an einen Abgeordneten. Ihr Brief wird "
-"öffentlich veröffentlicht, damit andere ihn lesen und unterzeichnen können."
+"hier veröffentlicht, damit andere ihn lesen und unterzeichnen können."
 
 #: letters/templates/letters/letter_form.html:16
 msgid "Before you write"
-msgstr "Bevor Sie schreiben"
-
-#: letters/templates/letters/letter_form.html:18
-msgid "Be thoughtful but feel free to be critical."
-msgstr "Seien Sie nachdenklich, aber scheuen Sie sich nicht, kritisch zu sein."
+msgstr "Bevor Sie anfangen"
 
 #: letters/templates/letters/letter_form.html:19
 msgid "Representatives are humans too—stay respectful."
@@ -617,7 +612,7 @@ msgstr "Bleiben Sie bei Forderungen im Rahmen des Grundgesetzes."
 
 #: letters/templates/letters/letter_form.html:30
 msgid "Title:"
-msgstr "Titel:"
+msgstr "Betreff:"
 
 #: letters/templates/letters/letter_form.html:36
 msgid ""
@@ -628,7 +623,7 @@ msgstr ""
 
 #: letters/templates/letters/letter_form.html:41
 msgid "To Representative:"
-msgstr "An Abgeordnete:"
+msgstr "Adressat:"
 
 #: letters/templates/letters/letter_form.html:47
 msgid ""
@@ -640,7 +635,7 @@ msgstr ""
 
 #: letters/templates/letters/letter_form.html:53
 msgid "Letter Body:"
-msgstr "Brieftext:"
+msgstr "Text:"
 
 #: letters/templates/letters/letter_form.html:60
 msgid "Publish Letter"
@@ -655,7 +650,7 @@ msgid ""
 "Type your title and we'll use your verified profile to suggest "
 "representatives, topics, and related letters."
 msgstr ""
-"Geben Sie Ihren Titel ein und wir verwenden Ihr verifiziertes Profil, um "
+"Geben Sie den Betreff Ihres Briefes ein und wir verwenden Ihr Profil, um "
 "Ihnen Abgeordnete, Themen und verwandte Briefe vorzuschlagen."
 
 #: letters/templates/letters/letter_form.html:81
@@ -680,8 +675,7 @@ msgid ""
 "Make your voice heard, reach out to your representative, participate in "
 "democracy."
 msgstr ""
-"Lassen Sie Ihre Stimme hören, wenden Sie sich an Ihren Abgeordneten, "
-"beteiligen Sie sich an der Demokratie."
+"Beteiligen Sie sich an unserer Demokratie und verschaffen Sie sich Gehör! Schreiben Sie einen offenen Brief and Ihre Abgeordnete. "
 
 #: letters/templates/letters/letter_list.html:10
 msgid "Open letters authored and signed by fellow citizens."
@@ -692,8 +686,7 @@ msgid ""
 "Physical letters mailed to representatives when number of verified "
 "signatures > 100."
 msgstr ""
-"Physische Briefe werden an Abgeordnete verschickt, wenn mehr als 100 "
-"verifizierte Unterschriften vorliegen."
+"Sobald mehr als 100 verifizierte Unterschriften vorliegen, werden die Briefe physisch an die Adressaten verschickt. "
 
 #: letters/templates/letters/letter_list.html:15
 msgid "Browse Open Letters"
@@ -832,7 +825,7 @@ msgstr "Ihre direkten Abgeordneten"
 
 #: letters/templates/letters/partials/suggestions.html:56
 msgid "These representatives directly represent your constituency:"
-msgstr "Diese Abgeordneten vertreten Ihren Wahlkreis direkt:"
+msgstr "Diese Abgeordneten vertreten Sie direkt:"
 
 #: letters/templates/letters/partials/suggestions.html:67
 #: letters/templates/letters/partials/suggestions.html:102
@@ -1030,8 +1023,8 @@ msgid ""
 "Geben Sie Ihre vollständige Adresse ein, um präzise Wahlkreis- und "
 "Abgeordnetenempfehlungen zu erhalten."
 msgstr ""
-"Geben Sie Ihre vollständige Adresse ein, um präzise Wahlkreis- und "
-"Abgeordnetenempfehlungen zu erhalten."
+"Geben Sie Ihre Adresse ein, um Ihre Wahlkreise zu ermitteln. Ihre Adresse wird nicht gespeichert."
+"Sie können diese sonst auch manuell auswählen."
 
 #: letters/templates/letters/profile.html:61
 msgid "Gespeicherte Adresse:"
@@ -1090,7 +1083,7 @@ msgid ""
 "Need a fresh start? You can delete your account at any time. Your letters "
 "stay visible but without your name."
 msgstr ""
-"Brauchen Sie einen Neuanfang? Sie können Ihr Konto jederzeit löschen. Ihre "
+"Sie können Ihr Konto jederzeit löschen. Ihre "
 "Briefe bleiben sichtbar, aber ohne Ihren Namen."
 
 #: letters/templates/letters/register.html:9
