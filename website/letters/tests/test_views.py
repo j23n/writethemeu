@@ -72,17 +72,3 @@ class ProfileViewAddressTests(TestCase):
         # Verify constituency was saved
         verification = IdentityVerification.objects.get(user=self.user)
         self.assertEqual(verification.federal_constituency, federal_const)
-
-        # Test 2: Address form should NOT work anymore (no address_form_submit handling)
-        response = self.client.post(reverse('profile'), {
-            'address_form_submit': '1',
-            'street_address': 'Test Street 123',
-            'postal_code': '12345',
-            'city': 'TestCity',
-        })
-
-        # Should not save address or redirect with success
-        # View should either ignore this or show form errors
-        verification.refresh_from_db()
-        # Address fields should not be updated (they might not even exist)
-        # This test will fail until we remove address form handling
