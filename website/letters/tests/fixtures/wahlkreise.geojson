@@ -1,0 +1,59 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "WKR_NR": 83,
+        "WKR_NAME": "Berlin-Mitte",
+        "LAND_NAME": "Berlin"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [13.2, 52.4],
+          [13.6, 52.4],
+          [13.6, 52.6],
+          [13.2, 52.6],
+          [13.2, 52.4]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "WKR_NR": 18,
+        "WKR_NAME": "Hamburg-Mitte",
+        "LAND_NAME": "Hamburg"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [9.8, 53.4],
+          [10.2, 53.4],
+          [10.2, 53.7],
+          [9.8, 53.7],
+          [9.8, 53.4]
+        ]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "WKR_NR": 218,
+        "WKR_NAME": "München-Süd",
+        "LAND_NAME": "Bayern"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[
+          [11.4, 48.0],
+          [11.8, 48.0],
+          [11.8, 48.3],
+          [11.4, 48.3],
+          [11.4, 48.0]
+        ]]
+      }
+    }
+  ]
+}

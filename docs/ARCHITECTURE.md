@@ -21,9 +21,9 @@ WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`)
     - **forms.py** – Letter creation, signatures, reports, verification
     - **templates/** – Django templates (base, letters, auth, partials)
     - **management/commands/** – Data sync, queries, utilities
-    - **tests.py** – Comprehensive test suite
+    - **tests/** – Organized test suite (test_auth, test_letters, test_views, etc.)
+      - **fixtures/** – Test data (minimal wahlkreise.geojson for geocoding tests)
     - **admin.py** – Django admin customizations
-    - **data/** – GeoJSON boundaries, database snapshots
     - **fixtures/** – Seed data for development
   - **locale/** – Translation files (de/en)
 
@@ -107,14 +107,20 @@ Django admin (`letters/admin.py`) exposes all models with customizations:
 - Report moderation
 
 ## Testing Strategy
-Comprehensive test suite in `letters/tests.py`:
-- Address geocoding with mocked OSM Nominatim responses
-- Point-in-polygon constituency matching
-- Topic keyword matching and scoring
-- Representative suggestion integration tests
-- Letter creation, signing, and signature removal flows
-- Identity verification behavior
-- Internationalization configuration
+Comprehensive test suite organized in `letters/tests/`:
+- **test_fixtures.py** – Shared `ParliamentFixtureMixin` for reusable test setup
+- **test_auth.py** – Account registration, deletion, password reset flows
+- **test_letters.py** – Letter creation, form filtering, and representative selection
+- **test_identity_verification.py** – Verification linking and address forms
+- **test_views.py** – Competency pages and profile address management
+- **test_template_filters.py** – Markdown rendering and HTML sanitization
+- **test_address_matching.py** – Address geocoding with mocked OSM Nominatim, point-in-polygon constituency matching
+- **test_constituency_suggestions.py** – Topic keyword matching, representative scoring
+- **test_representative_sync.py** – Data import from Abgeordnetenwatch API
+- **test_i18n.py** – Internationalization configuration and language switching
+
+Test fixtures in `letters/tests/fixtures/`:
+- **wahlkreise.geojson** – Minimal GeoJSON with 3 Länder (Berlin, Hamburg, Bayern) for geocoding tests
 
 Run tests: `uv run python manage.py test letters`
 

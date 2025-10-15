@@ -33,3 +33,4 @@ website/letters/data/wahlkreise.geojson
 
 # Git worktrees
 .worktrees/
+*.sqlite3-journal

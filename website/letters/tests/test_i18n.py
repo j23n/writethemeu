@@ -67,7 +67,7 @@ class LetterFormI18nTests(TestCase):
         """Test that letter creation form renders without errors."""
         from django.contrib.auth.models import User
         # Create a user and log them in
-        user = User.objects.create_user(username='testuser', password='testpass')
+        _ = User.objects.create_user(username='testuser', password='testpass')
         self.client.login(username='testuser', password='testpass')
 
         # Test German version

@@ -41,7 +41,6 @@ PARTY_ALIASES = {
     'bündnis 90 / die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
     'bündnis90 / die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
     'bündnis 90/ die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
-    'bündnis 90/ die grünen': 'BÜNDNIS 90/DIE GRÜNEN',
     'gruene': 'BÜNDNIS 90/DIE GRÜNEN',
     'grüne': 'BÜNDNIS 90/DIE GRÜNEN',
     'die grünen': 'BÜNDNIS 90/DIE GRÜNEN',

@@ -5,7 +5,7 @@ from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
 
 from .constants import normalize_german_state
-from .models import Letter, Representative, Signature, Report, Tag, Constituency, IdentityVerification
+from .models import Letter, Representative, Signature, Report, Constituency
 
 
 class UserRegisterForm(UserCreationForm):

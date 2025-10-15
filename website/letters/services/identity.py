@@ -4,12 +4,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Dict, Optional
 
 from django.utils import timezone
 
-from ..constants import normalize_german_state
 from .constituency import ConstituencyLocator, LocatedConstituencies
+
+if TYPE_CHECKING:
+    from ..models import Constituency, IdentityVerification
 
 
 class IdentityVerificationService:
@@ -25,7 +27,7 @@ class IdentityVerificationService:
         }
 
     @staticmethod
-    def complete_verification(user, verification_data: Dict[str, str]) -> Optional['IdentityVerification']:
+    def complete_verification(user, verification_data: Dict[str, str]) -> Optional[IdentityVerification]:
         from ..models import IdentityVerification
 
         postal_code = (verification_data.get('postal_code') or '').strip()
@@ -87,9 +89,9 @@ class IdentityVerificationService:
     @staticmethod
     def self_declare(
         user,
-        federal_constituency: Optional['Constituency'] = None,
-        state_constituency: Optional['Constituency'] = None,
-    ) -> Optional['IdentityVerification']:
+        federal_constituency: Optional[Constituency] = None,
+        state_constituency: Optional[Constituency] = None,
+    ) -> Optional[IdentityVerification]:
         from ..models import IdentityVerification
 
         verification, _ = IdentityVerification.objects.get_or_create(

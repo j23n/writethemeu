@@ -2,7 +2,7 @@
 # ABOUTME: Interactive tool for testing representative suggestion logic.
 
 from django.core.management.base import BaseCommand
-from letters.services import ConstituencyLocator, TopicSuggestionService, ConstituencySuggestionService
+from letters.services import ConstituencyLocator
 
 
 class Command(BaseCommand):

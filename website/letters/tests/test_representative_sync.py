@@ -1,7 +1,7 @@
 # ABOUTME: Test representative synchronization service.
 # ABOUTME: Covers parliament syncing, photo handling, and representative import logic.
 
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from django.test import TestCase
 from letters.services.representative_sync import RepresentativeSyncService
 from letters.models import Parliament, ParliamentTerm
@@ -193,7 +193,7 @@ class DownloadRepresentativeImageTests(TestCase):
     def setUp(self):
         """Set up test service instance and mock representative."""
         self.service = RepresentativeSyncService(dry_run=True)
-        from letters.models import Representative, Parliament, ParliamentTerm
+        from letters.models import Representative, Parliament
 
         parliament = Parliament.objects.create(
             name='Test Parliament',

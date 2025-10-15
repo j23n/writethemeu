@@ -4,16 +4,13 @@ from collections import OrderedDict
 from django.shortcuts import render, redirect, get_object_or_404
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import login, logout
+from django.contrib.auth import logout
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.db.models import Q, Count
-from django.core.paginator import Paginator
 from django.views.generic import ListView, DetailView, CreateView, TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
-from django.http import HttpResponseRedirect, JsonResponse
-from django.utils import timezone
 from django.views.decorators.http import require_http_methods
 from django.utils.translation import gettext_lazy as _, gettext
 from django.utils.encoding import force_bytes, force_str
@@ -22,7 +19,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
-from .models import Letter, Signature, Report, Representative, Tag, IdentityVerification, TopicArea, Committee
+from .models import Letter, Signature, Representative, Tag, IdentityVerification, TopicArea, Committee
 from .forms import (
     LetterForm,
     SignatureForm,
