@@ -72,38 +72,21 @@ class RepresentativeSyncService:
         for parliament_data in parliaments:
             label = parliament_data.get('label', '')
             if level in ('all', 'eu') and label == 'EU-Parlament':
-                self._sync_eu(parliament_data)
+                self._sync_parliament(parliament_data, level='EU', region='EU', description='EU parliament')
             elif level in ('all', 'federal') and label == 'Bundestag':
-                self._sync_federal(parliament_data)
+                self._sync_parliament(parliament_data, level='FEDERAL', region='DE', description='Bundestag')
             elif level in ('all', 'state') and label not in ('Bundestag', 'EU-Parlament'):
                 if state and normalize_german_state(label) != normalize_german_state(state):
                     continue
-                self._sync_state(parliament_data)
+                region = normalize_german_state(label)
+                self._sync_parliament(parliament_data, level='STATE', region=region, description=f"Landtag {label}")
 
     # --------------------------------------
-    def _sync_federal(self, parliament_data: Dict[str, Any]) -> None:
-        logger.info("Syncing Bundestag representatives …")
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='FEDERAL', region='DE')
+    def _sync_parliament(self, parliament_data: Dict[str, Any], level: str, region: str, description: str) -> None:
+        logger.info("Syncing %s representatives …", description)
+        parliament, term = self._ensure_parliament_and_term(parliament_data, level=level, region=region)
         mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc="Bundestag representatives", unit="rep"):
-            self._import_representative(mandate, parliament, term)
-        self._sync_committees_for_term(term)
-
-    def _sync_eu(self, parliament_data: Dict[str, Any]) -> None:
-        logger.info("Syncing EU parliament representatives …")
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='EU', region='EU')
-        mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc="EU Parliament representatives", unit="rep"):
-            self._import_representative(mandate, parliament, term)
-        self._sync_committees_for_term(term)
-
-    def _sync_state(self, parliament_data: Dict[str, Any]) -> None:
-        label = parliament_data.get('label', '')
-        logger.info("Syncing Landtag representatives for %s …", label)
-        region = normalize_german_state(label)
-        parliament, term = self._ensure_parliament_and_term(parliament_data, level='STATE', region=region)
-        mandates = self._fetch_active_mandates(term)
-        for mandate in tqdm(mandates, desc=f"{label} representatives", unit="rep"):
+        for mandate in tqdm(mandates, desc=f"{description} representatives", unit="rep"):
             self._import_representative(mandate, parliament, term)
         self._sync_committees_for_term(term)
 
