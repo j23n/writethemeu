@@ -64,6 +64,55 @@ Query commands for debugging:
 - `query_topics` – Find matching topics for letter text
 - `query_representatives` – Find representatives by location/topics
 
+## State-Level Electoral Districts
+
+### Data Files
+
+Electoral district boundaries are stored as GeoJSON files in the data directory:
+
+- `wahlkreise_federal.geojson` - Federal Bundestag constituencies (299 districts)
+- `wahlkreise_{state}.geojson` - State Landtag constituencies (9 states available)
+
+Available state files:
+- `wahlkreise_bw.geojson` - Baden-Württemberg (70 districts)
+- `wahlkreise_by.geojson` - Bavaria (91 Stimmkreise)
+- `wahlkreise_be.geojson` - Berlin (78 districts)
+- `wahlkreise_hb.geojson` - Bremen (city-state structure)
+- `wahlkreise_ni.geojson` - Lower Saxony (87 districts)
+- `wahlkreise_nw.geojson` - North Rhine-Westphalia (128 districts)
+- `wahlkreise_st.geojson` - Saxony-Anhalt (41 districts)
+- `wahlkreise_sh.geojson` - Schleswig-Holstein (35 districts)
+- `wahlkreise_th.geojson` - Thuringia (44 districts)
+
+### Fetching State Data
+
+```bash
+# List available states
+python manage.py fetch_wahlkreis_data --list
+
+# Fetch single state
+python manage.py fetch_wahlkreis_data --state BW
+
+# Fetch all available states
+python manage.py fetch_wahlkreis_data --all-states
+```
+
+### WahlkreisLocator Service
+
+The `WahlkreisLocator` class loads federal and all available state files on initialization.
+
+Public API (unchanged):
+- `locate(lat, lon)` - Returns federal Wahlkreis as `(wkr_nr, wkr_name, land_name)` tuple
+
+Internal API (for future use):
+- `_locate_detailed(lat, lon)` - Returns dict with both `federal` and `state` constituencies
+
+State data is loaded automatically but only federal data is returned by the public API for backward compatibility.
+
+### Attribution
+
+All data sources are listed on the `/data-sources/` page with full license and attribution information as required by data providers.
+
 ## Representative Recommendation Engine
 `ConstituencySuggestionService` (in `letters/services/constituency.py`) analyzes letter titles and user location to suggest relevant representatives:
 1. **Topic Analysis** – Tokenizes text and maps keywords to `TopicArea` taxonomy

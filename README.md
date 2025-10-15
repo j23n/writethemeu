@@ -7,6 +7,38 @@
 4. Download constituency boundaries: `uv run python manage.py fetch_wahlkreis_data`.
 5. Launch the dev server with `uv run python manage.py runserver` and visit http://localhost:8000/.
 
+## Data Setup
+
+### Downloading Electoral District Boundaries
+
+WriteThem.eu requires electoral district (Wahlkreis) boundary data for address-based representative lookup.
+
+#### Federal Data
+
+```bash
+python manage.py fetch_wahlkreis_data
+```
+
+#### State Data (Optional)
+
+Download Landtagswahl boundaries for German states:
+
+```bash
+# List available states
+python manage.py fetch_wahlkreis_data --list
+
+# Download all 9 available states
+python manage.py fetch_wahlkreis_data --all-states
+
+# Or download specific states
+python manage.py fetch_wahlkreis_data --state BW
+python manage.py fetch_wahlkreis_data --state BE
+```
+
+Currently supported states: BW, BY, BE, HB, NI, NW, ST, SH, TH
+
+See `/data-sources/` page for full attribution and license information.
+
 ## Useful Commands
 ```bash
 # Data import and queries
