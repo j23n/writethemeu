@@ -297,6 +297,25 @@ class RepresentativeSyncService:
         first_name, last_name = self._split_name(politician.get('label', ''))
         party_name = normalize_party_name(self._extract_party_name(mandate))
         election_mode = self._derive_election_mode(parliament, electoral)
+        biography = self._extract_biography(politician)
+        focus_topics = self._extract_focus_topics(politician)
+        links = self._extract_links(politician)
+
+        metadata = {
+            'mandate': mandate,
+            'politician_id': politician_id,
+            'abgeordnetenwatch_url': (
+                politician.get('abgeordnetenwatch_url')
+                or politician.get('url')
+            ),
+            'wikipedia_url': self._extract_wikipedia_link(politician),
+        }
+        if biography:
+            metadata['biography'] = biography
+        if focus_topics:
+            metadata['focus_topics'] = focus_topics
+        if links:
+            metadata['links'] = links
 
         defaults = {
             'parliament_term': term,
@@ -308,28 +327,8 @@ class RepresentativeSyncService:
             'term_start': self._parse_date(mandate.get('start_date')) or term.start_date,
             'term_end': self._parse_date(mandate.get('end_date')) or term.end_date,
             'is_active': True,
-            'metadata': {
-                'mandate': mandate,
-                'politician_id': politician_id,
-                'abgeordnetenwatch_url': (
-                    politician.get('abgeordnetenwatch_url')
-                    or politician.get('url')
-                ),
-                'wikipedia_url': self._extract_wikipedia_link(politician),
-            }
+            'metadata': metadata,
         }
-
-        metadata = dict(defaults['metadata'])
-        biography = self._extract_biography(politician)
-        if biography:
-            metadata['biography'] = biography
-        focus_topics = self._extract_focus_topics(politician)
-        if focus_topics:
-            metadata['focus_topics'] = focus_topics
-        links = self._extract_links(politician)
-        if links:
-            metadata['links'] = links
-        defaults['metadata'] = metadata
 
         rep, created = Representative.objects.update_or_create(
             external_id=mandate_id,
