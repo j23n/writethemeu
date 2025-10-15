@@ -113,6 +113,10 @@ class Command(BaseCommand):
 
             self.stdout.write(self.style.SUCCESS(f"Saved Wahlkreis data to {output_path}"))
 
+        # Ensure EU constituency exists
+        self.stdout.write("Ensuring EU constituency exists...")
+        self._ensure_eu_constituency()
+
         # Sync constituencies to database
         self.stdout.write("Syncing constituencies to database...")
         stats = self._sync_constituencies_to_db(geojson_data)
@@ -296,3 +300,49 @@ class Command(BaseCommand):
                     )
 
         return updated_count
+
+    def _ensure_eu_constituency(self) -> None:
+        """Ensure a Germany-wide EU constituency exists."""
+        from letters.models import Parliament, ParliamentTerm, Constituency
+
+        # Get or create EU parliament
+        eu_parliament, _ = Parliament.objects.get_or_create(
+            level='EU',
+            region='DE',
+            defaults={
+                'name': 'Europäisches Parlament',
+                'legislative_body': 'Europäisches Parlament'
+            }
+        )
+
+        # Get or create current EU term
+        eu_term, _ = ParliamentTerm.objects.get_or_create(
+            parliament=eu_parliament,
+            name='2024-2029',
+            defaults={
+                'start_date': '2024-07-16',
+                'end_date': '2029-07-15'
+            }
+        )
+
+        # Get or create EU constituency
+        eu_constituency, created = Constituency.objects.get_or_create(
+            parliament_term=eu_term,
+            scope='EU_AT_LARGE',
+            defaults={
+                'name': 'Deutschland',
+                'wahlkreis_id': 'DE',
+                'metadata': {'country': 'DE'}
+            }
+        )
+
+        if created:
+            self.stdout.write(self.style.SUCCESS(
+                f"Created EU constituency: {eu_constituency.name}"
+            ))
+        else:
+            # Update wahlkreis_id if missing
+            if not eu_constituency.wahlkreis_id:
+                eu_constituency.wahlkreis_id = 'DE'
+                eu_constituency.save(update_fields=['wahlkreis_id'])
+                self.stdout.write(f"Updated EU constituency with wahlkreis_id=DE")
