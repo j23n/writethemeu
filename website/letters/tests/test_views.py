@@ -113,3 +113,10 @@ class ProfileViewAddressTests(TestCase):
         self.assertContains(response, 'Unter den Linden 77')
         self.assertContains(response, '10117')
         self.assertContains(response, 'Berlin')
+
+    def test_profile_page_does_not_show_verification_section(self):
+        """Profile page should not display verification section"""
+        response = self.client.get(reverse('profile'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Identity & Constituency')
+        self.assertNotContains(response, 'Start Third-party Verification')

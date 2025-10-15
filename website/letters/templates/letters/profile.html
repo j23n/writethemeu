@@ -12,45 +12,6 @@
 <div class="card">
     <h2>{% blocktrans with username=user.username %}{{ username }}'s Profile{% endblocktrans %}</h2>
 
-    <div style="margin-top: 1rem;">
-        <h3>{% trans "Identity & Constituency" %}</h3>
-        {% if verification %}
-            <p class="text-muted mb-2">
-                <strong>{% trans "Status:" %}</strong> {{ verification.get_status_display }}
-                {% if verification.verification_type %}
-                    · <strong>{% trans "Type:" %}</strong> {{ verification.get_verification_type_display }}
-                {% endif %}
-            </p>
-
-            {% if verification.is_verified %}
-                {% if verification.is_self_declared %}
-                    <div class="alert alert-secondary" role="status">
-                        {% trans "You self-declared your constituency. Representatives will see your signatures as self-declared constituents." %}
-                    </div>
-                    <a href="{% url 'start_verification' %}" class="btn btn-sm btn-outline-primary">{% trans "Start third-party verification" %}</a>
-                {% else %}
-                    <div class="alert alert-success" role="status">
-                        {% trans "Your identity was verified via a third-party provider. Signatures will appear as verified constituents." %}
-                    </div>
-                {% endif %}
-            {% elif verification.status == 'PENDING' %}
-                <div class="alert alert-warning" role="status">
-                    {% trans "Your verification is being processed." %}
-                    <a href="{% url 'complete_verification' %}" class="btn btn-sm btn-outline-secondary ms-2">{% trans "Complete Verification (Stub)" %}</a>
-                </div>
-            {% elif verification.status == 'FAILED' %}
-                <div class="alert alert-danger" role="status">
-                    {% trans "Verification failed. Please try again or contact support." %}
-                </div>
-            {% endif %}
-        {% else %}
-            <p class="text-muted mb-3">
-                {% trans "You can self-declare your constituency below or start a verification with a trusted provider. Verified signatures carry more weight." %}
-            </p>
-            <a href="{% url 'start_verification' %}" class="btn btn-primary">{% trans "Start Third-party Verification" %}</a>
-        {% endif %}
-    </div>
-
     <div class="mt-4">
         <h3>{% trans "Ihre Adresse" %}</h3>
         <p class="text-muted">
