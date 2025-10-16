@@ -87,6 +87,89 @@ class FetchWahlkreisStateDataTests(TestCase):
                     shutil.rmtree('test_data')
 
     @patch('requests.get')
+    def test_fetch_syncs_to_database_when_parliament_exists(self, mock_get):
+        """Test that fetching state data creates constituencies in database."""
+        # Mock response for BW (uses "Nummer" and "WK Name")
+        mock_geojson = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [9.0, 48.7]},
+                    "properties": {"Nummer": "1", "WK Name": "Stuttgart I"}
+                },
+                {
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [9.1, 48.8]},
+                    "properties": {"Nummer": "2", "WK Name": "Stuttgart II"}
+                }
+            ]
+        }
+
+        # Create proper ZIP file containing GeoJSON
+        import io
+        import zipfile
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            zip_file.writestr('wahlkreise_bw.geojson', json.dumps(mock_geojson))
+        zip_content = zip_buffer.getvalue()
+
+        mock_response = Mock()
+        mock_response.content = zip_content
+        mock_response.headers = {}
+        mock_response.raise_for_status = Mock()
+        mock_get.return_value = mock_response
+
+        # Create Parliament and Term
+        from letters.models import Parliament, ParliamentTerm, Constituency
+        parliament = Parliament.objects.create(
+            name='Baden-Württemberg',
+            level='STATE',
+            region='Baden-Württemberg',
+            legislative_body='Landtag Baden-Württemberg'
+        )
+        term = ParliamentTerm.objects.create(
+            parliament=parliament,
+            name='Baden-Württemberg 2021 - 2026',
+            start_date='2021-05-17',
+            end_date='2026-03-13'
+        )
+
+        out = StringIO()
+
+        with self.settings(CONSTITUENCY_BOUNDARIES_PATH='test_data/wahlkreise.geojson'):
+            Path('test_data').mkdir(exist_ok=True)
+
+            try:
+                call_command('sync_wahlkreise', '--state', 'BW', '--force', stdout=out)
+
+                output = out.getvalue()
+                self.assertIn('Created 2 and updated 0 constituencies', output)
+
+                # Verify constituencies were created
+                constituencies = Constituency.objects.filter(
+                    parliament_term=term,
+                    scope='STATE_DISTRICT'
+                )
+                self.assertEqual(constituencies.count(), 2)
+
+                # Verify first constituency
+                c1 = constituencies.get(wahlkreis_id='BW-001')
+                self.assertEqual(c1.name, '1 - Stuttgart I (Baden-Württemberg 2021 - 2026)')
+                self.assertEqual(c1.metadata['WKR_NR'], 1)  # Should be normalized to int
+                self.assertEqual(c1.metadata['WKR_NAME'], 'Stuttgart I')
+                self.assertEqual(c1.metadata['LAND_CODE'], 'BW')
+
+                # Verify second constituency
+                c2 = constituencies.get(wahlkreis_id='BW-002')
+                self.assertEqual(c2.name, '2 - Stuttgart II (Baden-Württemberg 2021 - 2026)')
+            finally:
+                # Cleanup
+                import shutil
+                if Path('test_data').exists():
+                    shutil.rmtree('test_data')
+
+    @patch('requests.get')
     def test_fetch_all_states_handles_failures_gracefully(self, mock_get):
         """Test --all-states continues on failures and reports summary."""
         # Make first request succeed, second fail, third succeed

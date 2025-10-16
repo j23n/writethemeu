@@ -20,6 +20,7 @@ except ImportError:
     shapefile = None
 
 from letters.models import Parliament, ParliamentTerm, Constituency
+from letters.constants import normalize_german_state
 
 # Official Bundeswahlleiterin Shapefile URL (2025 election)
 DEFAULT_WAHLKREIS_URL = (
@@ -128,9 +129,9 @@ class Command(BaseCommand):
     """Download Wahlkreis geodata and sync all constituencies to database."""
 
     help = (
-        "Fetch German electoral district (Wahlkreis) boundary data. "
-        "Downloads federal Bundestag boundaries by default and syncs all 299 constituencies to the database, "
-        "or state Landtag boundaries with --state flag (GeoJSON only, no DB sync). "
+        "Fetch German electoral district (Wahlkreis) boundary data and sync to database. "
+        "Downloads federal Bundestag boundaries by default and syncs all 299 constituencies, "
+        "or state Landtag boundaries with --state flag (syncs if Parliament/Term exists). "
         "Converts Shapefiles/GeoPackages to GeoJSON and normalizes properties. "
         "Use --list to see available states. Use --all-states to download all 9 available state datasets."
     )
@@ -174,6 +175,11 @@ class Command(BaseCommand):
             action="store_true",
             help="List available states and their configuration.",
         )
+
+    def _get_state_region_name(self, state_code: str) -> str:
+        """Map state code to canonical German region name used in Parliament.region."""
+        state_name = STATE_SOURCES[state_code]['name']
+        return normalize_german_state(state_name) or state_name
 
     def handle(self, *args, **options):
         # Handle --list flag
@@ -477,6 +483,138 @@ class Command(BaseCommand):
                 eu_constituency.save(update_fields=['wahlkreis_id'])
                 self.stdout.write(f"Updated EU constituency with wahlkreis_id=DE")
 
+    @transaction.atomic
+    def _sync_state_constituencies_to_db(self, state_code: str, geojson_data: dict) -> dict:
+        """Create or update state Wahlkreise as Constituency records in the database."""
+        # Map state code to canonical region name
+        region_name = self._get_state_region_name(state_code)
+
+        # Find the state parliament
+        try:
+            parliament = Parliament.objects.get(level='STATE', region=region_name)
+        except Parliament.DoesNotExist:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"Parliament not found for region '{region_name}'. "
+                    f"Skipping database sync. Run sync_representatives first."
+                )
+            )
+            return {'created': 0, 'updated': 0, 'skipped': True}
+
+        # Find the appropriate ParliamentTerm based on election year
+        config = STATE_SOURCES[state_code]
+        election_year = config['election_year']
+
+        # Try to find a term that includes this election year
+        term = None
+        for t in parliament.terms.all():
+            # Term names are like "Baden-Württemberg 2021 - 2026"
+            if str(election_year) in t.name:
+                term = t
+                break
+
+        if not term:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"No ParliamentTerm found for {region_name} with election year {election_year}. "
+                    f"Available terms: {', '.join(t.name for t in parliament.terms.all())}. "
+                    f"Skipping database sync."
+                )
+            )
+            return {'created': 0, 'updated': 0, 'skipped': True}
+
+        stats = {'created': 0, 'updated': 0}
+        features = geojson_data.get('features', [])
+
+        for feature in features:
+            props = feature.get('properties', {})
+            wkr_nr = props.get('WKR_NR')
+
+            # Try to get name from various possible fields
+            wkr_name = (
+                props.get('WKR_NAME') or
+                props.get('name') or
+                props.get('NAME') or
+                props.get('Wahlkreis') or
+                props.get('wahlkreis')
+            )
+
+            if not wkr_nr:
+                continue
+
+            # Create wahlkreis_id with state prefix to avoid collisions
+            wahlkreis_id = f"{state_code}-{str(wkr_nr).zfill(3)}"
+
+            # Create constituency name matching existing format
+            # Format: "{wkr_nr} - {name} ({term_name})"
+            if wkr_name:
+                constituency_name = f"{wkr_nr} - {wkr_name} ({term.name})"
+            else:
+                constituency_name = f"{wkr_nr} ({term.name})"
+
+            # Try to find existing constituency by parliament_term and WKR_NR in metadata
+            # This matches constituencies that may have been created by sync_representatives
+            existing = Constituency.objects.filter(
+                parliament_term=term,
+                scope='STATE_DISTRICT',
+                metadata__WKR_NR=wkr_nr
+            ).first()
+
+            # If not found by metadata, try matching by name
+            # (for constituencies created before we added WKR_NR metadata)
+            if not existing:
+                existing = Constituency.objects.filter(
+                    parliament_term=term,
+                    scope='STATE_DISTRICT',
+                    name=constituency_name
+                ).first()
+
+            if existing:
+                # Update existing constituency
+                existing.name = constituency_name
+                existing.wahlkreis_id = wahlkreis_id
+                if not existing.metadata:
+                    existing.metadata = {}
+                existing.metadata.update({
+                    'WKR_NR': wkr_nr,
+                    'WKR_NAME': wkr_name,
+                    'LAND_CODE': state_code,
+                    'LAND_NAME': region_name,
+                    'state': region_name,
+                    'source': 'wahlkreise_geojson'
+                })
+                existing.last_synced_at = timezone.now()
+                existing.save()
+                stats['updated'] += 1
+            else:
+                # Create new constituency
+                try:
+                    constituency = Constituency.objects.create(
+                        parliament_term=term,
+                        name=constituency_name,
+                        scope='STATE_DISTRICT',
+                        wahlkreis_id=wahlkreis_id,
+                        metadata={
+                            'WKR_NR': wkr_nr,
+                            'WKR_NAME': wkr_name,
+                            'LAND_CODE': state_code,
+                            'LAND_NAME': region_name,
+                            'state': region_name,
+                            'source': 'wahlkreise_geojson'
+                        },
+                        last_synced_at=timezone.now()
+                    )
+                    stats['created'] += 1
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Failed to create constituency {constituency_name}: {e}"
+                        )
+                    )
+                    raise
+
+        return stats
+
     def _list_states(self):
         """Display available state configurations."""
         self.stdout.write(self.style.SUCCESS("\nAvailable State Data Sources:"))
@@ -570,6 +708,21 @@ class Command(BaseCommand):
             self.style.SUCCESS(f"✓ Saved {state_code} data to {output_path}")
         )
 
+        # Sync to database
+        self.stdout.write(f"  Syncing constituencies to database...")
+        stats = self._sync_state_constituencies_to_db(state_code, geojson_data)
+
+        if stats.get('skipped'):
+            self.stdout.write(
+                self.style.WARNING(f"  Database sync skipped for {state_code}")
+            )
+        else:
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  ✓ Created {stats['created']} and updated {stats['updated']} constituencies"
+                )
+            )
+
     def _fetch_all_states(self, force: bool):
         """Fetch data for all available states."""
         self.stdout.write(
@@ -647,6 +800,35 @@ class Command(BaseCommand):
 
         for feature in data.get("features", []):
             props = feature.get("properties", {})
+
+            # Normalize WKR_NR from various possible field names
+            if "WKR_NR" not in props:
+                wkr_nr = (
+                    props.get("Nummer") or
+                    props.get("nummer") or
+                    props.get("WK_NR") or
+                    props.get("WahlkreisNr") or
+                    props.get("wahlkreis_nr") or
+                    props.get("STIMMKREIS") or
+                    props.get("Nr")
+                )
+                if wkr_nr is not None:
+                    props["WKR_NR"] = wkr_nr
+
+            # Normalize WKR_NAME from various possible field names
+            if "WKR_NAME" not in props:
+                wkr_name = (
+                    props.get("WK Name") or
+                    props.get("Name") or
+                    props.get("name") or
+                    props.get("Wahlkreis") or
+                    props.get("wahlkreis") or
+                    props.get("WK_NAME") or
+                    props.get("WahlkreisName") or
+                    props.get("STIMMKREISNAME")
+                )
+                if wkr_name is not None:
+                    props["WKR_NAME"] = wkr_name
 
             # Ensure standard fields exist
             if "LAND_CODE" not in props:
