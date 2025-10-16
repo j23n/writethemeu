@@ -817,25 +817,108 @@ class CommitteeDetailView(DetailView):
 
 def data_sources(request):
     """Display data sources and attribution information."""
-    from .management.commands.sync_wahlkreise import STATE_SOURCES
-
-    # States with data available
-    available_states = []
-    for code, config in STATE_SOURCES.items():
-        available_states.append({
-            'code': code,
-            'name': config['name'],
-            'attribution': config['attribution'],
-            'license': config['license'],
-            'license_url': config.get('license_url', ''),
-            'election_year': config['election_year'],
-            'count': config.get('count', 'N/A'),
-            'source_url': config['url'],
-            'note': config.get('note', ''),
-        })
-
-    # Sort by name
-    available_states.sort(key=lambda x: x['name'])
+    # Hardcoded list of states with constituency data available
+    available_states = [
+        {
+            'code': 'BW',
+            'name': 'Baden-Württemberg',
+            'attribution': '© Statistisches Landesamt Baden-Württemberg',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2021,
+            'count': 70,
+            'source_url': 'https://www.statistik-bw.de',
+            'note': '',
+        },
+        {
+            'code': 'BY',
+            'name': 'Bavaria',
+            'attribution': '© Bayerisches Landesamt für Statistik',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2023,
+            'count': 91,
+            'source_url': 'https://www.statistik.bayern.de',
+            'note': '',
+        },
+        {
+            'code': 'BE',
+            'name': 'Berlin',
+            'attribution': '© Amt für Statistik Berlin-Brandenburg',
+            'license': 'CC BY 3.0 DE',
+            'license_url': 'https://creativecommons.org/licenses/by/3.0/de/',
+            'election_year': 2023,
+            'count': 78,
+            'source_url': 'https://www.statistik-berlin-brandenburg.de',
+            'note': '',
+        },
+        {
+            'code': 'HB',
+            'name': 'Bremen',
+            'attribution': '© Statistisches Landesamt Bremen',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2023,
+            'count': 5,
+            'source_url': 'https://www.statistik.bremen.de',
+            'note': '',
+        },
+        {
+            'code': 'NI',
+            'name': 'Lower Saxony',
+            'attribution': '© Landesamt für Statistik Niedersachsen',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 87,
+            'source_url': 'https://www.statistik.niedersachsen.de',
+            'note': '',
+        },
+        {
+            'code': 'NW',
+            'name': 'North Rhine-Westphalia',
+            'attribution': '© IT.NRW',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 128,
+            'source_url': 'https://www.it.nrw',
+            'note': '',
+        },
+        {
+            'code': 'ST',
+            'name': 'Saxony-Anhalt',
+            'attribution': '© Statistisches Landesamt Sachsen-Anhalt',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2021,
+            'count': 43,
+            'source_url': 'https://statistik.sachsen-anhalt.de',
+            'note': '',
+        },
+        {
+            'code': 'SH',
+            'name': 'Schleswig-Holstein',
+            'attribution': '© Statistisches Amt für Hamburg und Schleswig-Holstein',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 35,
+            'source_url': 'https://www.statistik-nord.de',
+            'note': '',
+        },
+        {
+            'code': 'TH',
+            'name': 'Thuringia',
+            'attribution': '© Thüringer Landesamt für Statistik',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2024,
+            'count': 44,
+            'source_url': 'https://statistik.thueringen.de',
+            'note': '',
+        },
+    ]
 
     # States without direct downloads
     unavailable_states = [
