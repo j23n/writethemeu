@@ -34,7 +34,7 @@ class WahlkreisSearchTestCase(TestCase):
         content = response.content.decode('utf-8')
         # Should return error because no Constituency exists in test database
         self.assertIn('alert-danger', content)
-        self.assertIn('Representative data not loaded', content)
+        self.assertIn('Could not find constituencies for this address', content)
 
     def test_search_wahlkreis_with_invalid_address(self):
         """Invalid address returns HTML fragment with error message"""
@@ -47,7 +47,7 @@ class WahlkreisSearchTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         content = response.content.decode('utf-8')
         self.assertIn('alert-danger', content)
-        self.assertIn('Address not found', content)
+        self.assertIn('Could not find constituencies for this address', content)
 
     def test_search_wahlkreis_missing_fields(self):
         """Missing required fields returns HTML fragment with error"""

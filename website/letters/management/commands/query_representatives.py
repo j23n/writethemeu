@@ -2,6 +2,7 @@
 # ABOUTME: Interactive tool for testing representative suggestion logic.
 
 from django.core.management.base import BaseCommand
+from letters.models import Representative
 from letters.services import ConstituencyLocator
 
 
@@ -62,7 +63,6 @@ class Command(BaseCommand):
                     return
 
                 # Get representatives from constituencies
-                from letters.models import Representative
                 representatives = []
                 for constituency in constituencies:
                     reps = list(constituency.representatives.filter(is_active=True))
