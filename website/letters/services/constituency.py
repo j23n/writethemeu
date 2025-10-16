@@ -706,21 +706,27 @@ class ConstituencySuggestionService:
     ) -> List[Representative]:
         """
         Get expert representatives based on topic expertise.
-        Simply returns representatives who have the matched TopicAreas assigned.
+        Finds representatives who have the matched TopicAreas assigned OR
+        serve on committees with those topic areas.
         """
         if not matched_topics:
             return []
 
-        # Find representatives with the matched topic areas
+        # Find representatives via topic_areas OR committee memberships
+        topic_query = Q(topic_areas__in=matched_topics)
+        committee_query = Q(committee_memberships__committee__topic_areas__in=matched_topics)
+
         reps = Representative.objects.filter(
-            is_active=True,
-            topic_areas__in=matched_topics
+            is_active=True
+        ).filter(
+            topic_query | committee_query
         ).exclude(
             id__in=exclude_ids
         ).select_related(
             'parliament', 'parliament_term'
         ).prefetch_related(
             'constituencies',
+            'topic_areas',
             'committee_memberships__committee__topic_areas'
         ).distinct()
 
