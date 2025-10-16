@@ -42,7 +42,7 @@ STATE_SOURCES = {
     },
     'BY': {
         'name': 'Bavaria',
-        'url': 'https://fragdenstaat.de/anfrage/geometrien-der-stimmkreiseinteilung-zur-landtagswahl-2023-in-bayern/274642/anhang/stimmkreise-2023shp.zip',
+        'url': 'https://fragdenstaat.de/files/foi/788050/shapefilestimmkreiseltwbayern2023.zip?download',
         'format': 'shapefile_zip',
         'count': 91,
         'attribution': '© Bayerisches Landesamt für Statistik, 2023',
@@ -53,7 +53,7 @@ STATE_SOURCES = {
     },
     'BE': {
         'name': 'Berlin',
-        'url': 'https://daten.berlin.de/datensaetze/geometrien-der-wahlkreise-für-die-wahl-zum-abgeordnetenhaus-von-berlin-2021',
+        'url': 'https://download.statistik-berlin-brandenburg.de/265b512e15ac1f85/7adee8c53c6c/RBS_OD_Wahlkreise_AH2021.zip',
         'format': 'shapefile_zip',
         'count': 78,
         'attribution': '© Amt für Statistik Berlin-Brandenburg, 2021',
@@ -94,7 +94,7 @@ STATE_SOURCES = {
     },
     'ST': {
         'name': 'Saxony-Anhalt',
-        'url': 'https://wahlergebnisse.sachsen-anhalt.de/wahlen/lt21/wahlkreiseinteilung/downloads/download.php',
+        'url': 'https://wahlergebnisse.sachsen-anhalt.de/wahlen/lt21/wahlkreiseinteilung/downloads/Wahlkreise_LT_2021.zip',
         'format': 'shapefile_zip',
         'count': 41,
         'attribution': '© Statistisches Landesamt Sachsen-Anhalt, 2021',
@@ -379,28 +379,23 @@ class Command(BaseCommand):
             if not wkr_nr or not wkr_name:
                 continue
 
+            # Generate wahlkreis_id (3-digit zero-padded)
+            wahlkreis_id = f"{wkr_nr:03d}"
+
             # Create constituency name matching the format used by sync_representatives
             constituency_name = f"{wkr_nr} - {wkr_name} (Bundestag 2025 - 2029)"
 
-            # Try to find existing constituency by external_id or by name
+            # Match by wahlkreis_id + parliament_term
             existing = Constituency.objects.filter(
-                external_id=str(wkr_nr)
+                parliament_term=term,
+                scope='FEDERAL_DISTRICT',
+                wahlkreis_id=wahlkreis_id
             ).first()
-
-            if not existing:
-                # Try matching by parliament_term, name, and scope
-                existing = Constituency.objects.filter(
-                    parliament_term=term,
-                    name=constituency_name,
-                    scope='FEDERAL_DISTRICT'
-                ).first()
 
             if existing:
                 # Update existing constituency
                 existing.external_id = str(wkr_nr)
-                existing.parliament_term = term
                 existing.name = constituency_name
-                existing.scope = 'FEDERAL_DISTRICT'
                 if not existing.metadata:
                     existing.metadata = {}
                 existing.metadata.update({
@@ -421,6 +416,7 @@ class Command(BaseCommand):
                         parliament_term=term,
                         name=constituency_name,
                         scope='FEDERAL_DISTRICT',
+                        wahlkreis_id=wahlkreis_id,
                         metadata={
                             'WKR_NR': wkr_nr,
                             'WKR_NAME': wkr_name,
@@ -561,7 +557,11 @@ class Command(BaseCommand):
 
         for feature in features:
             props = feature.get('properties', {})
-            wkr_nr = props.get('WKR_NR')
+            wkr_nr = (
+                props.get('WKR_NR') or
+                props.get('SKR_NR') or # Bayern
+                props.get('AWK')       # Berlin
+            )
 
             # Try to get name from various possible fields
             wkr_name = (
@@ -569,43 +569,33 @@ class Command(BaseCommand):
                 props.get('name') or
                 props.get('NAME') or
                 props.get('Wahlkreis') or
-                props.get('wahlkreis')
+                props.get('wahlkreis') or
+                props.get('SKR_NAME') or # Bayern
+                props.get('AWK')         # Berlin
             )
 
             if not wkr_nr:
-                continue
+                raise ValueError(f"Could not parse wkr_nr from {props}, {feature.keys()}")
+            if not wkr_name:
+                raise ValueError(f"Could not parse wkr_name from {props}, {feature.keys()}")
 
-            # Create wahlkreis_id with state prefix to avoid collisions
-            wahlkreis_id = f"{state_code}-{str(wkr_nr).zfill(3)}"
+            # Generate wahlkreis_id with state prefix (4-digit zero-padded for states)
+            wahlkreis_id = f"{state_code}-{str(wkr_nr).zfill(4)}"
 
             # Create constituency name matching existing format
             # Format: "{wkr_nr} - {name} ({term_name})"
-            if wkr_name:
-                constituency_name = f"{wkr_nr} - {wkr_name} ({term.name})"
-            else:
-                constituency_name = f"{wkr_nr} ({term.name})"
+            constituency_name = f"{wkr_nr} - {wkr_name} ({term.name})"
 
-            # Try to find existing constituency by parliament_term and WKR_NR in metadata
-            # This matches constituencies that may have been created by sync_representatives
+            # Match by wahlkreis_id + parliament_term
             existing = Constituency.objects.filter(
                 parliament_term=term,
                 scope='STATE_DISTRICT',
-                metadata__WKR_NR=wkr_nr
+                wahlkreis_id=wahlkreis_id
             ).first()
-
-            # If not found by metadata, try matching by name
-            # (for constituencies created before we added WKR_NR metadata)
-            if not existing:
-                existing = Constituency.objects.filter(
-                    parliament_term=term,
-                    scope='STATE_DISTRICT',
-                    name=constituency_name
-                ).first()
 
             if existing:
                 # Update existing constituency
                 existing.name = constituency_name
-                existing.wahlkreis_id = wahlkreis_id
                 if not existing.metadata:
                     existing.metadata = {}
                 existing.metadata.update({
@@ -622,7 +612,7 @@ class Command(BaseCommand):
             else:
                 # Create new constituency
                 try:
-                    constituency = Constituency.objects.create(
+                    Constituency.objects.create(
                         parliament_term=term,
                         name=constituency_name,
                         scope='STATE_DISTRICT',
@@ -651,19 +641,10 @@ class Command(BaseCommand):
     def _list_states(self):
         """Display available state configurations."""
         self.stdout.write(self.style.SUCCESS("\nAvailable State Data Sources:"))
-        self.stdout.write("=" * 80)
-
         for code, config in STATE_SOURCES.items():
             self.stdout.write(f"\n{code} - {config['name']}")
             self.stdout.write(f"  Election: {config['election_year']}")
-            self.stdout.write(f"  Districts: {config.get('count', 'N/A')}")
-            self.stdout.write(f"  Format: {config['format']}")
-            self.stdout.write(f"  License: {config['license']}")
-            if config.get('note'):
-                self.stdout.write(f"  Note: {config['note']}")
             self.stdout.write(f"  URL: {config['url'][:70]}...")
-
-        self.stdout.write("\n" + "=" * 80)
         self.stdout.write(f"\nTotal: {len(STATE_SOURCES)} states with direct downloads\n")
 
     def _fetch_state(self, state_code: str, force: bool):

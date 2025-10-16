@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.utils.html import strip_tags
 from tqdm import tqdm
 
-from ..constants import GERMAN_STATE_ALIASES, normalize_german_state, normalize_party_name
+from ..constants import GERMAN_STATE_ALIASES, get_state_code, normalize_german_state, normalize_party_name
 from ..models import (
     Committee,
     CommitteeMembership,
@@ -404,12 +404,32 @@ class RepresentativeSyncService:
         district_id = const_data.get('id')
         state_name = normalize_german_state(self._extract_state_from_electoral(electoral, parliament))
 
+        # Fetch full constituency details to get number field
+        constituency_number = None
+        if district_id:
+            try:
+                full_const = AbgeordnetenwatchAPI._request(f'constituencies/{district_id}')
+                constituency_number = full_const.get('data', {}).get('number')
+            except Exception:
+                logger.warning("Failed to fetch constituency details for ID %s", district_id)
+
+        # Generate wahlkreis_id
+        wahlkreis_id = None
+        if constituency_number is not None:
+            if parliament.level == 'FEDERAL':
+                wahlkreis_id = f"{constituency_number:03d}"
+            else:  # STATE
+                state_code = get_state_code(state_name or parliament.name)
+                if state_code:
+                    wahlkreis_id = f"{state_code}-{constituency_number:04d}"
+
         scope = 'FEDERAL_DISTRICT' if parliament.level == 'FEDERAL' else 'STATE_DISTRICT'
         constituency = self._get_or_create_constituency(
             term,
             scope=scope,
             name=district_name,
             external_id=district_id,
+            wahlkreis_id=wahlkreis_id,
             metadata={'state': state_name}
         )
         return constituency
@@ -452,6 +472,7 @@ class RepresentativeSyncService:
         name: str,
         metadata: Optional[Dict] = None,
         external_id: Optional[int] = None,
+        wahlkreis_id: Optional[str] = None,
     ) -> Optional[Constituency]:
         """Get existing constituency or create only non-district constituencies.
 
@@ -460,19 +481,38 @@ class RepresentativeSyncService:
         """
         metadata = metadata or {}
 
-        # For district constituencies with external_id, only GET, never create
-        if external_id and scope in ('FEDERAL_DISTRICT', 'STATE_DISTRICT'):
-            try:
-                constituency = Constituency.objects.get(external_id=str(external_id))
-                return constituency
-            except Constituency.DoesNotExist:
-                logger.warning(
-                    "Constituency with external_id=%s not found. Run sync_wahlkreise first.",
-                    external_id
-                )
-                return None
+        # For district constituencies, try to find by wahlkreis_id first
+        if scope in ('FEDERAL_DISTRICT', 'STATE_DISTRICT'):
+            existing = None
 
-        # For list constituencies (no external_id), create or update
+            # Primary: Match by wahlkreis_id if available
+            if wahlkreis_id:
+                existing = Constituency.objects.filter(
+                    parliament_term=term,
+                    scope=scope,
+                    wahlkreis_id=wahlkreis_id
+                ).first()
+
+            # Fallback: Match by external_id for backwards compatibility
+            if not existing and external_id:
+                existing = Constituency.objects.filter(
+                    external_id=str(external_id)
+                ).first()
+
+            if existing:
+                # Update wahlkreis_id if we have one and it's not set
+                if wahlkreis_id and existing.wahlkreis_id != wahlkreis_id:
+                    existing.wahlkreis_id = wahlkreis_id
+                    existing.save(update_fields=['wahlkreis_id'])
+                return existing
+
+            logger.warning(
+                "Constituency not found for %s term=%s wahlkreis_id=%s external_id=%s. Run sync_wahlkreise first.",
+                scope, term.name, wahlkreis_id, external_id
+            )
+            return None
+
+        # For list constituencies, create or update
         defaults = {
             'parliament_term': term,
             'scope': scope,

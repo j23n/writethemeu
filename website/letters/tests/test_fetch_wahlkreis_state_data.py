@@ -32,8 +32,7 @@ class FetchWahlkreisStateDataTests(TestCase):
         # Check key information is shown
         self.assertIn('Baden-Württemberg', output)
         self.assertIn('Election:', output)
-        self.assertIn('Districts:', output)
-        self.assertIn('License:', output)
+        self.assertIn('URL:', output)
         self.assertIn('Total: 9 states', output)
 
     @patch('requests.get')
@@ -154,20 +153,56 @@ class FetchWahlkreisStateDataTests(TestCase):
                 self.assertEqual(constituencies.count(), 2)
 
                 # Verify first constituency
-                c1 = constituencies.get(wahlkreis_id='BW-001')
+                c1 = constituencies.get(wahlkreis_id='BW-0001')  # 4-digit for states
                 self.assertEqual(c1.name, '1 - Stuttgart I (Baden-Württemberg 2021 - 2026)')
                 self.assertEqual(c1.metadata['WKR_NR'], 1)  # Should be normalized to int
                 self.assertEqual(c1.metadata['WKR_NAME'], 'Stuttgart I')
                 self.assertEqual(c1.metadata['LAND_CODE'], 'BW')
 
                 # Verify second constituency
-                c2 = constituencies.get(wahlkreis_id='BW-002')
+                c2 = constituencies.get(wahlkreis_id='BW-0002')  # 4-digit for states
                 self.assertEqual(c2.name, '2 - Stuttgart II (Baden-Württemberg 2021 - 2026)')
             finally:
                 # Cleanup
                 import shutil
                 if Path('test_data').exists():
                     shutil.rmtree('test_data')
+
+    def test_state_data_source_urls_accessible(self):
+        """Test that all state data source URLs return 2xx status codes.
+
+        Note: This test makes real network requests and may be slow.
+        Some state servers may not support HEAD requests, so we fall back to GET with a small range.
+        """
+        from letters.management.commands.sync_wahlkreise import STATE_SOURCES
+        import requests
+
+        failed_states = []
+
+        for state_code, config in STATE_SOURCES.items():
+            url = config['url']
+            try:
+                # Try HEAD request first (faster)
+                response = requests.head(url, timeout=10, allow_redirects=True)
+
+                # Some servers return 400 for HEAD but work for GET
+                if response.status_code == 400:
+                    # Try a GET request with range header to minimize data transfer
+                    response = requests.get(url, headers={'Range': 'bytes=0-1023'}, timeout=10, allow_redirects=True)
+
+                # Accept 2xx status codes (and 206 Partial Content for range requests)
+                if not (200 <= response.status_code < 300):
+                    failed_states.append((state_code, url, response.status_code))
+            except requests.RequestException as e:
+                failed_states.append((state_code, url, str(e)))
+
+        # Assert all URLs are accessible
+        if failed_states:
+            error_msg = "\n".join(
+                f"  {code}: {url} -> {status}"
+                for code, url, status in failed_states
+            )
+            self.fail(f"The following state data sources are not accessible:\n{error_msg}")
 
     @patch('requests.get')
     def test_fetch_all_states_handles_failures_gracefully(self, mock_get):
