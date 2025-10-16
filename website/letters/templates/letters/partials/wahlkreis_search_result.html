@@ -1,0 +1,11 @@
+{% load i18n %}
+
+{% if success %}
+    <div class="alert alert-success"
+         data-federal-wahlkreis-id="{{ federal_constituency_id }}"
+         data-state-wahlkreis-id="{{ state_constituency_id }}">
+        {% trans "Found:" %} {{ wahlkreis_name }} ({{ land_name }})
+    </div>
+{% else %}
+    <div class="alert alert-danger">{{ error }}</div>
+{% endif %}

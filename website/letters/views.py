@@ -1,7 +1,9 @@
+import logging
 import re
 from collections import OrderedDict
 
 from django.shortcuts import render, redirect, get_object_or_404
+from django.http import JsonResponse
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
@@ -19,7 +21,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 
-from .models import Letter, Signature, Representative, Tag, IdentityVerification, TopicArea, Committee
+from .models import Letter, Signature, Representative, Tag, IdentityVerification, TopicArea, Committee, Constituency
 from .forms import (
     LetterForm,
     SignatureForm,
@@ -27,9 +29,11 @@ from .forms import (
     LetterSearchForm,
     UserRegisterForm,
     SelfDeclaredConstituencyForm,
-    IdentityVerificationForm
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
+from .services.constituency import ConstituencyLocator
+
+logger = logging.getLogger('letters.services')
 
 
 def _send_activation_email(user, request):
@@ -312,64 +316,27 @@ def profile(request):
         verification = None
 
     if request.method == 'POST':
-        # Check which form was submitted
-        if 'address_form_submit' in request.POST:
-            address_form = IdentityVerificationForm(request.POST, user=user)
-            constituency_form = SelfDeclaredConstituencyForm(user=user)
+        constituency_form = SelfDeclaredConstituencyForm(request.POST, user=user)
 
-            if address_form.is_valid():
-                street_address = address_form.cleaned_data.get('street_address')
-                postal_code = address_form.cleaned_data.get('postal_code')
-                city = address_form.cleaned_data.get('city')
-
-                # Only update if all fields are provided
-                if street_address and postal_code and city:
-                    # Get or create verification record
-                    verification, created = IdentityVerification.objects.get_or_create(
-                        user=user,
-                        defaults={
-                            'status': 'SELF_DECLARED',
-                            'verification_type': 'SELF_DECLARED',
-                        }
-                    )
-
-                    # Update address fields
-                    verification.street_address = street_address
-                    verification.postal_code = postal_code
-                    verification.city = city
-                    verification.save()
-
-                    messages.success(
-                        request,
-                        _('Ihre Adresse wurde gespeichert.')
-                    )
-                    return redirect('profile')
-        else:
-            # Constituency form submission
-            constituency_form = SelfDeclaredConstituencyForm(request.POST, user=user)
-            address_form = IdentityVerificationForm(user=user)
-
-            if constituency_form.is_valid():
-                IdentityVerificationService.self_declare(
-                    user=user,
-                    federal_constituency=constituency_form.cleaned_data['federal_constituency'],
-                    state_constituency=constituency_form.cleaned_data['state_constituency'],
-                )
-                messages.success(
-                    request,
-                    _('Your constituency information has been updated.')
-                )
-                return redirect('profile')
+        if constituency_form.is_valid():
+            IdentityVerificationService.self_declare(
+                user=user,
+                federal_constituency=constituency_form.cleaned_data['federal_constituency'],
+                state_constituency=constituency_form.cleaned_data['state_constituency'],
+            )
+            messages.success(
+                request,
+                _('Your constituency information has been updated.')
+            )
+            return redirect('profile')
     else:
         constituency_form = SelfDeclaredConstituencyForm(user=user)
-        address_form = IdentityVerificationForm(user=user)
 
     context = {
         'user_letters': user_letters,
         'user_signatures': user_signatures,
         'verification': verification,
         'constituency_form': constituency_form,
-        'address_form': address_form,
     }
 
     return render(request, 'letters/profile.html', context)
@@ -614,8 +581,81 @@ def complete_verification(request):
     return redirect('profile')
 
 
+@login_required
+@require_http_methods(["POST"])
+def search_wahlkreis(request):
+    """
+    HTMX endpoint: Search for Wahlkreis by address.
+    Returns HTML fragment with constituency data or error message.
+    """
+    street_address = request.POST.get('street_address', '').strip()
+    postal_code = request.POST.get('postal_code', '').strip()
+    city = request.POST.get('city', '').strip()
+
+    # Validate required fields
+    if not all([street_address, postal_code, city]):
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
+            'success': False,
+            'error': 'Please provide street address, postal code, and city.'
+        })
+
+    # Find constituencies using ConstituencyLocator
+    # (handles geocoding internally)
+    try:
+        locator = ConstituencyLocator()
+        constituencies = locator.locate(
+            street=street_address,
+            postal_code=postal_code,
+            city=city,
+            country='DE'
+        )
+
+        if not constituencies:
+            logger.warning(
+                f'Address search found no constituencies for {street_address}, {postal_code} {city}'
+            )
+            return render(request, 'letters/partials/wahlkreis_search_result.html', {
+                'success': False,
+                'error': 'Could not find constituencies for this address. Please select manually.'
+            })
+
+        # Find federal and state constituencies
+        federal_constituency = None
+        state_constituency = None
+
+        for constituency in constituencies:
+            if constituency.scope == 'FEDERAL_DISTRICT' and not federal_constituency:
+                federal_constituency = constituency
+            elif constituency.scope in ['STATE_LIST', 'STATE_DISTRICT'] and not state_constituency:
+                state_constituency = constituency
+
+        # Get display name from metadata if available
+        wahlkreis_name = 'Unknown'
+        land_name = 'Unknown'
+
+        if federal_constituency and federal_constituency.metadata:
+            wahlkreis_name = federal_constituency.name
+            land_name = federal_constituency.metadata.get('state', 'Unknown')
+
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
+            'success': True,
+            'wahlkreis_name': wahlkreis_name,
+            'land_name': land_name,
+            'federal_constituency_id': federal_constituency.id if federal_constituency else None,
+            'state_constituency_id': state_constituency.id if state_constituency else None,
+        })
+
+    except Exception as e:
+        logger.exception('Unexpected error during wahlkreis search')
+        return render(request, 'letters/partials/wahlkreis_search_result.html', {
+            'success': False,
+            'error': 'Search temporarily unavailable. Please select Wahlkreise manually.'
+        })
+
+
 # Letter Creation Suggestions (HTMX endpoints)
 
+@login_required
 @require_http_methods(["POST"])
 def analyze_letter_title(request):
     """
@@ -642,8 +682,6 @@ def analyze_letter_title(request):
             constituency_states = verification.get_constituency_states()
             if constituency_states:
                 user_location.setdefault('state', next(iter(constituency_states)))
-            elif verification.state:
-                user_location.setdefault('state', verification.state)
 
     # Analyze with ConstituencySuggestionService
     suggestion_result = ConstituencySuggestionService.suggest_from_concern(

@@ -98,6 +98,12 @@ class Constituency(models.Model):
     name = models.CharField(max_length=255)
     external_id = models.CharField(max_length=100, blank=True, null=True, unique=True)
     scope = models.CharField(max_length=30, choices=SCOPE_CHOICES)
+    wahlkreis_id = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text=_('Geographic Wahlkreis identifier (e.g., WKR_NR from GeoJSON)')
+    )
     metadata = models.JSONField(default=dict, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -244,7 +250,8 @@ class Representative(models.Model):
             self._constituency_cache = constituencies
 
         if self.parliament.level == 'EU':
-            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
+            verification_constituencies = verification.get_constituencies()
+            return any(c.scope in ('FEDERAL_LIST', 'STATE_LIST') for c in verification_constituencies)
 
         verification_constituencies = verification.get_constituencies()
         verification_constituency_ids = {c.id for c in verification_constituencies}
@@ -260,9 +267,6 @@ class Representative(models.Model):
             for c in constituencies
             if c.metadata and c.metadata.get('state')
         }
-
-        if self.election_mode == 'FEDERAL_LIST':
-            return (verification.country or '').upper() in {'DE', 'DEU', 'GERMANY', 'DEUTSCHLAND', 'EU'}
 
         if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
             if verification_states & rep_states:
@@ -583,11 +587,6 @@ class IdentityVerification(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='identity_verification')
     provider = models.CharField(max_length=100, default='stub_provider')
     status = models.CharField(max_length=20, choices=VERIFICATION_STATUS_CHOICES, default='PENDING')
-    street_address = models.CharField(max_length=255, blank=True)
-    postal_code = models.CharField(max_length=20, blank=True)
-    city = models.CharField(max_length=100, blank=True)
-    state = models.CharField(max_length=100, blank=True)
-    country = models.CharField(max_length=32, blank=True, default='DE')
     parliament = models.ForeignKey(
         Parliament,
         on_delete=models.SET_NULL,
@@ -602,26 +601,29 @@ class IdentityVerification(models.Model):
         blank=True,
         related_name='verified_residents'
     )
-    constituency = models.ForeignKey(
-        Constituency,
-        on_delete=models.SET_NULL,
+    # Wahlkreis identifiers (geographic electoral districts)
+    federal_wahlkreis_number = models.CharField(
+        max_length=10,
         null=True,
         blank=True,
-        related_name='verified_residents'
+        help_text=_('Federal Wahlkreis number (1-299)')
     )
-    federal_constituency = models.ForeignKey(
-        Constituency,
-        on_delete=models.SET_NULL,
+    state_wahlkreis_number = models.CharField(
+        max_length=10,
         null=True,
         blank=True,
-        related_name='federal_verified_residents'
+        help_text=_('State-specific Wahlkreis identifier')
     )
-    state_constituency = models.ForeignKey(
+    eu_wahlkreis = models.CharField(
+        max_length=10,
+        default='DE',
+        help_text=_('EU Wahlkreis (always DE for Germany)')
+    )
+    # All applicable constituencies for this verification
+    constituencies = models.ManyToManyField(
         Constituency,
-        on_delete=models.SET_NULL,
-        null=True,
         blank=True,
-        related_name='state_verified_residents'
+        related_name='verified_residents_all'
     )
     verification_data = models.JSONField(default=dict, blank=True)
     verification_type = models.CharField(
@@ -658,32 +660,39 @@ class IdentityVerification(models.Model):
 
     @property
     def normalized_state(self):
-        return normalize_german_state(self.state)
+        """Get normalized state from linked constituencies"""
+        states = self.get_constituency_states()
+        return next(iter(states)) if states else None
 
-    def link_constituency(self, constituency: Constituency, scope: Optional[str] = None) -> None:
-        """Attach the verification to a specific constituency and infer parliament links."""
+    def link_constituency(self, constituency: Constituency) -> None:
+        """Add a constituency to this verification's M2M relationship."""
         if not constituency:
             return
-
-        scope = scope or constituency.scope
-
-        if scope in {'FEDERAL_DISTRICT', 'STATE_DISTRICT'}:
-            self.constituency = constituency
-        elif not self.constituency:
-            self.constituency = constituency
-
-        if scope and scope.startswith('FEDERAL'):
-            self.federal_constituency = constituency
-        if scope and scope.startswith('STATE'):
-            self.state_constituency = constituency
-
+        self.constituencies.add(constituency)
         self._update_parliament_links()
 
     def _update_parliament_links(self) -> None:
-        for constituency in self.get_constituencies():
-            self.parliament_term = constituency.parliament_term
-            self.parliament = constituency.parliament_term.parliament
+        # Only access M2M if instance has been saved
+        if self.pk:
+            for constituency in self.get_constituencies():
+                self.parliament_term = constituency.parliament_term
+                self.parliament = constituency.parliament_term.parliament
+                return
+
+        # Fallback to old ForeignKey fields for backward compatibility
+        if self.federal_constituency:
+            self.parliament_term = self.federal_constituency.parliament_term
+            self.parliament = self.federal_constituency.parliament_term.parliament
             return
+        if self.state_constituency:
+            self.parliament_term = self.state_constituency.parliament_term
+            self.parliament = self.state_constituency.parliament_term.parliament
+            return
+        if self.constituency:
+            self.parliament_term = self.constituency.parliament_term
+            self.parliament = self.constituency.parliament_term.parliament
+            return
+
         if self.parliament_term:
             self.parliament = self.parliament_term.parliament
 
@@ -692,24 +701,16 @@ class IdentityVerification(models.Model):
         super().save(*args, **kwargs)
 
     def get_constituencies(self) -> List[Constituency]:
-        """Return distinct constituencies linked to this verification."""
-        constituencies: List[Constituency] = []
-        seen: Set[int] = set()
-        for attr in ('constituency', 'federal_constituency', 'state_constituency'):
-            constituency = getattr(self, attr, None)
-            if constituency and constituency.id not in seen:
-                constituencies.append(constituency)
-                seen.add(constituency.id)
-        return constituencies
+        """Return all constituencies linked via the M2M relationship."""
+        if not self.pk:
+            return []
+        return list(self.constituencies.all())
 
     def constituency_ids(self) -> List[int]:
         return [c.id for c in self.get_constituencies()]
 
     def get_constituency_states(self) -> Set[str]:
         states: Set[str] = set()
-        normalized = self.normalized_state
-        if normalized:
-            states.add(normalized)
         for constituency in self.get_constituencies():
             metadata_state = (constituency.metadata or {}).get('state') if constituency.metadata else None
             if metadata_state:
@@ -717,6 +718,28 @@ class IdentityVerification(models.Model):
                 if normalized_state:
                     states.add(normalized_state)
         return states
+
+    @property
+    def constituency(self) -> Optional[Constituency]:
+        """Helper property: returns first constituency from M2M."""
+        constituencies = self.get_constituencies()
+        return constituencies[0] if constituencies else None
+
+    @property
+    def federal_constituency(self) -> Optional[Constituency]:
+        """Helper property: filters constituencies for FEDERAL_DISTRICT."""
+        for const in self.get_constituencies():
+            if const.scope == 'FEDERAL_DISTRICT':
+                return const
+        return None
+
+    @property
+    def state_constituency(self) -> Optional[Constituency]:
+        """Helper property: filters constituencies for state-level."""
+        for const in self.get_constituencies():
+            if const.scope in ('STATE_LIST', 'STATE_DISTRICT', 'FEDERAL_STATE_LIST'):
+                return const
+        return None
 
 
 class Report(models.Model):

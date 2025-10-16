@@ -342,7 +342,8 @@ class RepresentativeSyncService:
 
         rep.constituencies.clear()
         for constituency in self._determine_constituencies(parliament, term, electoral, rep):
-            rep.constituencies.add(constituency)
+            if constituency:
+                rep.constituencies.add(constituency)
 
         if not self.dry_run:
             photo_path_exists = rep.photo_path and (Path(settings.MEDIA_ROOT) / rep.photo_path).exists()
@@ -451,26 +452,39 @@ class RepresentativeSyncService:
         name: str,
         metadata: Optional[Dict] = None,
         external_id: Optional[int] = None,
-    ) -> Constituency:
+    ) -> Optional[Constituency]:
+        """Get existing constituency or create only non-district constituencies.
+
+        FEDERAL_DISTRICT and STATE_DISTRICT constituencies should already exist
+        from sync_wahlkreise and will not be created here.
+        """
         metadata = metadata or {}
+
+        # For district constituencies with external_id, only GET, never create
+        if external_id and scope in ('FEDERAL_DISTRICT', 'STATE_DISTRICT'):
+            try:
+                constituency = Constituency.objects.get(external_id=str(external_id))
+                return constituency
+            except Constituency.DoesNotExist:
+                logger.warning(
+                    "Constituency with external_id=%s not found. Run sync_wahlkreise first.",
+                    external_id
+                )
+                return None
+
+        # For list constituencies (no external_id), create or update
         defaults = {
             'parliament_term': term,
             'scope': scope,
             'name': name,
             'metadata': metadata,
         }
-        if external_id:
-            constituency, created = Constituency.objects.update_or_create(
-                external_id=str(external_id),
-                defaults=defaults,
-            )
-        else:
-            constituency, created = Constituency.objects.update_or_create(
-                parliament_term=term,
-                scope=scope,
-                name=name,
-                defaults={**defaults, 'name': name},
-            )
+        constituency, created = Constituency.objects.update_or_create(
+            parliament_term=term,
+            scope=scope,
+            name=name,
+            defaults=defaults,
+        )
         constituency.last_synced_at = timezone.now()
         constituency.save(update_fields=['last_synced_at'])
         if created:

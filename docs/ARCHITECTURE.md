@@ -85,6 +85,27 @@ Letter card component (`letters/templates/letters/partials/letter_card.html`) is
 ## Identity Verification (Stub)
 `IdentityVerificationService` provides demo endpoints marking all attempts as `VERIFIED`. Verification records capture street/PLZ/city/state, inferred constituency/parliament, and expiration timestamps. Production implementation requires integrating third-party provider (see `docs/plans/2025-10-10-identity-verification.md`).
 
+### Wahlkreis vs. Constituency Separation
+The domain model maintains a clear separation between geographic electoral districts (Wahlkreise) and parliamentary representation units (Constituencies):
+
+- **Wahlkreis** – Geographic electoral district identifier (e.g., federal Wahlkreis number 1-299, state-specific identifiers, or "DE" for EU)
+  - Stored as simple string fields on `IdentityVerification`: `federal_wahlkreis_number`, `state_wahlkreis_number`, `eu_wahlkreis`
+  - Used for address resolution and privacy-preserving user identification
+  - Resolved by `WahlkreisResolver` service using geocoding and GeoJSON boundary lookups
+
+- **Constituency** – Database model representing the set of voters a representative serves
+  - Has `scope` field (FEDERAL_DISTRICT, FEDERAL_STATE_LIST, FEDERAL_LIST, STATE_DISTRICT, STATE_LIST, EU_AT_LARGE)
+  - Linked to `ParliamentTerm` and contains metadata about the electoral unit
+  - Multiple constituencies can map to the same Wahlkreis (e.g., both direct mandate and list constituencies)
+  - Linked to `IdentityVerification` via M2M `constituencies` field
+
+**Property Helpers**: `IdentityVerification` provides `@property` methods that filter the M2M constituencies:
+- `constituency` – Returns first constituency (for backward compatibility)
+- `federal_constituency` – Returns constituency with scope FEDERAL_DISTRICT
+- `state_constituency` – Returns constituency with scope STATE_LIST/STATE_DISTRICT/FEDERAL_STATE_LIST
+
+This separation allows users to verify their address once (stored as Wahlkreis IDs) while being matched to multiple constituency types across different parliamentary levels.
+
 ## Authentication & User Management
 - Double opt-in email verification for new accounts
 - Password reset flow with email confirmation

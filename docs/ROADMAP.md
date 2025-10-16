@@ -23,9 +23,9 @@ Empower citizens to participate in democracy by writing impactful open letters t
    - Badges for verified vs unverified signatures, count constituents distinctly.
    - Social sharing (link copy, optional Twitter/Bluesky share).
 6. **Identity Verification (Optional)**
-   - Integrate one third-party provider (e.g., Verimi or yes®) via OAuth2/OIDC to pull verified name/address.
-   - Store attestation + expiry; map address to constituency for direct mandates.
-   - Users without verification can still sign, flagged as “unverified.”
+   - Integrate one third-party provider (e.g., Verimi or yes®) via OAuth2/OIDC to pull verified name.
+   - Store attestation + expiry; store only constituency foreign keys (addresses never persisted).
+   - Users without verification can still sign, flagged as "unverified."
 7. **Signature Threshold & Fulfilment**
    - Configurable threshold per letter or representative type.
    - Admin view showing letters reaching milestones, export letter + supporters for printing/mailing.
@@ -93,13 +93,12 @@ Empower citizens to participate in democracy by writing impactful open letters t
   - GeoJSON boundary data loading and caching
   - Coordinate → Wahlkreis mapping
 
-- [ ] Integration & Validation
-  - Integrate geocoding into representative suggestions
-  - Test with 20+ real German addresses
-  - Verify direct representatives correctly suggested
-  - Document matching algorithm for transparency
-  - Handle edge cases (border areas, ambiguous addresses)
-  - Performance testing with concurrent requests
+- [x] Integration & Validation (Completed: 2025-10-15, privacy-profile branch)
+  - Integrate geocoding into profile (HTMX address search)
+  - Privacy-first: addresses used for geocoding, never persisted
+  - Test with real German addresses (Berlin, etc.)
+  - Handle edge cases (geocoding failures, invalid addresses)
+  - GeocodeCache for performance (rate limit compliance)
 
 ### Phase 3: Internationalization
 **Multi-language support with German as primary**

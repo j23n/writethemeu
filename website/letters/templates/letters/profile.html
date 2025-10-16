@@ -12,88 +12,59 @@
 <div class="card">
     <h2>{% blocktrans with username=user.username %}{{ username }}'s Profile{% endblocktrans %}</h2>
 
-    <div style="margin-top: 1rem;">
-        <h3>{% trans "Identity & Constituency" %}</h3>
-        {% if verification %}
-            <p class="text-muted mb-2">
-                <strong>{% trans "Status:" %}</strong> {{ verification.get_status_display }}
-                {% if verification.verification_type %}
-                    · <strong>{% trans "Type:" %}</strong> {{ verification.get_verification_type_display }}
-                {% endif %}
-            </p>
-
-            {% if verification.is_verified %}
-                {% if verification.is_self_declared %}
-                    <div class="alert alert-secondary" role="status">
-                        {% trans "You self-declared your constituency. Representatives will see your signatures as self-declared constituents." %}
-                    </div>
-                    <a href="{% url 'start_verification' %}" class="btn btn-sm btn-outline-primary">{% trans "Start third-party verification" %}</a>
-                {% else %}
-                    <div class="alert alert-success" role="status">
-                        {% trans "Your identity was verified via a third-party provider. Signatures will appear as verified constituents." %}
-                    </div>
-                {% endif %}
-            {% elif verification.status == 'PENDING' %}
-                <div class="alert alert-warning" role="status">
-                    {% trans "Your verification is being processed." %}
-                    <a href="{% url 'complete_verification' %}" class="btn btn-sm btn-outline-secondary ms-2">{% trans "Complete Verification (Stub)" %}</a>
-                </div>
-            {% elif verification.status == 'FAILED' %}
-                <div class="alert alert-danger" role="status">
-                    {% trans "Verification failed. Please try again or contact support." %}
-                </div>
-            {% endif %}
-        {% else %}
-            <p class="text-muted mb-3">
-                {% trans "You can self-declare your constituency below or start a verification with a trusted provider. Verified signatures carry more weight." %}
-            </p>
-            <a href="{% url 'start_verification' %}" class="btn btn-primary">{% trans "Start Third-party Verification" %}</a>
-        {% endif %}
-    </div>
-
     <div class="mt-4">
-        <h3>{% trans "Ihre Adresse" %}</h3>
+        <h3>{% trans "Your Wahlkreise" %}</h3>
         <p class="text-muted">
-            {% trans "Geben Sie Ihre vollständige Adresse ein, um präzise Wahlkreis- und Abgeordnetenempfehlungen zu erhalten." %}
+            {% trans "Select your Wahlkreise to help us recommend the right representatives. You can search by address or select manually from the dropdowns." %}
         </p>
-        {% if verification and verification.street_address %}
-            <div class="alert alert-info" role="status">
-                <strong>{% trans "Gespeicherte Adresse:" %}</strong><br>
-                {{ verification.street_address }}<br>
-                {{ verification.postal_code }} {{ verification.city }}
+
+        <form method="post" id="wahlkreis-form" class="mt-3">
+            {% csrf_token %}
+
+            {# Address search section #}
+            <div class="card mb-3" style="background-color: #f8f9fa;">
+                <div class="card-body">
+                    <h5 class="card-title">{% trans "Search by Address" %}</h5>
+                    <p class="text-muted small">{% trans "Enter your address to automatically find your Wahlkreise. Your address will not be saved." %}</p>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-2">
+                            <label for="street_address" class="form-label">{% trans "Street and Number" %}</label>
+                            <input type="text" id="street_address" name="street_address" class="form-control" placeholder="Platz der Republik 1">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label for="postal_code" class="form-label">{% trans "Postal Code" %}</label>
+                            <input type="text" id="postal_code" name="postal_code" class="form-control" placeholder="11011">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-8 mb-2">
+                            <label for="city" class="form-label">{% trans "City" %}</label>
+                            <input type="text" id="city" name="city" class="form-control" placeholder="Berlin">
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">&nbsp;</label>
+                            <button type="button"
+                                    hx-post="{% url 'search_wahlkreis' %}"
+                                    hx-include="[name='street_address'],[name='postal_code'],[name='city']"
+                                    hx-target="#search-message"
+                                    hx-swap="innerHTML"
+                                    class="btn btn-secondary w-100 d-block">
+                                {% trans "Search" %}
+                            </button>
+                        </div>
+                    </div>
+
+                    {# Search result message area #}
+                    <div id="search-message" class="mt-2"></div>
+                </div>
             </div>
-        {% endif %}
-        <form method="post" class="mt-3">
-            {% csrf_token %}
-            {% if address_form.non_field_errors %}
-                <div class="alert alert-danger">{{ address_form.non_field_errors }}</div>
-            {% endif %}
-            {% for field in address_form %}
-                <div class="form-group mb-3">
-                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                    {{ field }}
-                    {% if field.errors %}
-                        <div class="text-danger small">{{ field.errors|join:', ' }}</div>
-                    {% endif %}
-                    {% if field.help_text %}
-                        <small class="form-text text-muted">{{ field.help_text }}</small>
-                    {% endif %}
-                </div>
-            {% endfor %}
-            <button type="submit" name="address_form_submit" class="btn btn-primary">{% trans "Adresse speichern" %}</button>
-        </form>
-    </div>
 
-    <div class="mt-4">
-        <h3>{% trans "Self-declare your constituency" %}</h3>
-        <p class="text-muted">
-            {% trans "Select the constituencies you live in so we can prioritise the right representatives." %}
-        </p>
-        <form method="post" class="mt-3">
-            {% csrf_token %}
+            {# Wahlkreis self-declaration #}
             {% if constituency_form.non_field_errors %}
                 <div class="alert alert-danger">{{ constituency_form.non_field_errors }}</div>
             {% endif %}
+
             {% for field in constituency_form %}
                 <div class="form-group mb-3">
                     <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
@@ -106,7 +77,8 @@
                     {% endif %}
                 </div>
             {% endfor %}
-            <button type="submit" class="btn btn-secondary">{% trans "Save constituencies" %}</button>
+
+            <button type="submit" class="btn btn-primary">{% trans "Save Wahlkreise" %}</button>
         </form>
     </div>
 </div>
@@ -144,19 +116,39 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://unpkg.com/htmx.org@1.9.10"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Tom Select on constituency dropdowns
+    // Initialize Tom Select on wahlkreis dropdowns
     const selectElements = document.querySelectorAll('.filterable-select');
+    const selectInstances = {};
 
     selectElements.forEach(function(element) {
-        new TomSelect(element, {
+        selectInstances[element.id] = new TomSelect(element, {
             placeholder: element.getAttribute('data-placeholder') || 'Select...',
             allowEmptyOption: true,
             create: false,
             maxOptions: null,
             plugins: ['clear_button']
         });
+    });
+
+    // Handle HTMX response: update Tom Select dropdowns from data attributes
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'search-message') {
+            const alert = event.detail.target.querySelector('.alert-success');
+            if (alert) {
+                const federalId = alert.dataset.federalWahlkreisId;
+                const stateId = alert.dataset.stateWahlkreisId;
+
+                if (federalId && selectInstances['id_federal_constituency']) {
+                    selectInstances['id_federal_constituency'].setValue(federalId);
+                }
+                if (stateId && selectInstances['id_state_constituency']) {
+                    selectInstances['id_state_constituency'].setValue(stateId);
+                }
+            }
+        }
     });
 });
 </script>

@@ -15,5 +15,6 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "pyshp>=3.0.2.post1",
     "ruff>=0.14.0",
 ]

@@ -2,7 +2,9 @@
 # ABOUTME: Interactive tool for testing representative suggestion logic.
 
 from django.core.management.base import BaseCommand
+from letters.models import Representative
 from letters.services import ConstituencyLocator
+from letters.services.wahlkreis import WahlkreisResolver
 
 
 class Command(BaseCommand):
@@ -50,15 +52,47 @@ class Command(BaseCommand):
         try:
             # Use constituency locator if address provided
             if postal_code or (street and city):
+                # First try to resolve Wahlkreis if full address provided
+                if street and postal_code and city:
+                    resolver = WahlkreisResolver()
+                    result = resolver.resolve(street=street, postal_code=postal_code, city=city)
+
+                    if result['federal_wahlkreis_number']:
+                        self.stdout.write(self.style.SUCCESS(
+                            f"Found Wahlkreise: "
+                            f"Federal={result['federal_wahlkreis_number']}, "
+                            f"State={result['state_wahlkreis_number']}, "
+                            f"EU={result['eu_wahlkreis']}"
+                        ))
+
                 locator = ConstituencyLocator()
-                representatives = locator.locate(
+                constituencies = locator.locate(
                     street=street,
                     postal_code=postal_code,
                     city=city
                 )
 
+                if not constituencies:
+                    self.stdout.write('No constituencies found for this location')
+                    return
+
+                # Get representatives from constituencies
+                representatives = []
+                for constituency in constituencies:
+                    reps = list(constituency.representatives.filter(is_active=True))
+                    representatives.extend(reps)
+
+                # Remove duplicates
+                seen = set()
+                unique_reps = []
+                for rep in representatives:
+                    if rep.id not in seen:
+                        seen.add(rep.id)
+                        unique_reps.append(rep)
+                representatives = unique_reps
+
                 if not representatives:
-                    self.stdout.write('No representatives found for this location')
+                    self.stdout.write('No active representatives found for these constituencies')
                     return
 
                 # Filter by topics if provided
