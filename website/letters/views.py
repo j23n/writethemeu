@@ -31,7 +31,7 @@ from .forms import (
     SelfDeclaredConstituencyForm,
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
-from .services.constituency import ConstituencyLocator
+from .services.wahlkreis import WahlkreisResolver
 
 logger = logging.getLogger('letters.services')
 
@@ -599,20 +599,18 @@ def search_wahlkreis(request):
             'error': 'Please provide street address, postal code, and city.'
         })
 
-    # Find constituencies using ConstituencyLocator
-    # (handles geocoding internally)
+    # Build full address string
+    address = f"{street_address}, {postal_code} {city}"
+
+    # Find constituencies using WahlkreisResolver
     try:
-        locator = ConstituencyLocator()
-        constituencies = locator.locate(
-            street=street_address,
-            postal_code=postal_code,
-            city=city,
-            country='DE'
-        )
+        resolver = WahlkreisResolver()
+        result = resolver.resolve(address=address, country='DE')
+        constituencies = result['constituencies']
 
         if not constituencies:
             logger.warning(
-                f'Address search found no constituencies for {street_address}, {postal_code} {city}'
+                f'Address search found no constituencies for {address}'
             )
             return render(request, 'letters/partials/wahlkreis_search_result.html', {
                 'success': False,
