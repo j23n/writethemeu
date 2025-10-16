@@ -363,60 +363,35 @@ class RepresentativeSyncService:
         electoral: Dict,
         representative: Representative,
     ) -> Iterable[Constituency]:
-        mandate_won = electoral.get('mandate_won')
+        """Link representative to constituencies by external_id from API."""
 
-        if mandate_won == 'constituency':
-            constituency = self._handle_direct_mandate(parliament, term, electoral)
-            if constituency:
-                yield constituency
-            return
+        # Try direct constituency (Direktmandat)
+        const_data = electoral.get('constituency')
+        if const_data:
+            const_id = const_data.get('id')
+            if const_id:
+                try:
+                    yield Constituency.objects.get(external_id=str(const_id))
+                except Constituency.DoesNotExist:
+                    logger.warning(
+                        "Constituency external_id=%s not found for %s. Run sync_wahlkreise first.",
+                        const_id,
+                        representative.full_name
+                    )
 
-        # For list seats, we cannot reliably match without external_id
-        # Log warning and skip - list constituencies should be handled differently
-        logger.warning(
-            "Representative %s (mandate_id=%s) is a list seat but we cannot match "
-            "list constituencies by external_id. Skipping constituency assignment.",
-            representative.full_name,
-            representative.external_id
-        )
-
-    # --------------------------------------
-    def _handle_direct_mandate(self, parliament: Parliament, term: ParliamentTerm, electoral: Dict) -> Optional[Constituency]:
-        const_data = electoral.get('constituency') or {}
-        district_id = const_data.get('id')
-
-        if not district_id:
-            logger.warning("Direct mandate missing constituency ID in electoral data")
-            return None
-
-        constituency = self._find_constituency_by_external_id(district_id)
-        return constituency
-
-
-    # --------------------------------------
-    def _find_constituency_by_external_id(
-        self,
-        external_id: Optional[int],
-    ) -> Optional[Constituency]:
-        """Find constituency by external_id from Abgeordnetenwatch API.
-
-        Returns None if not found. Never creates constituencies.
-        Constituencies should be created by sync_wahlkreise command first.
-        """
-        if not external_id:
-            return None
-
-        constituency = Constituency.objects.filter(
-            external_id=str(external_id)
-        ).first()
-
-        if not constituency:
-            logger.warning(
-                "Constituency with external_id=%s not found. Run sync_wahlkreise first.",
-                external_id
-            )
-
-        return constituency
+        # Try electoral list (Listenmandat)
+        list_data = electoral.get('electoral_list')
+        if list_data:
+            list_id = list_data.get('id')
+            if list_id:
+                try:
+                    yield Constituency.objects.get(external_id=str(list_id))
+                except Constituency.DoesNotExist:
+                    logger.warning(
+                        "Electoral list external_id=%s not found for %s. Run sync_wahlkreise first.",
+                        list_id,
+                        representative.full_name
+                    )
 
     # --------------------------------------
     @staticmethod
