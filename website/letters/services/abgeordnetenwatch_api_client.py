@@ -81,3 +81,13 @@ class AbgeordnetenwatchAPI:
             # For now, fetch all and filter in Python
             pass
         return cls.fetch_paginated('committee-memberships', params)
+
+    @classmethod
+    def get_constituencies(cls, parliament_period_id: int) -> List[Dict]:
+        """Fetch all constituencies for a given parliament period."""
+        return cls.fetch_paginated('constituencies', {'parliament_period': parliament_period_id})
+
+    @classmethod
+    def get_electoral_lists(cls, parliament_period_id: int) -> List[Dict]:
+        """Fetch all electoral lists for a given parliament period."""
+        return cls.fetch_paginated('electoral-lists', {'parliament_period': parliament_period_id})
