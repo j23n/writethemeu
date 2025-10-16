@@ -88,6 +88,33 @@ def normalize_german_state(state: Optional[str]) -> Optional[str]:
     return state_clean
 
 
+def get_state_code(state_name: Optional[str]) -> Optional[str]:
+    """Get 2-letter state code from German state name.
+
+    Args:
+        state_name: German state name (canonical or variant)
+
+    Returns:
+        2-letter state code (e.g., 'BW', 'BY') or None if not found
+    """
+    if not state_name:
+        return None
+
+    # Normalize first to get canonical name
+    canonical = normalize_german_state(state_name)
+    if not canonical:
+        return None
+
+    # Find the code in the aliases
+    aliases = GERMAN_STATE_ALIASES.get(canonical, [])
+    for variant in aliases:
+        # State codes are 2 uppercase letters
+        if len(variant) == 2 and variant.isupper():
+            return variant
+
+    return None
+
+
 def normalize_party_name(party: Optional[str]) -> Optional[str]:
     """Return canonical party label when known."""
     if not party:

@@ -1,66 +1,63 @@
-# ABOUTME: Query management command to find constituency by address or postal code.
+# ABOUTME: Query management command to find constituency by address.
 # ABOUTME: Interactive tool for testing address-based constituency matching.
 
 from django.core.management.base import BaseCommand
-from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
+from letters.services.wahlkreis import WahlkreisResolver
 
 
 class Command(BaseCommand):
-    help = 'Find constituency (Wahlkreis) by address or postal code'
+    help = 'Find constituency (Wahlkreis) by address'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--street',
+            'address',
             type=str,
-            help='Street name and number'
-        )
-        parser.add_argument(
-            '--postal-code',
-            type=str,
-            help='Postal code (PLZ)',
-            required=True
-        )
-        parser.add_argument(
-            '--city',
-            type=str,
-            help='City name'
+            help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 
     def handle(self, *args, **options):
-        street = options.get('street')
-        postal_code = options['postal_code']
-        city = options.get('city')
+        address = options['address']
 
         try:
-            # Try full address geocoding if all parts provided
-            if street and city:
-                geocoder = AddressGeocoder()
-                lat, lon, success, error = geocoder.geocode(street, postal_code, city)
+            # Use WahlkreisResolver to get full resolution
+            resolver = WahlkreisResolver()
+            result = resolver.resolve(address=address)
 
-                if not success:
-                    self.stdout.write(self.style.ERROR(f'Error: Could not geocode address: {error}'))
-                    return
+            if not result['federal_wahlkreis_number']:
+                self.stdout.write(self.style.ERROR('Error: Could not resolve address to Wahlkreis'))
+                return
 
-                locator = WahlkreisLocator()
-                result = locator.locate(lat, lon)
+            # Display Wahlkreis information
+            self.stdout.write(self.style.SUCCESS('\n=== Wahlkreis Information ==='))
+            self.stdout.write(f"Federal Wahlkreis: {result['federal_wahlkreis_number']}")
 
-                if not result:
-                    self.stdout.write('No constituency found for these coordinates')
-                    return
-
-                wkr_nr, wkr_name, land_name = result
-                self.stdout.write(f'WK {wkr_nr:03d} - {wkr_name} ({land_name})')
-
-            # Fallback to PLZ prefix lookup
+            if result['state_wahlkreis_number']:
+                self.stdout.write(f"State Wahlkreis:   {result['state_wahlkreis_number']}")
             else:
-                plz_prefix = postal_code[:2]
-                state_name = ConstituencyLocator.STATE_BY_PLZ_PREFIX.get(plz_prefix)
+                self.stdout.write("State Wahlkreis:   (not available for this state)")
 
-                if state_name:
-                    self.stdout.write(f'State: {state_name} (from postal code prefix)')
-                else:
-                    self.stdout.write('Error: Could not determine state from postal code')
+            self.stdout.write(f"EU Region:         {result['eu_wahlkreis']}")
+
+            # Display constituency information
+            constituencies = result['constituencies']
+            if constituencies:
+                self.stdout.write(self.style.SUCCESS(f'\n=== Constituencies ({len(constituencies)}) ==='))
+                for c in constituencies:
+                    self.stdout.write(f"\n{c.scope}:")
+                    self.stdout.write(f"  Name:       {c.name}")
+                    self.stdout.write(f"  Parliament: {c.parliament_term.parliament.name}")
+                    self.stdout.write(f"  Term:       {c.parliament_term.name}")
+                    if c.wahlkreis_id:
+                        self.stdout.write(f"  WK ID:      {c.wahlkreis_id}")
+
+                    # Show number of active representatives
+                    rep_count = c.representatives.filter(is_active=True).count()
+                    self.stdout.write(f"  Reps:       {rep_count} active")
+            else:
+                self.stdout.write(self.style.WARNING('\nNo constituencies found'))
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f'Error: {str(e)}'))
+            import traceback
+            traceback.print_exc()
             return

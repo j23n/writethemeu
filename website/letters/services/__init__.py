@@ -4,8 +4,6 @@
 from .abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
 from .geocoding import AddressGeocoder, WahlkreisLocator
 from .constituency import (
-    ConstituencyLocator,
-    LocatedConstituencies,
     LocationContext,
     ConstituencySuggestionService,
 )
@@ -18,9 +16,7 @@ __all__ = [
     'AbgeordnetenwatchAPI',
     'AddressGeocoder',
     'WahlkreisLocator',
-    'LocatedConstituencies',
     'LocationContext',
-    'ConstituencyLocator',
     'ConstituencySuggestionService',
     'RepresentativeSyncService',
     'IdentityVerificationService',

@@ -20,7 +20,7 @@ class WahlkreisResolver:
     Process:
     1. Geocode address → coordinates
     2. Look up Wahlkreis from GeoJSON → get federal/state Wahlkreis IDs
-    3. Query Constituency objects by wahlkreis_id
+    3. Query Constituency objects by list_id
     4. Add state-level list constituencies for the user's state
     """
 
@@ -44,13 +44,15 @@ class WahlkreisResolver:
 
     def resolve(
         self,
-        street: Optional[str] = None,
-        postal_code: Optional[str] = None,
-        city: Optional[str] = None,
+        address: str,
         country: str = 'DE'
     ) -> Dict:
         """
         Resolve address to Wahlkreis identifiers and Constituency objects.
+
+        Args:
+            address: Full address string (e.g., "Unter den Linden 1, 10117 Berlin")
+            country: Country code (default: 'DE')
 
         Returns:
             {
@@ -67,56 +69,86 @@ class WahlkreisResolver:
             'constituencies': []
         }
 
-        if not (street and postal_code and city):
-            logger.warning("Incomplete address provided to WahlkreisResolver")
+        address = (address or '').strip()
+        if not address:
+            logger.warning("Empty address provided to WahlkreisResolver")
             return result
 
         # Step 1: Geocode address
-        lat, lon, success, error = self.geocoder.geocode(street, postal_code, city, country)
+        lat, lon, success, error = self.geocoder.geocode(address, country)
 
         if not success or lat is None or lon is None:
             logger.warning(f"Geocoding failed: {error}")
             return result
 
-        # Step 2: Look up Wahlkreis
+        # Step 2: Look up Wahlkreise (federal and state)
         wahlkreis_result = self.wahlkreis_locator.locate(lat, lon)
 
         if not wahlkreis_result:
             logger.warning(f"No Wahlkreis found for coordinates {lat}, {lon}")
             return result
 
-        wkr_nr, wkr_name, land_name = wahlkreis_result
+        federal_data = wahlkreis_result.get('federal')
+        state_data = wahlkreis_result.get('state')
 
-        # Normalize to 3-digit string
-        federal_wahlkreis_number = str(wkr_nr).zfill(3)
-        result['federal_wahlkreis_number'] = federal_wahlkreis_number
+        if not federal_data:
+            logger.warning(f"No federal Wahlkreis found for coordinates {lat}, {lon}")
+            return result
 
-        # For state, we use the same number for now (TODO: get actual state Wahlkreis)
-        result['state_wahlkreis_number'] = federal_wahlkreis_number
-
+        # Extract federal Wahlkreis data
+        federal_wkr_nr = federal_data['wkr_nr']
+        federal_wahlkreis_number = str(federal_wkr_nr).zfill(3)
+        land_name = federal_data['land_name']
         normalized_state = normalize_german_state(land_name)
 
-        # Step 3: Find constituencies by wahlkreis_id
-        constituencies = list(
+        result['federal_wahlkreis_number'] = federal_wahlkreis_number
+
+        # Extract state Wahlkreis data if available
+        if state_data:
+            state_wkr_nr = state_data['wkr_nr']
+            state_land_code = state_data['land_code']
+            # State constituencies use format: {STATE_CODE}-{NUMBER}
+            # e.g., "BY-0108", "BE-0101"
+            state_wahlkreis_number = f"{state_land_code}-{str(state_wkr_nr).zfill(4)}"
+            result['state_wahlkreis_number'] = state_wahlkreis_number
+
+        # Step 3: Find constituencies by list_id
+        constituencies = []
+
+        # Add federal district constituency
+        federal_constituencies = list(
             Constituency.objects.filter(
-                wahlkreis_id=federal_wahlkreis_number,
+                list_id=federal_wahlkreis_number,
                 scope='FEDERAL_DISTRICT'
             )
         )
+        constituencies.extend(federal_constituencies)
 
-        # Step 4: Add state-level list constituencies
+        # Add state district constituency if we have state Wahlkreis data
+        if state_data:
+            state_wahlkreis_number = result['state_wahlkreis_number']
+            state_district_constituencies = list(
+                Constituency.objects.filter(
+                    list_id=state_wahlkreis_number,
+                    scope='STATE_DISTRICT'
+                )
+            )
+            constituencies.extend(state_district_constituencies)
+
+        # Add federal state list constituency
         if normalized_state:
-            state_constituencies = Constituency.objects.filter(
-                scope='STATE_LIST',
+            federal_state_list_constituencies = Constituency.objects.filter(
+                scope='FEDERAL_STATE_LIST',
                 metadata__state=normalized_state
             )
-            constituencies.extend(state_constituencies)
+            constituencies.extend(federal_state_list_constituencies)
 
         result['constituencies'] = constituencies
 
         logger.info(
-            f"Resolved {street}, {postal_code} {city} to "
-            f"Wahlkreis {federal_wahlkreis_number} with {len(constituencies)} constituencies"
+            f"Resolved {address} to "
+            f"Federal WK {federal_wahlkreis_number}, State WK {result['state_wahlkreis_number']}, "
+            f"with {len(constituencies)} constituencies"
         )
 
         return result

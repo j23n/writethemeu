@@ -1,270 +1,222 @@
-# ABOUTME: Management command to download Wahlkreis geodata and sync all constituencies to database.
-# ABOUTME: Ensures all 299 Bundestag constituencies exist independent of representative assignments.
+# ABOUTME: Management command to sync constituencies from Abgeordnetenwatch API.
+# ABOUTME: Creates Parliament/ParliamentTerm/Constituency records and validates against GeoJSON wahlkreise files.
 
-import io
 import json
-import tempfile
-import zipfile
-from pathlib import Path
-from typing import Optional
 
 import requests
 from django.conf import settings
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
 
-try:
-    import shapefile
-except ImportError:
-    shapefile = None
-
 from letters.models import Parliament, ParliamentTerm, Constituency
-
-# Official Bundeswahlleiterin Shapefile URL (2025 election)
-DEFAULT_WAHLKREIS_URL = (
-    "https://www.bundeswahlleiterin.de/dam/jcr/a3b60aa9-8fa5-4223-9fb4-0a3a3cebd7d1/"
-    "btw25_geometrie_wahlkreise_vg250_shp_geo.zip"
-)
+from letters.services.abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
 
 
 class Command(BaseCommand):
-    """Download Wahlkreis geodata and sync all constituencies to database."""
+    """Sync German electoral constituencies from Abgeordnetenwatch API."""
 
     help = (
-        "Fetch Bundestag constituency (Wahlkreis) boundary data from bundeswahlleiterin.de, "
-        "convert from Shapefile to GeoJSON if needed, store for shapely-based lookup, "
-        "and populate all 299 constituencies in the database. "
-        "This ensures constituencies exist independent of whether they have representatives."
+        "Sync German electoral constituencies from Abgeordnetenwatch API. "
+        "Creates Parliament, ParliamentTerm, and Constituency records for all levels "
+        "(EU, Federal Bundestag, State Landtag). Validates that GeoJSON wahlkreise files "
+        "have matching constituencies for address geocoding. "
+        "Run this command before sync_representatives."
     )
 
     def add_arguments(self, parser):
-        parser.add_argument(
-            "--url",
-            default=DEFAULT_WAHLKREIS_URL,
-            help="Source URL for the GeoJSON or ZIP archive containing the Wahlkreis data.",
-        )
-        parser.add_argument(
-            "--output",
-            default=str(getattr(settings, "CONSTITUENCY_BOUNDARIES_PATH", "wahlkreise.geojson")),
-            help="Destination file path for the downloaded GeoJSON.",
-        )
-        parser.add_argument(
-            "--zip-member",
-            default=None,
-            help=(
-                "When the downloaded file is a ZIP archive, specify the member name to extract. "
-                "If omitted, the first *.geojson member will be used."
-            ),
-        )
-        parser.add_argument(
-            "--force",
-            action="store_true",
-            help="Overwrite existing file without prompting.",
-        )
+        pass
 
     def handle(self, *args, **options):
-        url: str = options["url"]
-        output_path = Path(options["output"]).expanduser().resolve()
-        zip_member: Optional[str] = options["zip_member"]
-        force: bool = options["force"]
+        """Sync constituencies from API and validate against GeoJSON wahlkreise."""
 
-        # If file exists and force is not set, use existing file
-        if output_path.exists() and not force:
-            self.stdout.write(f"Using existing GeoJSON file at {output_path}")
-            geojson_text = output_path.read_text(encoding="utf-8")
-            try:
-                geojson_data = json.loads(geojson_text)
-                feature_count = len(geojson_data.get("features", []))
-                self.stdout.write(f"Loaded GeoJSON with {feature_count} features")
-            except json.JSONDecodeError as exc:
-                raise CommandError("Existing file is not valid GeoJSON") from exc
-        else:
-            # Download and process the file
-            self.stdout.write(f"Downloading Wahlkreis data from {url} ...")
+        # Step 1: Sync from API
+        self.stdout.write(self.style.SUCCESS("Step 1: Syncing constituencies from Abgeordnetenwatch API..."))
+        self._handle_api_sync()
 
-            try:
-                response = requests.get(url, timeout=60)
-                response.raise_for_status()
-            except requests.RequestException as exc:
-                raise CommandError(f"Failed to download data: {exc}") from exc
+        # Step 2: Validate GeoJSON matches
+        self.stdout.write(self.style.SUCCESS("\nStep 2: Validating GeoJSON matches..."))
+        validation_stats = self._validate_geojson_matches()
 
-            content_type = response.headers.get("Content-Type", "")
-            data_bytes = response.content
-
-            # Check if this is a ZIP file
-            if url.lower().endswith(".zip") or "zip" in content_type:
-                # Check if it contains a .shp file (Shapefile format)
-                if self._zip_contains_shapefile(data_bytes):
-                    self.stdout.write("Detected Shapefile in ZIP, converting to GeoJSON...")
-                    geojson_text = self._convert_shapefile_to_geojson(data_bytes)
-                else:
-                    # Extract GeoJSON directly from ZIP
-                    geojson_bytes = self._extract_from_zip(data_bytes, zip_member)
-                    geojson_text = geojson_bytes.decode("utf-8")
-            else:
-                geojson_text = data_bytes.decode("utf-8")
-
-            # Validate GeoJSON
-            try:
-                geojson_data = json.loads(geojson_text)
-                feature_count = len(geojson_data.get("features", []))
-                self.stdout.write(f"Validated GeoJSON with {feature_count} features")
-            except json.JSONDecodeError as exc:
-                raise CommandError("Downloaded data is not valid GeoJSON") from exc
-
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(geojson_text, encoding="utf-8")
-
-            self.stdout.write(self.style.SUCCESS(f"Saved Wahlkreis data to {output_path}"))
-
-        # Ensure EU constituency exists
-        self.stdout.write("Ensuring EU constituency exists...")
-        self._ensure_eu_constituency()
-
-        # Sync constituencies to database
-        self.stdout.write("Syncing constituencies to database...")
-        stats = self._sync_constituencies_to_db(geojson_data)
-        self.stdout.write(self.style.SUCCESS(
-            f"Created {stats['created']} and updated {stats['updated']} constituencies"
-        ))
-
-        # Update wahlkreis_id on existing constituencies
-        self.stdout.write("Updating wahlkreis_id fields on constituencies...")
-        updated = self._update_wahlkreis_ids(geojson_data)
-        self.stdout.write(self.style.SUCCESS(f"Updated {updated} constituencies with wahlkreis_id"))
-
-    def _zip_contains_shapefile(self, data: bytes) -> bool:
-        """Check if ZIP contains Shapefile components (.shp)."""
-        try:
-            with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                return any(name.lower().endswith(".shp") for name in archive.namelist())
-        except zipfile.BadZipFile:
-            return False
-
-    def _convert_shapefile_to_geojson(self, data: bytes) -> str:
-        """Convert Shapefile in ZIP to GeoJSON using pyshp."""
-        if shapefile is None:
-            raise CommandError(
-                "pyshp library is required to convert Shapefiles. "
-                "Install with: uv add --dev pyshp"
-            )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-
-            # Extract all Shapefile components to temp directory
-            with zipfile.ZipFile(io.BytesIO(data)) as archive:
-                shp_files = [name for name in archive.namelist() if name.lower().endswith(".shp")]
-                if not shp_files:
-                    raise CommandError("No .shp file found in ZIP archive")
-
-                shp_file = shp_files[0]
-                base_name = Path(shp_file).stem
-
-                # Extract all related files (.shp, .shx, .dbf, .prj, etc.)
-                for member in archive.namelist():
-                    if Path(member).stem == base_name:
-                        archive.extract(member, tmpdir_path)
-
-            # Convert using pyshp
-            shp_path = tmpdir_path / shp_file
-            sf = shapefile.Reader(str(shp_path))
-
-            # Convert to GeoJSON
-            features = []
-            for shape_rec in sf.shapeRecords():
-                feature = {
-                    "type": "Feature",
-                    "geometry": shape_rec.shape.__geo_interface__,
-                    "properties": shape_rec.record.as_dict()
-                }
-                features.append(feature)
-
-            geojson = {
-                "type": "FeatureCollection",
-                "features": features
-            }
-
-            return json.dumps(geojson, ensure_ascii=False, indent=None)
-
-    def _extract_from_zip(self, data: bytes, member: Optional[str]) -> bytes:
-        with zipfile.ZipFile(io.BytesIO(data)) as archive:
-            target_name = member
-            if target_name is None:
-                target_name = next(
-                    (name for name in archive.namelist() if name.lower().endswith(".geojson")),
-                    None,
-                )
-                if target_name is None:
-                    raise CommandError(
-                        "ZIP archive does not contain a *.geojson file. Use --zip-member to specify a file."
-                    )
-
-            if target_name not in archive.namelist():
-                available = ", ".join(archive.namelist())
-                raise CommandError(
-                    f"ZIP member '{target_name}' not found. Available members: {available}"
-                )
-
-            return archive.read(target_name)
+        self.stdout.write(self.style.SUCCESS("\n✓ Sync complete!"))
 
     @transaction.atomic
-    def _sync_constituencies_to_db(self, geojson_data: dict) -> dict:
-        """Create or update all Wahlkreise as Constituency records in the database."""
-        # Get or create Bundestag parliament and current term
-        bundestag, _ = Parliament.objects.get_or_create(
-            name='Bundestag',
+    def _sync_constituencies_from_api(
+        self,
+        parliament_data: dict,
+        period_data: dict,
+        level: str
+    ) -> dict:
+        """
+        Sync constituencies from Abgeordnetenwatch API for a given parliament term.
+
+        Args:
+            parliament_data: Parliament data from API (includes 'id' and 'label')
+            period_data: Parliament period/term data from API (includes 'id' and 'label')
+            level: 'FEDERAL', 'STATE', or 'EU'
+
+        Returns:
+            dict with stats: {'created': int, 'updated': int, 'errors': list}
+        """
+        parliament_id = parliament_data['id']
+        parliament_name = parliament_data['label']
+        parliament_term_id = period_data['id']
+        period_name = period_data['label']
+
+        stats = {'created': 0, 'updated': 0, 'errors': []}
+
+        # Fetch constituencies (districts)
+        try:
+            constituencies_data = AbgeordnetenwatchAPI.get_constituencies(parliament_term_id)
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch constituencies for parliament_term_id {parliament_term_id}: {e}"
+            self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+            stats['errors'].append(error_msg)
+            constituencies_data = []
+        except Exception as e:
+            error_msg = f"Unexpected error fetching constituencies for parliament_term_id {parliament_term_id}: {e}"
+            self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+            stats['errors'].append(error_msg)
+            constituencies_data = []
+
+        # Fetch electoral lists
+        try:
+            electoral_lists_data = AbgeordnetenwatchAPI.get_electoral_lists(parliament_term_id)
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch electoral lists for parliament_term_id {parliament_term_id}: {e}"
+            self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+            stats['errors'].append(error_msg)
+            electoral_lists_data = []
+        except Exception as e:
+            error_msg = f"Unexpected error fetching electoral lists for parliament_term_id {parliament_term_id}: {e}"
+            self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+            stats['errors'].append(error_msg)
+            electoral_lists_data = []
+
+        # Get or create Parliament and ParliamentTerm
+        parliament, _ = Parliament.objects.get_or_create(
+            metadata__api_id=parliament_id,
             defaults={
-                'level': 'FEDERAL',
-                'legislative_body': 'Bundestag',
-                'region': 'DE',
-                'metadata': {'source': 'wahlkreise_geojson'}
+                'name': f'Parliament {parliament_id}',  # Will be updated by sync_representatives
+                'level': level,
+                'legislative_body': '',
+                'region': '',
+                'metadata': {'api_id': parliament_id, 'source': 'abgeordnetenwatch'}
             }
         )
 
-        # Get or create current term (2025-2029)
         term, _ = ParliamentTerm.objects.get_or_create(
-            parliament=bundestag,
-            name='Bundestag 2025 - 2029',
+            metadata__period_id=parliament_term_id,
+            parliament=parliament,
             defaults={
-                'metadata': {'source': 'wahlkreise_geojson'}
+                'name': f'Term {parliament_term_id}',  # Will be updated by sync_representatives
+                'metadata': {'period_id': parliament_term_id, 'source': 'abgeordnetenwatch'}
             }
         )
 
-        stats = {'created': 0, 'updated': 0}
-        features = geojson_data.get('features', [])
+        # Process district constituencies
+        for const_data in constituencies_data:
+            external_id = str(const_data['id'])
+            number = const_data.get('number')
+            name = const_data.get('name', '')
+            label = const_data.get('label', f"{number} - {name}")
 
-        for feature in features:
-            props = feature.get('properties', {})
-            wkr_nr = props.get('WKR_NR')
-            wkr_name = props.get('WKR_NAME')
-            land_name = props.get('LAND_NAME')
+            # Determine scope based on parliament level
+            if level == 'FEDERAL':
+                scope = 'FEDERAL_DISTRICT'
+                # Generate list_id: 3-digit zero-padded for federal (e.g., "001")
+                list_id = str(number).zfill(3) if number else None
+            elif level == 'STATE':
+                scope = 'STATE_DISTRICT'
+                # Generate list_id: state code + 4-digit number (e.g., "BY-0001")
+                # Extract state code from parliament name (strip prefix like "Landtag ")
+                from letters.constants import normalize_german_state, get_state_code
+                name_to_normalize = parliament_name
+                for prefix in ['Landtag ', 'Abgeordnetenhaus ', 'Bürgerschaft ']:
+                    if name_to_normalize.startswith(prefix):
+                        name_to_normalize = name_to_normalize[len(prefix):]
+                        break
+                state_code = get_state_code(normalize_german_state(name_to_normalize))
+                if state_code and number:
+                    list_id = f"{state_code}-{str(number).zfill(4)}"
+                else:
+                    list_id = None
+            elif level == 'EU':
+                scope = 'EU_AT_LARGE'
+                # EU constituency is Germany-wide, use 'DE' as list_id for geocoding
+                list_id = 'DE'
+            else:
+                continue  # Unknown level
 
-            if not wkr_nr or not wkr_name:
-                continue
-
-            # Create constituency name matching the format used by sync_representatives
-            constituency_name = f"{wkr_nr} - {wkr_name} (Bundestag 2025 - 2029)"
-
+            # Create or update constituency
             constituency, created = Constituency.objects.update_or_create(
-                external_id=str(wkr_nr),
+                external_id=external_id,
                 defaults={
                     'parliament_term': term,
-                    'name': constituency_name,
-                    'scope': 'FEDERAL_DISTRICT',
+                    'name': label,
+                    'scope': scope,
+                    'list_id': list_id,
                     'metadata': {
-                        'WKR_NR': wkr_nr,
-                        'WKR_NAME': wkr_name,
-                        'LAND_NAME': land_name,
-                        'state': land_name,
-                        'source': 'wahlkreise_geojson'
-                    }
+                        'api_id': const_data['id'],
+                        'number': number,
+                        'source': 'abgeordnetenwatch',
+                        'raw': const_data
+                    },
+                    'last_synced_at': timezone.now()
                 }
             )
 
-            constituency.last_synced_at = timezone.now()
-            constituency.save(update_fields=['last_synced_at'])
+            if created:
+                stats['created'] += 1
+            else:
+                stats['updated'] += 1
+
+        # Process electoral lists
+        for list_data in electoral_lists_data:
+            external_id = str(list_data['id'])
+            name = list_data.get('name', '')
+            label = list_data.get('label', name)
+
+            # Determine scope and list_id based on name pattern
+            name_lower = name.lower()
+            if level == 'FEDERAL':
+                if 'bundesliste' in name_lower:
+                    scope = 'FEDERAL_LIST'
+                else:
+                    scope = 'FEDERAL_STATE_LIST'
+                # Electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
+            elif level == 'STATE':
+                if 'regional' in name_lower or 'wahlkreis' in name_lower:
+                    scope = 'STATE_REGIONAL_LIST'
+                else:
+                    scope = 'STATE_LIST'
+                # Electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
+            elif level == 'EU':
+                scope = 'EU_AT_LARGE'
+                # EU electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
+            else:
+                scope = 'OTHER'
+                list_id = None
+
+            # Create or update constituency
+            constituency, created = Constituency.objects.update_or_create(
+                external_id=external_id,
+                defaults={
+                    'parliament_term': term,
+                    'name': label,
+                    'scope': scope,
+                    'list_id': list_id,
+                    'metadata': {
+                        'api_id': list_data['id'],
+                        'source': 'abgeordnetenwatch',
+                        'raw': list_data
+                    },
+                    'last_synced_at': timezone.now()
+                }
+            )
 
             if created:
                 stats['created'] += 1
@@ -273,77 +225,198 @@ class Command(BaseCommand):
 
         return stats
 
-    def _update_wahlkreis_ids(self, geojson_data: dict) -> int:
-        """Update wahlkreis_id field on existing constituencies from GeoJSON."""
-        updated_count = 0
+    def _validate_geojson_matches(self) -> dict:
+        """
+        Validate that all GeoJSON wahlkreise have matching constituencies in DB.
 
-        for feature in geojson_data.get('features', []):
-            properties = feature.get('properties', {})
-            wkr_nr = properties.get('WKR_NR')
+        This ensures address geocoding will always find a valid constituency.
 
-            if not wkr_nr:
-                continue
+        Returns:
+            dict with validation stats:
+            - 'geojson_count': int - number of wahlkreise in GeoJSON files
+            - 'db_count': int - number of constituencies in DB with list_id
+            - 'matched': int - wahlkreise with matching constituency
+            - 'missing_in_db': list - list_ids in GeoJSON but not in DB
+            - 'missing_in_geojson': list - list_ids in DB but not in GeoJSON
+        """
+        from pathlib import Path
 
-            # Normalize to 3-digit string
-            wahlkreis_id = str(wkr_nr).zfill(3)
+        # Load federal GeoJSON
+        geojson_path = Path(settings.CONSTITUENCY_BOUNDARIES_PATH)
+        if not geojson_path.exists():
+            self.stdout.write(self.style.WARNING(f"  GeoJSON file not found at {geojson_path}"))
+            return {
+                'geojson_count': 0,
+                'db_count': 0,
+                'matched': 0,
+                'missing_in_db': [],
+                'missing_in_geojson': []
+            }
 
-            # Find constituencies by metadata WKR_NR
-            constituencies = Constituency.objects.filter(
-                metadata__WKR_NR=wkr_nr,
-                scope='FEDERAL_DISTRICT'
-            )
+        # Extract list_ids from GeoJSON
+        geojson_list_ids = set()
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            for feature in data.get('features', []):
+                props = feature.get('properties', {})
+                wkr_nr = props.get('WKR_NR')
+                if wkr_nr:
+                    list_id = str(wkr_nr).zfill(3)
+                    geojson_list_ids.add(list_id)
 
-            for constituency in constituencies:
-                if constituency.wahlkreis_id != wahlkreis_id:
-                    constituency.wahlkreis_id = wahlkreis_id
-                    constituency.save(update_fields=['wahlkreis_id'])
-                    updated_count += 1
+        # Get list_ids from DB
+        db_list_ids = set(
+            Constituency.objects
+            .filter(scope='FEDERAL_DISTRICT', list_id__isnull=False)
+            .values_list('list_id', flat=True)
+        )
+
+        # Find mismatches
+        missing_in_db = sorted(geojson_list_ids - db_list_ids)
+        missing_in_geojson = sorted(db_list_ids - geojson_list_ids)
+        matched = len(geojson_list_ids & db_list_ids)
+
+        stats = {
+            'geojson_count': len(geojson_list_ids),
+            'db_count': len(db_list_ids),
+            'matched': matched,
+            'missing_in_db': missing_in_db,
+            'missing_in_geojson': missing_in_geojson
+        }
+
+        # Report results
+        self.stdout.write(f"  GeoJSON wahlkreise: {stats['geojson_count']}")
+        self.stdout.write(f"  DB constituencies: {stats['db_count']}")
+        self.stdout.write(f"  Matched: {stats['matched']}")
+
+        if missing_in_db:
+            self.stdout.write(self.style.WARNING(
+                f"  Warning: {len(missing_in_db)} wahlkreise in GeoJSON but not in DB: {', '.join(missing_in_db[:10])}"
+            ))
+
+        if missing_in_geojson:
+            self.stdout.write(self.style.WARNING(
+                f"  Warning: {len(missing_in_geojson)} constituencies in DB but not in GeoJSON: {', '.join(missing_in_geojson[:10])}"
+            ))
+
+        if not missing_in_db and not missing_in_geojson:
+            self.stdout.write(self.style.SUCCESS("  All wahlkreise have matching constituencies!"))
+
+        return stats
+
+    def _handle_api_sync(self):
+        """Sync constituencies from Abgeordnetenwatch API for all parliaments."""
+
+        self.stdout.write("Syncing constituencies from Abgeordnetenwatch API...")
+
+        # Track overall statistics
+        total_stats = {
+            'parliaments_processed': 0,
+            'parliaments_failed': 0,
+            'total_created': 0,
+            'total_updated': 0,
+            'failed_parliaments': []
+        }
+
+        # Get all parliaments
+        try:
+            parliaments_data = AbgeordnetenwatchAPI.get_parliaments()
+        except requests.RequestException as e:
+            error_msg = f"Failed to fetch parliaments list: {e}"
+            self.stdout.write(self.style.ERROR(error_msg))
+            self.stdout.write(self.style.ERROR("Cannot proceed without parliaments list. Aborting."))
+            return
+        except Exception as e:
+            error_msg = f"Unexpected error fetching parliaments list: {e}"
+            self.stdout.write(self.style.ERROR(error_msg))
+            self.stdout.write(self.style.ERROR("Cannot proceed without parliaments list. Aborting."))
+            return
+
+        for parliament_data in parliaments_data:
+            parliament_id = parliament_data['id']
+            parliament_name = parliament_data['label']
+
+            # Determine level
+            if parliament_name == 'EU-Parlament':
+                level = 'EU'
+            elif parliament_name == 'Bundestag':
+                level = 'FEDERAL'
+            else:
+                level = 'STATE'
+
+            self.stdout.write(f"\n{parliament_name} ({level})...")
+
+            try:
+                # Get parliament periods
+                try:
+                    periods = AbgeordnetenwatchAPI.get_parliament_periods(parliament_id)
+                except requests.RequestException as e:
+                    error_msg = f"Failed to fetch periods for {parliament_name}: {e}"
+                    self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+                    total_stats['parliaments_failed'] += 1
+                    total_stats['failed_parliaments'].append((parliament_name, error_msg))
+                    continue
+                except Exception as e:
+                    error_msg = f"Unexpected error fetching periods for {parliament_name}: {e}"
+                    self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+                    total_stats['parliaments_failed'] += 1
+                    total_stats['failed_parliaments'].append((parliament_name, error_msg))
+                    continue
+
+                if not periods:
+                    self.stdout.write(f"  No periods found")
+                    total_stats['parliaments_processed'] += 1
+                    continue
+
+                # Sync current period only
+                current_period = periods[0]
+                period_id = current_period['id']
+                period_name = current_period['label']
+
+                self.stdout.write(f"  Period: {period_name}")
+
+                stats = self._sync_constituencies_from_api(parliament_data, current_period, level)
+
+                if stats.get('errors'):
                     self.stdout.write(
-                        f"Updated {constituency.name} with wahlkreis_id={wahlkreis_id}"
+                        self.style.WARNING(
+                            f"  Created {stats['created']}, Updated {stats['updated']} constituencies ({len(stats['errors'])} errors)"
+                        )
+                    )
+                else:
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  Created {stats['created']}, Updated {stats['updated']} constituencies"
+                        )
                     )
 
-        return updated_count
+                total_stats['total_created'] += stats['created']
+                total_stats['total_updated'] += stats['updated']
+                total_stats['parliaments_processed'] += 1
 
-    def _ensure_eu_constituency(self) -> None:
-        """Ensure a Germany-wide EU constituency exists."""
-        # Get or create EU parliament
-        eu_parliament, _ = Parliament.objects.get_or_create(
-            level='EU',
-            region='DE',
-            defaults={
-                'name': 'Europäisches Parlament',
-                'legislative_body': 'Europäisches Parlament'
-            }
-        )
+            except Exception as e:
+                error_msg = f"Unexpected error processing {parliament_name}: {e}"
+                self.stdout.write(self.style.ERROR(f"  {error_msg}"))
+                total_stats['parliaments_failed'] += 1
+                total_stats['failed_parliaments'].append((parliament_name, error_msg))
+                continue
 
-        # Get or create current EU term
-        eu_term, _ = ParliamentTerm.objects.get_or_create(
-            parliament=eu_parliament,
-            name='2024-2029',
-            defaults={
-                'start_date': '2024-07-16',
-                'end_date': '2029-07-15'
-            }
-        )
+        # Print summary
+        self.stdout.write("\n" + "=" * 80)
+        self.stdout.write("Sync Summary:")
+        self.stdout.write(f"  Parliaments processed: {total_stats['parliaments_processed']}")
+        self.stdout.write(f"  Parliaments failed: {total_stats['parliaments_failed']}")
+        self.stdout.write(f"  Total constituencies created: {total_stats['total_created']}")
+        self.stdout.write(f"  Total constituencies updated: {total_stats['total_updated']}")
 
-        # Get or create EU constituency
-        eu_constituency, created = Constituency.objects.get_or_create(
-            parliament_term=eu_term,
-            scope='EU_AT_LARGE',
-            defaults={
-                'name': 'Deutschland',
-                'wahlkreis_id': 'DE',
-                'metadata': {'country': 'DE'}
-            }
-        )
+        if total_stats['failed_parliaments']:
+            self.stdout.write(self.style.WARNING("\nFailed parliaments:"))
+            for name, error in total_stats['failed_parliaments']:
+                self.stdout.write(f"  {name}: {error[:100]}")
 
-        if created:
-            self.stdout.write(self.style.SUCCESS(
-                f"Created EU constituency: {eu_constituency.name}"
-            ))
+        if total_stats['parliaments_failed'] == 0:
+            self.stdout.write(self.style.SUCCESS("\nAll parliaments processed successfully!"))
+        elif total_stats['parliaments_processed'] > 0:
+            self.stdout.write(self.style.WARNING("\nPartial success - some parliaments failed."))
         else:
-            # Update wahlkreis_id if missing
-            if not eu_constituency.wahlkreis_id:
-                eu_constituency.wahlkreis_id = 'DE'
-                eu_constituency.save(update_fields=['wahlkreis_id'])
-                self.stdout.write(f"Updated EU constituency with wahlkreis_id=DE")
+            self.stdout.write(self.style.ERROR("\nAll parliaments failed to process."))

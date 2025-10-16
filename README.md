@@ -3,14 +3,17 @@
 ## Getting Started
 1. Install dependencies with `uv sync`.
 2. Run `uv run python manage.py migrate` from `website/` to bootstrap the database.
-3. (Optional) Import representatives via `uv run python manage.py sync_representatives --level all`.
-4. Download constituency boundaries: `uv run python manage.py fetch_wahlkreis_data`.
+3. Sync constituencies from API: `uv run python manage.py sync_wahlkreise`.
+4. (Optional) Import representatives: `uv run python manage.py sync_representatives --level all`.
 5. Launch the dev server with `uv run python manage.py runserver` and visit http://localhost:8000/.
 
 ## Useful Commands
 ```bash
-# Data import and queries
-uv run python manage.py sync_representatives --level all  # Import representative data
+# Data sync
+uv run python manage.py sync_wahlkreise  # Sync constituencies from API
+uv run python manage.py sync_representatives --level all  # Import representatives
+
+# Queries
 uv run python manage.py query_wahlkreis --postal-code 10115  # Find constituency
 uv run python manage.py query_topics --text "climate change"  # Match topics
 uv run python manage.py query_representatives --postal-code 10115  # Find reps

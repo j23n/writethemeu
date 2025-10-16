@@ -4,7 +4,7 @@
 from unittest.mock import Mock, patch
 from django.test import TestCase
 from letters.services.representative_sync import RepresentativeSyncService
-from letters.models import Parliament, ParliamentTerm
+from letters.models import Parliament, ParliamentTerm, Constituency
 
 
 class SyncParliamentMethodTests(TestCase):
@@ -261,6 +261,82 @@ class DownloadRepresentativeImageTests(TestCase):
 
         self.assertIsNotNone(result)
         self.assertTrue(result.endswith('.webp'))
+
+
+class DetermineConstituenciesTests(TestCase):
+    """Test the simplified _determine_constituencies method."""
+
+    def test_determine_constituencies_direct_mandate(self):
+        """Test that direct mandate finds constituency by external_id."""
+        parliament = Parliament.objects.create(name='Test', level='FEDERAL', region='DE')
+        term = ParliamentTerm.objects.create(parliament=parliament, name='Test Term')
+        constituency = Constituency.objects.create(
+            external_id='12345',
+            parliament_term=term,
+            name='Test District',
+            scope='FEDERAL_DISTRICT'
+        )
+
+        service = RepresentativeSyncService(dry_run=True)
+        representative = Mock(full_name='Test Rep', external_id='999')
+
+        electoral = {
+            'constituency': {'id': 12345},
+            'mandate_won': 'constituency'
+        }
+
+        results = list(service._determine_constituencies(parliament, term, electoral, representative))
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].external_id, '12345')
+
+    def test_determine_constituencies_list_seat(self):
+        """Test that list seat finds constituency by electoral_list id."""
+        parliament = Parliament.objects.create(name='Test', level='FEDERAL', region='DE')
+        term = ParliamentTerm.objects.create(parliament=parliament, name='Test Term')
+        list_constituency = Constituency.objects.create(
+            external_id='67890',
+            parliament_term=term,
+            name='Test List',
+            scope='FEDERAL_STATE_LIST'
+        )
+
+        service = RepresentativeSyncService(dry_run=True)
+        representative = Mock(full_name='Test Rep', external_id='999')
+
+        electoral = {
+            'electoral_list': {'id': 67890},
+            'mandate_won': 'list'
+        }
+
+        results = list(service._determine_constituencies(parliament, term, electoral, representative))
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0].external_id, '67890')
+
+    def test_determine_constituencies_not_found(self):
+        """Test that missing constituency logs warning but doesn't crash."""
+        parliament = Parliament.objects.create(name='Test', level='FEDERAL', region='DE')
+        term = ParliamentTerm.objects.create(parliament=parliament, name='Test Term')
+
+        service = RepresentativeSyncService(dry_run=True)
+        representative = Mock(full_name='Test Rep', external_id='999')
+
+        electoral = {
+            'constituency': {'id': 99999},  # Doesn't exist
+            'mandate_won': 'constituency'
+        }
+
+        with patch('letters.services.representative_sync.logger') as mock_logger:
+            results = list(service._determine_constituencies(parliament, term, electoral, representative))
+
+            self.assertEqual(len(results), 0)
+            mock_logger.warning.assert_called_once()
+            # Check that the warning was called with correct arguments
+            call_args = mock_logger.warning.call_args
+            self.assertIn('external_id=', call_args[0][0])
+            self.assertEqual(call_args[0][1], 99999)  # The const_id parameter
+            self.assertEqual(call_args[0][2], 'Test Rep')  # The representative.full_name parameter
 
 
 # End of file

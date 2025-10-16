@@ -3,7 +3,6 @@
 
 from django.core.management.base import BaseCommand
 from letters.models import Representative
-from letters.services import ConstituencyLocator
 from letters.services.wahlkreis import WahlkreisResolver
 
 
@@ -11,21 +10,12 @@ class Command(BaseCommand):
     help = 'Find representatives by address and/or topics'
 
     def add_arguments(self, parser):
-        # Address arguments
+        # Address argument
         parser.add_argument(
-            '--street',
+            'address',
             type=str,
-            help='Street name and number'
-        )
-        parser.add_argument(
-            '--postal-code',
-            type=str,
-            help='Postal code (PLZ)'
-        )
-        parser.add_argument(
-            '--city',
-            type=str,
-            help='City name'
+            nargs='?',
+            help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 
         # Topic arguments
@@ -43,34 +33,25 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        street = options.get('street')
-        postal_code = options.get('postal_code')
-        city = options.get('city')
+        address = options.get('address')
         topics_str = options.get('topics')
         limit = options['limit']
 
         try:
-            # Use constituency locator if address provided
-            if postal_code or (street and city):
-                # First try to resolve Wahlkreis if full address provided
-                if street and postal_code and city:
-                    resolver = WahlkreisResolver()
-                    result = resolver.resolve(street=street, postal_code=postal_code, city=city)
+            # Use WahlkreisResolver if address provided
+            if address:
+                resolver = WahlkreisResolver()
+                result = resolver.resolve(address=address)
 
-                    if result['federal_wahlkreis_number']:
-                        self.stdout.write(self.style.SUCCESS(
-                            f"Found Wahlkreise: "
-                            f"Federal={result['federal_wahlkreis_number']}, "
-                            f"State={result['state_wahlkreis_number']}, "
-                            f"EU={result['eu_wahlkreis']}"
-                        ))
+                if result['federal_wahlkreis_number']:
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Found Wahlkreise: "
+                        f"Federal={result['federal_wahlkreis_number']}, "
+                        f"State={result['state_wahlkreis_number']}, "
+                        f"EU={result['eu_wahlkreis']}"
+                    ))
 
-                locator = ConstituencyLocator()
-                constituencies = locator.locate(
-                    street=street,
-                    postal_code=postal_code,
-                    city=city
-                )
+                constituencies = result['constituencies']
 
                 if not constituencies:
                     self.stdout.write('No constituencies found for this location')
@@ -98,10 +79,8 @@ class Command(BaseCommand):
                 # Filter by topics if provided
                 if topics_str:
                     topic_keywords = [t.strip() for t in topics_str.split(',')]
-                    # Simple keyword filter on representative focus areas
                     filtered_reps = []
                     for rep in representatives:
-                        # Check if any committee or focus area matches
                         rep_text = ' '.join([
                             rep.full_name,
                             ' '.join([c.name for c in rep.committees.all()]),
@@ -118,7 +97,6 @@ class Command(BaseCommand):
                     constituency_label = constituency.name if constituency else rep.parliament.name
                     self.stdout.write(f'{rep.full_name} ({rep.party}) - {constituency_label}')
 
-                    # Show committees
                     committees = list(rep.committees.all()[:3])
                     if committees:
                         committee_names = ', '.join([c.name for c in committees])
@@ -127,11 +105,11 @@ class Command(BaseCommand):
             # Use topic-based search if only topics provided
             elif topics_str:
                 self.stdout.write('Topic-based representative search not yet implemented')
-                self.stdout.write('Please provide at least a postal code for location-based search')
+                self.stdout.write('Please provide at least an address for location-based search')
 
             else:
                 self.stderr.write(self.style.ERROR(
-                    'Error: Please provide either an address (--postal-code required) or --topics'
+                    'Error: Please provide an address or --topics'
                 ))
 
         except Exception as e:

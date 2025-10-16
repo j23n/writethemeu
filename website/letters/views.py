@@ -31,7 +31,7 @@ from .forms import (
     SelfDeclaredConstituencyForm,
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
-from .services.constituency import ConstituencyLocator
+from .services.wahlkreis import WahlkreisResolver
 
 logger = logging.getLogger('letters.services')
 
@@ -599,20 +599,18 @@ def search_wahlkreis(request):
             'error': 'Please provide street address, postal code, and city.'
         })
 
-    # Find constituencies using ConstituencyLocator
-    # (handles geocoding internally)
+    # Build full address string
+    address = f"{street_address}, {postal_code} {city}"
+
+    # Find constituencies using WahlkreisResolver
     try:
-        locator = ConstituencyLocator()
-        constituencies = locator.locate(
-            street=street_address,
-            postal_code=postal_code,
-            city=city,
-            country='DE'
-        )
+        resolver = WahlkreisResolver()
+        result = resolver.resolve(address=address, country='DE')
+        constituencies = result['constituencies']
 
         if not constituencies:
             logger.warning(
-                f'Address search found no constituencies for {street_address}, {postal_code} {city}'
+                f'Address search found no constituencies for {address}'
             )
             return render(request, 'letters/partials/wahlkreis_search_result.html', {
                 'success': False,
@@ -815,3 +813,155 @@ class CommitteeDetailView(DetailView):
         ).order_by('representative__last_name', 'representative__first_name')
         context['memberships'] = memberships
         return context
+
+
+def data_sources(request):
+    """Display data sources and attribution information."""
+    # Hardcoded list of states with constituency data available
+    available_states = [
+        {
+            'code': 'BW',
+            'name': 'Baden-Württemberg',
+            'attribution': '© Statistisches Landesamt Baden-Württemberg',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2021,
+            'count': 70,
+            'source_url': 'https://www.statistik-bw.de',
+            'note': '',
+        },
+        {
+            'code': 'BY',
+            'name': 'Bavaria',
+            'attribution': '© Bayerisches Landesamt für Statistik',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2023,
+            'count': 91,
+            'source_url': 'https://www.statistik.bayern.de',
+            'note': '',
+        },
+        {
+            'code': 'BE',
+            'name': 'Berlin',
+            'attribution': '© Amt für Statistik Berlin-Brandenburg',
+            'license': 'CC BY 3.0 DE',
+            'license_url': 'https://creativecommons.org/licenses/by/3.0/de/',
+            'election_year': 2023,
+            'count': 78,
+            'source_url': 'https://www.statistik-berlin-brandenburg.de',
+            'note': '',
+        },
+        {
+            'code': 'HB',
+            'name': 'Bremen',
+            'attribution': '© Statistisches Landesamt Bremen',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2023,
+            'count': 5,
+            'source_url': 'https://www.statistik.bremen.de',
+            'note': '',
+        },
+        {
+            'code': 'NI',
+            'name': 'Lower Saxony',
+            'attribution': '© Landesamt für Statistik Niedersachsen',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 87,
+            'source_url': 'https://www.statistik.niedersachsen.de',
+            'note': '',
+        },
+        {
+            'code': 'NW',
+            'name': 'North Rhine-Westphalia',
+            'attribution': '© IT.NRW',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 128,
+            'source_url': 'https://www.it.nrw',
+            'note': '',
+        },
+        {
+            'code': 'ST',
+            'name': 'Saxony-Anhalt',
+            'attribution': '© Statistisches Landesamt Sachsen-Anhalt',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2021,
+            'count': 43,
+            'source_url': 'https://statistik.sachsen-anhalt.de',
+            'note': '',
+        },
+        {
+            'code': 'SH',
+            'name': 'Schleswig-Holstein',
+            'attribution': '© Statistisches Amt für Hamburg und Schleswig-Holstein',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2022,
+            'count': 35,
+            'source_url': 'https://www.statistik-nord.de',
+            'note': '',
+        },
+        {
+            'code': 'TH',
+            'name': 'Thuringia',
+            'attribution': '© Thüringer Landesamt für Statistik',
+            'license': 'Datenlizenz Deutschland – Namensnennung – Version 2.0',
+            'license_url': 'https://www.govdata.de/dl-de/by-2-0',
+            'election_year': 2024,
+            'count': 44,
+            'source_url': 'https://statistik.thueringen.de',
+            'note': '',
+        },
+    ]
+
+    # States without direct downloads
+    unavailable_states = [
+        {
+            'name': 'Brandenburg',
+            'contact': 'Ministerium des Innern und für Kommunales, Potsdam',
+            'note': 'No state-wide Landtagswahl download. Municipal data available for some cities (e.g., Potsdam).'
+        },
+        {
+            'name': 'Hamburg',
+            'contact': 'WFS Service available',
+            'note': 'Data available via WFS service (requires GIS tools). Excellent detail with ~1,300 Stimmbezirke.'
+        },
+        {
+            'name': 'Hesse',
+            'contact': 'presse@statistik.hessen.de',
+            'note': 'Geodata not publicly available. Contact Hessisches Statistisches Landesamt to request.'
+        },
+        {
+            'name': 'Mecklenburg-Vorpommern',
+            'contact': 'LAIV-MV',
+            'note': 'Shapefiles referenced but require contact with LAIV-MV for downloads.'
+        },
+        {
+            'name': 'Rhineland-Palatinate',
+            'contact': 'Landeswahlleiter via wahlen.rlp.de',
+            'note': 'Only PDF maps available. No machine-readable geodata.'
+        },
+        {
+            'name': 'Saarland',
+            'contact': 'landeswahlleitung@innen.saarland.de',
+            'note': 'Special system with only 3 large regional constituencies. Contact required.'
+        },
+        {
+            'name': 'Saxony',
+            'contact': 'WMS Service',
+            'note': 'WMS service only (visualization, not vector data). May need to contact Statistisches Landesamt.'
+        },
+    ]
+
+    context = {
+        'available_states': available_states,
+        'unavailable_states': unavailable_states,
+    }
+
+    return render(request, 'letters/data_sources.html', context)

@@ -4,7 +4,7 @@
 import os
 from django.test import TestCase
 from unittest.mock import patch, MagicMock
-from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
+from letters.services import AddressGeocoder, WahlkreisLocator
 from letters.services.wahlkreis import WahlkreisResolver
 from letters.models import GeocodeCache
 
@@ -68,9 +68,7 @@ class AddressGeocodingTests(TestCase):
             mock_get.return_value = mock_response
 
             lat, lon, success, error = self.geocoder.geocode(
-                'Platz der Republik 1',
-                '11011',
-                'Berlin'
+                'Platz der Republik 1, 11011 Berlin'
             )
 
             self.assertTrue(success)
@@ -90,12 +88,11 @@ class AddressGeocodingTests(TestCase):
             mock_get.return_value = mock_response
 
             # First call should cache
-            self.geocoder.geocode('Platz der Republik 1', '11011', 'Berlin')
+            address = 'Platz der Republik 1, 11011 Berlin'
+            self.geocoder.geocode(address)
 
             # Check cache entry exists
-            cache_key = self.geocoder._generate_cache_key(
-                'Platz der Republik 1', '11011', 'Berlin', 'DE'
-            )
+            cache_key = self.geocoder._generate_cache_key(address, 'DE')
             cache_entry = GeocodeCache.objects.filter(address_hash=cache_key).first()
             self.assertIsNotNone(cache_entry)
             self.assertTrue(cache_entry.success)
@@ -103,9 +100,8 @@ class AddressGeocodingTests(TestCase):
     def test_geocode_returns_cached_results(self):
         """Test that cached geocoding results are reused."""
         # Create cache entry
-        cache_key = self.geocoder._generate_cache_key(
-            'Test Street', '12345', 'Test City', 'DE'
-        )
+        address = 'Test Street, 12345 Test City'
+        cache_key = self.geocoder._generate_cache_key(address, 'DE')
         GeocodeCache.objects.create(
             address_hash=cache_key,
             success=True,
@@ -115,9 +111,7 @@ class AddressGeocodingTests(TestCase):
 
         # Should return cached result without API call
         with patch('requests.get') as mock_get:
-            lat, lon, success, error = self.geocoder.geocode(
-                'Test Street', '12345', 'Test City'
-            )
+            lat, lon, success, error = self.geocoder.geocode(address)
 
             # Verify no API call was made
             mock_get.assert_not_called()
@@ -135,7 +129,7 @@ class AddressGeocodingTests(TestCase):
             # Capture expected warning log
             with self.assertLogs('letters.services', level='WARNING') as log_context:
                 lat, lon, success, error = self.geocoder.geocode(
-                    'Invalid Street', '99999', 'Nowhere'
+                    'Invalid Street, 99999 Nowhere'
                 )
 
             self.assertFalse(success)
@@ -166,9 +160,10 @@ class WahlkreisLocationTests(TestCase):
         result = locator.locate(52.5186, 13.3761)
 
         self.assertIsNotNone(result)
-        wkr_nr, wkr_name, land_name = result
-        self.assertIsInstance(wkr_nr, int)
-        self.assertIn('Berlin', land_name)
+        self.assertIn('federal', result)
+        self.assertIsNotNone(result['federal'])
+        self.assertIsInstance(result['federal']['wkr_nr'], int)
+        self.assertIn('Berlin', result['federal']['land_name'])
 
     def test_locate_hamburg_coordinates(self):
         """Test that Hamburg coordinates find correct constituency."""
@@ -176,9 +171,10 @@ class WahlkreisLocationTests(TestCase):
         result = locator.locate(53.5511, 9.9937)
 
         self.assertIsNotNone(result)
-        wkr_nr, wkr_name, land_name = result
-        self.assertIsInstance(wkr_nr, int)
-        self.assertIn('Hamburg', land_name)
+        self.assertIn('federal', result)
+        self.assertIsNotNone(result['federal'])
+        self.assertIsInstance(result['federal']['wkr_nr'], int)
+        self.assertIn('Hamburg', result['federal']['land_name'])
 
     def test_coordinates_outside_germany(self):
         """Test that coordinates outside Germany return None."""
@@ -192,86 +188,48 @@ class WahlkreisLocationTests(TestCase):
         result = locator.locate(51.5074, -0.1278)
         self.assertIsNone(result)
 
+    def test_locator_loads_available_state_files(self):
+        """Test WahlkreisLocator loads state GeoJSON files if they exist."""
+        import tempfile
+        import shutil
+        import json
+        from pathlib import Path
 
-class FullAddressMatchingTests(TestCase):
-    """Integration tests for full address → constituency matching."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
 
-    @patch('letters.services.wahlkreis.WahlkreisResolver.resolve')
-    def test_locate_returns_correct_constituency(self, mock_resolve):
-        """Test that ConstituencyLocator.locate() returns constituencies."""
-        from letters.models import Parliament, ParliamentTerm, Constituency
+            # Copy federal fixture
+            federal_path = tmpdir_path / 'wahlkreise_federal.geojson'
+            shutil.copy(self.fixture_path, federal_path)
 
-        # Create test data
-        parliament = Parliament.objects.create(
-            name='Bundestag',
-            level='FEDERAL',
-            legislative_body='Bundestag',
-            region='DE'
-        )
-        term = ParliamentTerm.objects.create(
-            parliament=parliament,
-            name='20. Wahlperiode'
-        )
-        constituency = Constituency.objects.create(
-            parliament_term=term,
-            name='Berlin-Mitte',
-            scope='FEDERAL_DISTRICT',
-            wahlkreis_id='075'
-        )
+            # Create mock state file for BW
+            state_data = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [[[9.0, 48.7], [9.1, 48.7], [9.1, 48.8], [9.0, 48.8], [9.0, 48.7]]]
+                    },
+                    "properties": {
+                        "WKR_NR": 1,
+                        "WKR_NAME": "Stuttgart I",
+                        "LAND_CODE": "BW",
+                        "LAND_NAME": "Baden-Württemberg",
+                        "LEVEL": "STATE"
+                    }
+                }]
+            }
 
-        # Mock WahlkreisResolver to return our test constituency
-        mock_resolve.return_value = {
-            'federal_wahlkreis_number': '075',
-            'state_wahlkreis_number': '075',
-            'eu_wahlkreis': 'DE',
-            'constituencies': [constituency]
-        }
+            state_path = tmpdir_path / 'wahlkreise_bw.geojson'
+            state_path.write_text(json.dumps(state_data))
 
-        locator = ConstituencyLocator()
-        constituencies = locator.locate(
-            street='Unter den Linden 1',
-            postal_code='10117',
-            city='Berlin'
-        )
+            # Initialize locator with this directory
+            locator = WahlkreisLocator(geojson_path=str(federal_path))
 
-        self.assertEqual(len(constituencies), 1)
-        self.assertEqual(constituencies[0].id, constituency.id)
-
-    @patch('letters.services.AddressGeocoder.geocode')
-    def test_plz_fallback_returns_constituencies(self, mock_geocode):
-        """Test PLZ prefix fallback returns constituencies."""
-        from letters.models import Parliament, ParliamentTerm, Constituency
-
-        # Create test data
-        bundestag = Parliament.objects.create(
-            name='Bundestag',
-            level='FEDERAL',
-            legislative_body='Bundestag',
-            region='DE'
-        )
-        term = ParliamentTerm.objects.create(
-            parliament=bundestag,
-            name='20. Wahlperiode'
-        )
-        federal_const = Constituency.objects.create(
-            parliament_term=term,
-            name='Berlin',
-            scope='FEDERAL_STATE_LIST',
-            metadata={'state': 'Berlin'}
-        )
-
-        # Mock geocoding failure
-        mock_geocode.return_value = (None, None, False, "Geocoding failed")
-
-        locator = ConstituencyLocator()
-        result = locator.locate(
-            postal_code='10115'  # Berlin postal code
-        )
-
-        # Should return list of Constituency objects (using PLZ fallback)
-        self.assertIsInstance(result, list)
-        if result:  # May be empty if no DB match, but should be list
-            self.assertIsInstance(result[0], Constituency)
+            # Verify state data was loaded
+            self.assertIn('BW', locator.state_constituencies)
+            self.assertEqual(len(locator.state_constituencies['BW']), 1)
 
 
 # End of file
