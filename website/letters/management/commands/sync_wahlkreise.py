@@ -177,9 +177,20 @@ class Command(BaseCommand):
             elif level == 'STATE':
                 scope = 'STATE_DISTRICT'
                 # Generate list_id: state code + 4-digit number (e.g., "BY-0001")
-                # We'll need to get state code from parliament metadata or name
-                # For now, leave list_id as None - it will be enriched from GeoJSON
-                list_id = None
+                # Get state code from parliament region
+                from letters.constants import get_state_code
+                parliament = Parliament.objects.filter(metadata__api_id=parliament_data['id']).first()
+                if parliament and number:
+                    state_code = get_state_code(parliament.region)
+                    if state_code:
+                        list_id = f"{state_code}-{str(number).zfill(4)}"
+                    else:
+                        list_id = None
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning("Could not determine state code for parliament %s", parliament.name)
+                else:
+                    list_id = None
             else:
                 continue  # EU doesn't have districts
 
@@ -220,16 +231,39 @@ class Command(BaseCommand):
                     list_id = 'BUND-DE-LIST'
                 else:
                     scope = 'FEDERAL_STATE_LIST'
-                    # Extract state code from name if possible (e.g., "Bayern" → "BY")
-                    # For now, leave as None - will need to be enriched
+                    # Try to extract state from name
+                    from letters.constants import normalize_german_state, get_state_code
                     list_id = None
+                    for state_name in ['Baden-Württemberg', 'Bayern', 'Berlin', 'Brandenburg',
+                                      'Bremen', 'Hamburg', 'Hessen', 'Mecklenburg-Vorpommern',
+                                      'Niedersachsen', 'Nordrhein-Westfalen', 'Rheinland-Pfalz',
+                                      'Saarland', 'Sachsen', 'Sachsen-Anhalt', 'Schleswig-Holstein', 'Thüringen']:
+                        if state_name.lower() in name_lower:
+                            state_code = get_state_code(state_name)
+                            if state_code:
+                                list_id = f"{state_code}-LIST"
+                                break
+                    if not list_id:
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.warning("Could not determine state code for federal list: %s", name)
             elif level == 'STATE':
                 if 'regional' in name_lower or 'wahlkreis' in name_lower:
                     scope = 'STATE_REGIONAL_LIST'
                     list_id = None  # No standard format for regional lists
                 else:
                     scope = 'STATE_LIST'
-                    list_id = None  # Will need state code
+                    # Get state code from parliament
+                    from letters.constants import get_state_code
+                    parliament = Parliament.objects.filter(metadata__api_id=parliament_data['id']).first()
+                    if parliament:
+                        state_code = get_state_code(parliament.region)
+                        if state_code:
+                            list_id = f"{state_code}-STATE-LIST"
+                        else:
+                            list_id = None
+                    else:
+                        list_id = None
             elif level == 'EU':
                 scope = 'EU_AT_LARGE'
                 list_id = 'DE'
