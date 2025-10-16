@@ -176,6 +176,11 @@ class Command(BaseCommand):
             action="store_true",
             help="List available states and their configuration.",
         )
+        parser.add_argument(
+            "--api-sync",
+            action="store_true",
+            help="Sync constituencies from Abgeordnetenwatch API (new approach)",
+        )
 
     def _get_state_region_name(self, state_code: str) -> str:
         """Map state code to canonical German region name used in Parliament.region."""
@@ -183,6 +188,11 @@ class Command(BaseCommand):
         return normalize_german_state(state_name) or state_name
 
     def handle(self, *args, **options):
+        # Handle --api-sync flag (new approach)
+        if options.get('api_sync'):
+            self._handle_api_sync()
+            return
+
         # Handle --list flag
         if options.get('list'):
             self._list_states()
@@ -829,3 +839,173 @@ class Command(BaseCommand):
             feature["properties"] = props
 
         return json.dumps(data, ensure_ascii=False, indent=None)
+
+    @transaction.atomic
+    def _sync_constituencies_from_api(self, parliament_id: int, parliament_term_id: int, level: str) -> dict:
+        """
+        Sync constituencies from Abgeordnetenwatch API for a given parliament term.
+
+        Args:
+            parliament_id: Parliament ID from API
+            parliament_term_id: Parliament term/period ID from API
+            level: 'FEDERAL', 'STATE', or 'EU'
+
+        Returns:
+            dict with stats: {'created': int, 'updated': int}
+        """
+        from letters.services.abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
+
+        stats = {'created': 0, 'updated': 0}
+
+        # Fetch constituencies (districts)
+        constituencies_data = AbgeordnetenwatchAPI.get_constituencies(parliament_term_id)
+
+        # Fetch electoral lists
+        electoral_lists_data = AbgeordnetenwatchAPI.get_electoral_lists(parliament_term_id)
+
+        # Get or create Parliament and ParliamentTerm
+        parliament, _ = Parliament.objects.get_or_create(
+            metadata__api_id=parliament_id,
+            defaults={
+                'name': f'Parliament {parliament_id}',  # Will be updated by sync_representatives
+                'level': level,
+                'legislative_body': '',
+                'region': '',
+                'metadata': {'api_id': parliament_id, 'source': 'abgeordnetenwatch'}
+            }
+        )
+
+        term, _ = ParliamentTerm.objects.get_or_create(
+            metadata__period_id=parliament_term_id,
+            parliament=parliament,
+            defaults={
+                'name': f'Term {parliament_term_id}',  # Will be updated by sync_representatives
+                'metadata': {'period_id': parliament_term_id, 'source': 'abgeordnetenwatch'}
+            }
+        )
+
+        # Process district constituencies
+        for const_data in constituencies_data:
+            external_id = str(const_data['id'])
+            number = const_data.get('number')
+            name = const_data.get('name', '')
+            label = const_data.get('label', f"{number} - {name}")
+
+            # Determine scope based on parliament level
+            if level == 'FEDERAL':
+                scope = 'FEDERAL_DISTRICT'
+            elif level == 'STATE':
+                scope = 'STATE_DISTRICT'
+            else:
+                continue  # EU doesn't have districts
+
+            # Create or update constituency
+            constituency, created = Constituency.objects.update_or_create(
+                external_id=external_id,
+                defaults={
+                    'parliament_term': term,
+                    'name': label,
+                    'scope': scope,
+                    'metadata': {
+                        'api_id': const_data['id'],
+                        'number': number,
+                        'source': 'abgeordnetenwatch',
+                        'raw': const_data
+                    },
+                    'last_synced_at': timezone.now()
+                }
+            )
+
+            if created:
+                stats['created'] += 1
+            else:
+                stats['updated'] += 1
+
+        # Process electoral lists
+        for list_data in electoral_lists_data:
+            external_id = str(list_data['id'])
+            name = list_data.get('name', '')
+            label = list_data.get('label', name)
+
+            # Determine scope based on name pattern
+            name_lower = name.lower()
+            if level == 'FEDERAL':
+                if 'bundesliste' in name_lower:
+                    scope = 'FEDERAL_LIST'
+                else:
+                    scope = 'FEDERAL_STATE_LIST'
+            elif level == 'STATE':
+                if 'regional' in name_lower or 'wahlkreis' in name_lower:
+                    scope = 'STATE_REGIONAL_LIST'
+                else:
+                    scope = 'STATE_LIST'
+            elif level == 'EU':
+                scope = 'EU_AT_LARGE'
+            else:
+                scope = 'OTHER'
+
+            # Create or update constituency
+            constituency, created = Constituency.objects.update_or_create(
+                external_id=external_id,
+                defaults={
+                    'parliament_term': term,
+                    'name': label,
+                    'scope': scope,
+                    'metadata': {
+                        'api_id': list_data['id'],
+                        'source': 'abgeordnetenwatch',
+                        'raw': list_data
+                    },
+                    'last_synced_at': timezone.now()
+                }
+            )
+
+            if created:
+                stats['created'] += 1
+            else:
+                stats['updated'] += 1
+
+        return stats
+
+    def _handle_api_sync(self):
+        """Sync constituencies from Abgeordnetenwatch API for all parliaments."""
+        from letters.services.abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
+
+        self.stdout.write("Syncing constituencies from Abgeordnetenwatch API...")
+
+        # Get all parliaments
+        parliaments_data = AbgeordnetenwatchAPI.get_parliaments()
+
+        for parliament_data in parliaments_data:
+            parliament_id = parliament_data['id']
+            parliament_name = parliament_data['label']
+
+            # Determine level
+            if parliament_name == 'EU-Parlament':
+                level = 'EU'
+            elif parliament_name == 'Bundestag':
+                level = 'FEDERAL'
+            else:
+                level = 'STATE'
+
+            self.stdout.write(f"\n{parliament_name} ({level})...")
+
+            # Get parliament periods
+            periods = AbgeordnetenwatchAPI.get_parliament_periods(parliament_id)
+            if not periods:
+                self.stdout.write(f"  No periods found")
+                continue
+
+            # Sync current period only
+            current_period = periods[0]
+            period_id = current_period['id']
+            period_name = current_period['label']
+
+            self.stdout.write(f"  Period: {period_name}")
+
+            stats = self._sync_constituencies_from_api(parliament_id, period_id, level)
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  Created {stats['created']}, Updated {stats['updated']} constituencies"
+                )
+            )
