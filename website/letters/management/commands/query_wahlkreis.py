@@ -2,7 +2,7 @@
 # ABOUTME: Interactive tool for testing address-based constituency matching.
 
 from django.core.management.base import BaseCommand
-from letters.services import AddressGeocoder, WahlkreisLocator, ConstituencyLocator
+from letters.services.wahlkreis import WahlkreisResolver
 
 
 class Command(BaseCommand):
@@ -32,34 +32,40 @@ class Command(BaseCommand):
         city = options.get('city')
 
         try:
-            # Try full address geocoding if all parts provided
-            if street and city:
-                geocoder = AddressGeocoder()
-                lat, lon, success, error = geocoder.geocode(street, postal_code, city)
+            # Build address string
+            address_parts = []
+            if street:
+                address_parts.append(street)
+            if postal_code:
+                address_parts.append(postal_code)
+            if city:
+                address_parts.append(city)
 
-                if not success:
-                    self.stdout.write(self.style.ERROR(f'Error: Could not geocode address: {error}'))
-                    return
+            address = ', '.join(address_parts)
 
-                locator = WahlkreisLocator()
-                result = locator.locate(lat, lon)
+            # Use WahlkreisResolver to get full resolution
+            resolver = WahlkreisResolver()
+            result = resolver.resolve(address=address)
 
-                if not result:
-                    self.stdout.write('No constituency found for these coordinates')
-                    return
+            if not result['federal_wahlkreis_number']:
+                self.stdout.write(self.style.ERROR('Error: Could not resolve address to Wahlkreis'))
+                return
 
-                wkr_nr, wkr_name, land_name = result
-                self.stdout.write(f'WK {wkr_nr:03d} - {wkr_name} ({land_name})')
+            # Display results
+            self.stdout.write(self.style.SUCCESS(
+                f"Federal Wahlkreis: {result['federal_wahlkreis_number']}"
+            ))
 
-            # Fallback to PLZ prefix lookup
-            else:
-                plz_prefix = postal_code[:2]
-                state_name = ConstituencyLocator.STATE_BY_PLZ_PREFIX.get(plz_prefix)
+            if result['state_wahlkreis_number']:
+                self.stdout.write(self.style.SUCCESS(
+                    f"State Wahlkreis: {result['state_wahlkreis_number']}"
+                ))
 
-                if state_name:
-                    self.stdout.write(f'State: {state_name} (from postal code prefix)')
-                else:
-                    self.stdout.write('Error: Could not determine state from postal code')
+            constituencies = result['constituencies']
+            if constituencies:
+                self.stdout.write(f"\nFound {len(constituencies)} constituencies:")
+                for c in constituencies:
+                    self.stdout.write(f"  - {c.scope}: {c.name}")
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f'Error: {str(e)}'))
