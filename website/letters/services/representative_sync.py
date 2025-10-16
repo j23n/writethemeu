@@ -366,171 +366,56 @@ class RepresentativeSyncService:
         mandate_won = electoral.get('mandate_won')
 
         if mandate_won == 'constituency':
-            yield self._handle_direct_mandate(parliament, term, electoral)
+            constituency = self._handle_direct_mandate(parliament, term, electoral)
+            if constituency:
+                yield constituency
             return
 
-        if parliament.level == 'EU':
-            yield self._get_or_create_constituency(
-                term,
-                scope='EU_AT_LARGE',
-                name='Europäische Union',
-                metadata={'state': 'Deutschland'}
-            )
-            return
-
-        if parliament.level == 'FEDERAL':
-            list_scope, state_name = self._determine_federal_list_scope(parliament, electoral)
-            yield self._get_or_create_constituency(
-                term,
-                scope=list_scope,
-                name=self._build_list_name(term, list_scope, state_name),
-                metadata={'state': state_name} if state_name else {}
-            )
-            return
-
-        # State parliament list seats
-        state_name = normalize_german_state(parliament.name)
-        yield self._get_or_create_constituency(
-            term,
-            scope='STATE_LIST',
-            name=f"Landesliste {state_name or parliament.name}",
-            metadata={'state': state_name}
+        # For list seats, we cannot reliably match without external_id
+        # Log warning and skip - list constituencies should be handled differently
+        logger.warning(
+            "Representative %s (mandate_id=%s) is a list seat but we cannot match "
+            "list constituencies by external_id. Skipping constituency assignment.",
+            representative.full_name,
+            representative.external_id
         )
 
     # --------------------------------------
-    def _handle_direct_mandate(self, parliament: Parliament, term: ParliamentTerm, electoral: Dict) -> Constituency:
+    def _handle_direct_mandate(self, parliament: Parliament, term: ParliamentTerm, electoral: Dict) -> Optional[Constituency]:
         const_data = electoral.get('constituency') or {}
-        district_name = const_data.get('label', 'Direktmandat')
         district_id = const_data.get('id')
-        state_name = normalize_german_state(self._extract_state_from_electoral(electoral, parliament))
 
-        # Fetch full constituency details to get number field
-        constituency_number = None
-        if district_id:
-            try:
-                full_const = AbgeordnetenwatchAPI._request(f'constituencies/{district_id}')
-                constituency_number = full_const.get('data', {}).get('number')
-            except Exception:
-                logger.warning("Failed to fetch constituency details for ID %s", district_id)
-
-        # Generate wahlkreis_id
-        wahlkreis_id = None
-        if constituency_number is not None:
-            if parliament.level == 'FEDERAL':
-                wahlkreis_id = f"{constituency_number:03d}"
-            else:  # STATE
-                state_code = get_state_code(state_name or parliament.name)
-                if state_code:
-                    wahlkreis_id = f"{state_code}-{constituency_number:04d}"
-
-        scope = 'FEDERAL_DISTRICT' if parliament.level == 'FEDERAL' else 'STATE_DISTRICT'
-        constituency = self._get_or_create_constituency(
-            term,
-            scope=scope,
-            name=district_name,
-            external_id=district_id,
-            wahlkreis_id=wahlkreis_id,
-            metadata={'state': state_name}
-        )
-        return constituency
-
-    # --------------------------------------
-    @staticmethod
-    def _build_list_name(term: ParliamentTerm, scope: str, state_name: Optional[str]) -> str:
-        if scope == 'FEDERAL_LIST':
-            return f"Bundesliste {term.parliament.name}"
-        if scope == 'FEDERAL_STATE_LIST':
-            state_label = state_name or term.parliament.metadata.get('state') or term.parliament.region
-            return f"Landesliste {state_label}"
-        if scope == 'STATE_REGIONAL_LIST':
-            return f"Regionalliste {state_name or term.name}"
-        if scope == 'STATE_LIST':
-            return f"Landesliste {state_name or term.parliament.name}"
-        return state_name or term.name
-
-    def _determine_federal_list_scope(
-        self,
-        parliament: Parliament,
-        electoral: Dict,
-    ) -> Tuple[str, Optional[str]]:
-        list_info = electoral.get('electoral_list') or {}
-        label = (list_info.get('label') or '').lower()
-
-        if 'bundesliste' in label:
-            return 'FEDERAL_LIST', None
-
-        state_name = normalize_german_state(
-            self._extract_state_from_electoral(electoral, parliament)
-        )
-        return 'FEDERAL_STATE_LIST', state_name
-
-    # --------------------------------------
-    def _get_or_create_constituency(
-        self,
-        term: ParliamentTerm,
-        scope: str,
-        name: str,
-        metadata: Optional[Dict] = None,
-        external_id: Optional[int] = None,
-        wahlkreis_id: Optional[str] = None,
-    ) -> Optional[Constituency]:
-        """Get existing constituency or create only non-district constituencies.
-
-        FEDERAL_DISTRICT and STATE_DISTRICT constituencies should already exist
-        from sync_wahlkreise and will not be created here.
-        """
-        metadata = metadata or {}
-
-        # For district constituencies, try to find by wahlkreis_id first
-        if scope in ('FEDERAL_DISTRICT', 'STATE_DISTRICT'):
-            existing = None
-
-            # Primary: Match by wahlkreis_id if available
-            if wahlkreis_id:
-                existing = Constituency.objects.filter(
-                    parliament_term=term,
-                    scope=scope,
-                    wahlkreis_id=wahlkreis_id
-                ).first()
-
-            # Fallback: Match by external_id for backwards compatibility
-            if not existing and external_id:
-                existing = Constituency.objects.filter(
-                    external_id=str(external_id)
-                ).first()
-
-            if existing:
-                # Update wahlkreis_id if we have one and it's not set
-                if wahlkreis_id and existing.wahlkreis_id != wahlkreis_id:
-                    existing.wahlkreis_id = wahlkreis_id
-                    existing.save(update_fields=['wahlkreis_id'])
-                return existing
-
-            logger.warning(
-                "Constituency not found for %s term=%s wahlkreis_id=%s external_id=%s. Run sync_wahlkreise first.",
-                scope, term.name, wahlkreis_id, external_id
-            )
+        if not district_id:
+            logger.warning("Direct mandate missing constituency ID in electoral data")
             return None
 
-        # For list constituencies, create or update
-        defaults = {
-            'parliament_term': term,
-            'scope': scope,
-            'name': name,
-            'metadata': metadata,
-        }
-        constituency, created = Constituency.objects.update_or_create(
-            parliament_term=term,
-            scope=scope,
-            name=name,
-            defaults=defaults,
-        )
-        constituency.last_synced_at = timezone.now()
-        constituency.save(update_fields=['last_synced_at'])
-        if created:
-            self.stats['constituencies_created'] += 1
-        else:
-            self.stats['constituencies_updated'] += 1
+        constituency = self._find_constituency_by_external_id(district_id)
+        return constituency
+
+
+    # --------------------------------------
+    def _find_constituency_by_external_id(
+        self,
+        external_id: Optional[int],
+    ) -> Optional[Constituency]:
+        """Find constituency by external_id from Abgeordnetenwatch API.
+
+        Returns None if not found. Never creates constituencies.
+        Constituencies should be created by sync_wahlkreise command first.
+        """
+        if not external_id:
+            return None
+
+        constituency = Constituency.objects.filter(
+            external_id=str(external_id)
+        ).first()
+
+        if not constituency:
+            logger.warning(
+                "Constituency with external_id=%s not found. Run sync_wahlkreise first.",
+                external_id
+            )
+
         return constituency
 
     # --------------------------------------
