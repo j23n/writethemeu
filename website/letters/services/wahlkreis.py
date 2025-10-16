@@ -132,13 +132,13 @@ class WahlkreisResolver:
             )
             constituencies.extend(state_district_constituencies)
 
-        # Add state list constituency
+        # Add federal state list constituency
         if normalized_state:
-            state_list_constituencies = Constituency.objects.filter(
-                scope='STATE_LIST',
+            federal_state_list_constituencies = Constituency.objects.filter(
+                scope='FEDERAL_STATE_LIST',
                 metadata__state=normalized_state
             )
-            constituencies.extend(state_list_constituencies)
+            constituencies.extend(federal_state_list_constituencies)
 
         result['constituencies'] = constituencies
 
