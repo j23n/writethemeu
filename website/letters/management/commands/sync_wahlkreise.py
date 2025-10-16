@@ -34,59 +34,11 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Step 1: Syncing constituencies from Abgeordnetenwatch API..."))
         self._handle_api_sync()
 
-        # Step 2: Ensure EU constituency exists
-        self.stdout.write(self.style.SUCCESS("\nStep 2: Ensuring EU constituency exists..."))
-        self._ensure_eu_constituency()
-
-        # Step 3: Validate GeoJSON matches
-        self.stdout.write(self.style.SUCCESS("\nStep 3: Validating GeoJSON matches..."))
+        # Step 2: Validate GeoJSON matches
+        self.stdout.write(self.style.SUCCESS("\nStep 2: Validating GeoJSON matches..."))
         validation_stats = self._validate_geojson_matches()
 
         self.stdout.write(self.style.SUCCESS("\n✓ Sync complete!"))
-
-    def _ensure_eu_constituency(self) -> None:
-        """Ensure a Germany-wide EU constituency exists."""
-        # Get or create EU parliament
-        eu_parliament, _ = Parliament.objects.get_or_create(
-            level='EU',
-            region='DE',
-            defaults={
-                'name': 'Europäisches Parlament',
-                'legislative_body': 'Europäisches Parlament'
-            }
-        )
-
-        # Get or create current EU term
-        eu_term, _ = ParliamentTerm.objects.get_or_create(
-            parliament=eu_parliament,
-            name='2024-2029',
-            defaults={
-                'start_date': '2024-07-16',
-                'end_date': '2029-07-15'
-            }
-        )
-
-        # Get or create EU constituency
-        eu_constituency, created = Constituency.objects.get_or_create(
-            parliament_term=eu_term,
-            scope='EU_AT_LARGE',
-            defaults={
-                'name': 'Deutschland',
-                'list_id': 'DE',
-                'metadata': {'country': 'DE'}
-            }
-        )
-
-        if created:
-            self.stdout.write(self.style.SUCCESS(
-                f"Created EU constituency: {eu_constituency.name}"
-            ))
-        else:
-            # Update list_id if missing
-            if not eu_constituency.list_id:
-                eu_constituency.list_id = 'DE'
-                eu_constituency.save(update_fields=['list_id'])
-                self.stdout.write(f"Updated EU constituency with list_id=DE")
 
     @transaction.atomic
     def _sync_constituencies_from_api(
@@ -177,22 +129,24 @@ class Command(BaseCommand):
             elif level == 'STATE':
                 scope = 'STATE_DISTRICT'
                 # Generate list_id: state code + 4-digit number (e.g., "BY-0001")
-                # Get state code from parliament region
-                from letters.constants import get_state_code
-                parliament = Parliament.objects.filter(metadata__api_id=parliament_data['id']).first()
-                if parliament and number:
-                    state_code = get_state_code(parliament.region)
-                    if state_code:
-                        list_id = f"{state_code}-{str(number).zfill(4)}"
-                    else:
-                        list_id = None
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning("Could not determine state code for parliament %s", parliament.name)
+                # Extract state code from parliament name (strip prefix like "Landtag ")
+                from letters.constants import normalize_german_state, get_state_code
+                name_to_normalize = parliament_name
+                for prefix in ['Landtag ', 'Abgeordnetenhaus ', 'Bürgerschaft ']:
+                    if name_to_normalize.startswith(prefix):
+                        name_to_normalize = name_to_normalize[len(prefix):]
+                        break
+                state_code = get_state_code(normalize_german_state(name_to_normalize))
+                if state_code and number:
+                    list_id = f"{state_code}-{str(number).zfill(4)}"
                 else:
                     list_id = None
+            elif level == 'EU':
+                scope = 'EU_AT_LARGE'
+                # EU constituency is Germany-wide, use 'DE' as list_id for geocoding
+                list_id = 'DE'
             else:
-                continue  # EU doesn't have districts
+                continue  # Unknown level
 
             # Create or update constituency
             constituency, created = Constituency.objects.update_or_create(
@@ -228,45 +182,21 @@ class Command(BaseCommand):
             if level == 'FEDERAL':
                 if 'bundesliste' in name_lower:
                     scope = 'FEDERAL_LIST'
-                    list_id = 'BUND-DE-LIST'
                 else:
                     scope = 'FEDERAL_STATE_LIST'
-                    # Try to extract state from name
-                    from letters.constants import normalize_german_state, get_state_code
-                    list_id = None
-                    for state_name in ['Baden-Württemberg', 'Bayern', 'Berlin', 'Brandenburg',
-                                      'Bremen', 'Hamburg', 'Hessen', 'Mecklenburg-Vorpommern',
-                                      'Niedersachsen', 'Nordrhein-Westfalen', 'Rheinland-Pfalz',
-                                      'Saarland', 'Sachsen', 'Sachsen-Anhalt', 'Schleswig-Holstein', 'Thüringen']:
-                        if state_name.lower() in name_lower:
-                            state_code = get_state_code(state_name)
-                            if state_code:
-                                list_id = f"{state_code}-LIST"
-                                break
-                    if not list_id:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.warning("Could not determine state code for federal list: %s", name)
+                # Electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
             elif level == 'STATE':
                 if 'regional' in name_lower or 'wahlkreis' in name_lower:
                     scope = 'STATE_REGIONAL_LIST'
-                    list_id = None  # No standard format for regional lists
                 else:
                     scope = 'STATE_LIST'
-                    # Get state code from parliament
-                    from letters.constants import get_state_code
-                    parliament = Parliament.objects.filter(metadata__api_id=parliament_data['id']).first()
-                    if parliament:
-                        state_code = get_state_code(parliament.region)
-                        if state_code:
-                            list_id = f"{state_code}-STATE-LIST"
-                        else:
-                            list_id = None
-                    else:
-                        list_id = None
+                # Electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
             elif level == 'EU':
                 scope = 'EU_AT_LARGE'
-                list_id = 'DE'
+                # EU electoral lists don't have geographic boundaries, so no list_id
+                list_id = None
             else:
                 scope = 'OTHER'
                 list_id = None
