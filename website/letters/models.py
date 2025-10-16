@@ -250,7 +250,8 @@ class Representative(models.Model):
             self._constituency_cache = constituencies
 
         if self.parliament.level == 'EU':
-            return bool(verification.get_constituencies())
+            verification_constituencies = verification.get_constituencies()
+            return any(c.scope == 'FEDERAL_LIST' for c in verification_constituencies)
 
         verification_constituencies = verification.get_constituencies()
         verification_constituency_ids = {c.id for c in verification_constituencies}
@@ -603,27 +604,6 @@ class IdentityVerification(models.Model):
         blank=True,
         related_name='verified_residents'
     )
-    constituency = models.ForeignKey(
-        Constituency,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='verified_residents'
-    )
-    federal_constituency = models.ForeignKey(
-        Constituency,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='federal_verified_residents'
-    )
-    state_constituency = models.ForeignKey(
-        Constituency,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='state_verified_residents'
-    )
     # Wahlkreis identifiers (geographic electoral districts)
     federal_wahlkreis_number = models.CharField(
         max_length=10,
@@ -741,6 +721,28 @@ class IdentityVerification(models.Model):
                 if normalized_state:
                     states.add(normalized_state)
         return states
+
+    @property
+    def constituency(self) -> Optional[Constituency]:
+        """Helper property: returns first constituency from M2M."""
+        constituencies = self.get_constituencies()
+        return constituencies[0] if constituencies else None
+
+    @property
+    def federal_constituency(self) -> Optional[Constituency]:
+        """Helper property: filters constituencies for FEDERAL_DISTRICT."""
+        for const in self.get_constituencies():
+            if const.scope == 'FEDERAL_DISTRICT':
+                return const
+        return None
+
+    @property
+    def state_constituency(self) -> Optional[Constituency]:
+        """Helper property: filters constituencies for state-level."""
+        for const in self.get_constituencies():
+            if const.scope in ('STATE_LIST', 'STATE_DISTRICT', 'FEDERAL_STATE_LIST'):
+                return const
+        return None
 
 
 class Report(models.Model):

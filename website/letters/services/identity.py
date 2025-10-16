@@ -51,11 +51,6 @@ class IdentityVerificationService:
             eu_wahlkreis = wahlkreis_result['eu_wahlkreis']
             constituencies_to_link = wahlkreis_result['constituencies']
 
-        # For backward compatibility, still set the old fields
-        constituency = constituencies_to_link[0] if constituencies_to_link else None
-        federal_constituency = next((c for c in constituencies_to_link if c.scope == 'FEDERAL_DISTRICT'), None)
-        state_constituency = next((c for c in constituencies_to_link if c.scope in ('STATE_LIST', 'STATE_DISTRICT', 'FEDERAL_STATE_LIST')), None)
-
         expires_at_value = verification_data.get('expires_at')
         expires_at = None
         if expires_at_value:
@@ -72,9 +67,6 @@ class IdentityVerificationService:
             'verified_at': timezone.now(),
             'expires_at': expires_at,
             'verification_type': 'THIRD_PARTY',
-            'constituency': constituency,
-            'federal_constituency': federal_constituency,
-            'state_constituency': state_constituency,
             'federal_wahlkreis_number': federal_wahlkreis_number,
             'state_wahlkreis_number': state_wahlkreis_number,
             'eu_wahlkreis': eu_wahlkreis,
@@ -99,9 +91,6 @@ class IdentityVerificationService:
             'verification_data',
             'verified_at',
             'expires_at',
-            'constituency',
-            'federal_constituency',
-            'state_constituency',
             'federal_wahlkreis_number',
             'state_wahlkreis_number',
             'eu_wahlkreis',
@@ -127,9 +116,6 @@ class IdentityVerificationService:
         verification.provider = 'self_declared'
         verification.status = 'SELF_DECLARED'
         verification.verification_type = 'SELF_DECLARED'
-        verification.federal_constituency = federal_constituency
-        verification.state_constituency = state_constituency
-        verification.constituency = federal_constituency or state_constituency
         verification.verified_at = timezone.now()
         verification.expires_at = None
 

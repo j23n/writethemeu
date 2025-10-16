@@ -18,9 +18,9 @@
             {% endif %}
             {{ representative.parliament.name }}
             {% if constituency %}
-                · {% trans "Constituency" %}: {{ constituency.name }}
+                · {% trans "Wahlkreis" %}: {{ constituency.name }}
             {% elif representative.primary_constituency %}
-                · {% trans "Constituency" %}: {{ representative.primary_constituency.name }}
+                · {% trans "Wahlkreis" %}: {{ representative.primary_constituency.name }}
             {% endif %}
         </p>
         <p class="mb-1 small text-muted">

@@ -13,7 +13,7 @@
     <h2>{% blocktrans with username=user.username %}{{ username }}'s Profile{% endblocktrans %}</h2>
 
     <div class="mt-4">
-        <h3>{% trans "Your Constituencies" %}</h3>
+        <h3>{% trans "Your Wahlkreise" %}</h3>
         <p class="text-muted">
             {% trans "Select your Wahlkreise to help us recommend the right representatives. You can search by address or select manually from the dropdowns." %}
         </p>
@@ -78,7 +78,7 @@
                 </div>
             {% endfor %}
 
-            <button type="submit" class="btn btn-primary">{% trans "Save Constituencies" %}</button>
+            <button type="submit" class="btn btn-primary">{% trans "Save Wahlkreise" %}</button>
         </form>
     </div>
 </div>

@@ -214,11 +214,11 @@ class SignatureAdmin(admin.ModelAdmin):
 
 @admin.register(IdentityVerification)
 class IdentityVerificationAdmin(admin.ModelAdmin):
-    list_display = ['user', 'status', 'provider', 'constituency', 'parliament', 'parliament_term', 'verified_at', 'expires_at']
+    list_display = ['user', 'status', 'provider', 'parliament', 'parliament_term', 'verified_at', 'expires_at']
     list_filter = ['status', 'provider', 'parliament__level', 'verified_at', 'parliament_term__name']
-    search_fields = ['user__username', 'city', 'postal_code', 'state', 'parliament__name', 'parliament_term__name']
+    search_fields = ['user__username', 'parliament__name', 'parliament_term__name']
     readonly_fields = ['created_at', 'updated_at']
-    raw_id_fields = ['user', 'parliament', 'parliament_term', 'constituency']
+    raw_id_fields = ['user', 'parliament', 'parliament_term']
 
 
 @admin.register(Report)
