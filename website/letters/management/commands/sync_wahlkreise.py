@@ -382,29 +382,62 @@ class Command(BaseCommand):
             # Create constituency name matching the format used by sync_representatives
             constituency_name = f"{wkr_nr} - {wkr_name} (Bundestag 2025 - 2029)"
 
-            constituency, created = Constituency.objects.update_or_create(
-                external_id=str(wkr_nr),
-                defaults={
-                    'parliament_term': term,
-                    'name': constituency_name,
-                    'scope': 'FEDERAL_DISTRICT',
-                    'metadata': {
-                        'WKR_NR': wkr_nr,
-                        'WKR_NAME': wkr_name,
-                        'LAND_NAME': land_name,
-                        'state': land_name,
-                        'source': 'wahlkreise_geojson'
-                    }
-                }
-            )
+            # Try to find existing constituency by external_id or by name
+            existing = Constituency.objects.filter(
+                external_id=str(wkr_nr)
+            ).first()
 
-            constituency.last_synced_at = timezone.now()
-            constituency.save(update_fields=['last_synced_at'])
+            if not existing:
+                # Try matching by parliament_term, name, and scope
+                existing = Constituency.objects.filter(
+                    parliament_term=term,
+                    name=constituency_name,
+                    scope='FEDERAL_DISTRICT'
+                ).first()
 
-            if created:
-                stats['created'] += 1
-            else:
+            if existing:
+                # Update existing constituency
+                existing.external_id = str(wkr_nr)
+                existing.parliament_term = term
+                existing.name = constituency_name
+                existing.scope = 'FEDERAL_DISTRICT'
+                if not existing.metadata:
+                    existing.metadata = {}
+                existing.metadata.update({
+                    'WKR_NR': wkr_nr,
+                    'WKR_NAME': wkr_name,
+                    'LAND_NAME': land_name,
+                    'state': land_name,
+                    'source': 'wahlkreise_geojson'
+                })
+                existing.last_synced_at = timezone.now()
+                existing.save()
                 stats['updated'] += 1
+            else:
+                # Create new constituency
+                try:
+                    Constituency.objects.create(
+                        external_id=str(wkr_nr),
+                        parliament_term=term,
+                        name=constituency_name,
+                        scope='FEDERAL_DISTRICT',
+                        metadata={
+                            'WKR_NR': wkr_nr,
+                            'WKR_NAME': wkr_name,
+                            'LAND_NAME': land_name,
+                            'state': land_name,
+                            'source': 'wahlkreise_geojson'
+                        },
+                        last_synced_at=timezone.now()
+                    )
+                    stats['created'] += 1
+                except Exception as e:
+                    self.stdout.write(
+                        self.style.ERROR(
+                            f"Failed to create constituency {constituency_name}: {e}"
+                        )
+                    )
+                    raise
 
         return stats
 
