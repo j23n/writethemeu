@@ -1,5 +1,5 @@
 # ABOUTME: Service for synchronizing representatives, parliaments, and committees from Abgeordnetenwatch.
-# ABOUTME: Handles data import, photo downloads, and committee-topic mapping from the external API.
+# ABOUTME: Links representatives to constituencies via external_id from API. Run sync_wahlkreise first.
 
 from __future__ import annotations
 
@@ -32,7 +32,14 @@ logger = logging.getLogger('letters.services')
 
 
 class RepresentativeSyncService:
-    """Imports parliaments/terms/constituencies/representatives from Abgeordnetenwatch."""
+    """
+    Sync representatives from Abgeordnetenwatch API and link to constituencies.
+
+    Prerequisites:
+    - Run sync_wahlkreise first to create constituencies
+    - Constituencies are linked by external_id from API
+    - Both direct mandates and list seats are supported
+    """
 
     def __init__(self, dry_run: bool = False):
         self.dry_run = dry_run
