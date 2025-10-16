@@ -3,7 +3,6 @@
 
 from django.core.management.base import BaseCommand
 from letters.models import Representative
-from letters.services import ConstituencyLocator
 from letters.services.wahlkreis import WahlkreisResolver
 
 
@@ -50,27 +49,31 @@ class Command(BaseCommand):
         limit = options['limit']
 
         try:
-            # Use constituency locator if address provided
+            # Use WahlkreisResolver if address provided
             if postal_code or (street and city):
-                # First try to resolve Wahlkreis if full address provided
-                if street and postal_code and city:
-                    resolver = WahlkreisResolver()
-                    result = resolver.resolve(street=street, postal_code=postal_code, city=city)
+                # Build address string
+                address_parts = []
+                if street:
+                    address_parts.append(street)
+                if postal_code:
+                    address_parts.append(postal_code)
+                if city:
+                    address_parts.append(city)
 
-                    if result['federal_wahlkreis_number']:
-                        self.stdout.write(self.style.SUCCESS(
-                            f"Found Wahlkreise: "
-                            f"Federal={result['federal_wahlkreis_number']}, "
-                            f"State={result['state_wahlkreis_number']}, "
-                            f"EU={result['eu_wahlkreis']}"
-                        ))
+                address = ', '.join(address_parts)
 
-                locator = ConstituencyLocator()
-                constituencies = locator.locate(
-                    street=street,
-                    postal_code=postal_code,
-                    city=city
-                )
+                resolver = WahlkreisResolver()
+                result = resolver.resolve(address=address)
+
+                if result['federal_wahlkreis_number']:
+                    self.stdout.write(self.style.SUCCESS(
+                        f"Found Wahlkreise: "
+                        f"Federal={result['federal_wahlkreis_number']}, "
+                        f"State={result['state_wahlkreis_number']}, "
+                        f"EU={result['eu_wahlkreis']}"
+                    ))
+
+                constituencies = result['constituencies']
 
                 if not constituencies:
                     self.stdout.write('No constituencies found for this location')
@@ -98,10 +101,8 @@ class Command(BaseCommand):
                 # Filter by topics if provided
                 if topics_str:
                     topic_keywords = [t.strip() for t in topics_str.split(',')]
-                    # Simple keyword filter on representative focus areas
                     filtered_reps = []
                     for rep in representatives:
-                        # Check if any committee or focus area matches
                         rep_text = ' '.join([
                             rep.full_name,
                             ' '.join([c.name for c in rep.committees.all()]),
@@ -118,7 +119,6 @@ class Command(BaseCommand):
                     constituency_label = constituency.name if constituency else rep.parliament.name
                     self.stdout.write(f'{rep.full_name} ({rep.party}) - {constituency_label}')
 
-                    # Show committees
                     committees = list(rep.committees.all()[:3])
                     if committees:
                         committee_names = ', '.join([c.name for c in committees])
@@ -127,11 +127,11 @@ class Command(BaseCommand):
             # Use topic-based search if only topics provided
             elif topics_str:
                 self.stdout.write('Topic-based representative search not yet implemented')
-                self.stdout.write('Please provide at least a postal code for location-based search')
+                self.stdout.write('Please provide at least an address for location-based search')
 
             else:
                 self.stderr.write(self.style.ERROR(
-                    'Error: Please provide either an address (--postal-code required) or --topics'
+                    'Error: Please provide an address (street, postal code, and/or city) or --topics'
                 ))
 
         except Exception as e:
