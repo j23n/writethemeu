@@ -117,10 +117,14 @@ class StateDataIntegrationTest(TestCase):
         self.assertEqual(result['state']['wkr_name'], 'Stuttgart I')
         self.assertEqual(result['state']['land_code'], 'BW')
 
-        # Step 4: Verify backward compatibility - public API still works
+        # Step 4: Verify public API returns both federal and state
         public_result = locator.locate(48.8, 9.2)
 
         self.assertIsNotNone(public_result)
-        self.assertEqual(public_result[0], 258)  # wkr_nr
-        self.assertEqual(public_result[1], 'Stuttgart I')  # wkr_name
-        self.assertEqual(public_result[2], 'Baden-Württemberg')  # land_name
+        self.assertIn('federal', public_result)
+        self.assertIn('state', public_result)
+        self.assertEqual(public_result['federal']['wkr_nr'], 258)
+        self.assertEqual(public_result['federal']['wkr_name'], 'Stuttgart I')
+        self.assertEqual(public_result['federal']['land_name'], 'Baden-Württemberg')
+        self.assertEqual(public_result['state']['wkr_nr'], 1)
+        self.assertEqual(public_result['state']['wkr_name'], 'Stuttgart I')
