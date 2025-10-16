@@ -20,7 +20,7 @@ class WahlkreisResolver:
     Process:
     1. Geocode address → coordinates
     2. Look up Wahlkreis from GeoJSON → get federal/state Wahlkreis IDs
-    3. Query Constituency objects by wahlkreis_id
+    3. Query Constituency objects by list_id
     4. Add state-level list constituencies for the user's state
     """
 
@@ -112,13 +112,13 @@ class WahlkreisResolver:
             state_wahlkreis_number = f"{state_land_code}-{str(state_wkr_nr).zfill(4)}"
             result['state_wahlkreis_number'] = state_wahlkreis_number
 
-        # Step 3: Find constituencies by wahlkreis_id
+        # Step 3: Find constituencies by list_id
         constituencies = []
 
         # Add federal district constituency
         federal_constituencies = list(
             Constituency.objects.filter(
-                wahlkreis_id=federal_wahlkreis_number,
+                list_id=federal_wahlkreis_number,
                 scope='FEDERAL_DISTRICT'
             )
         )
@@ -129,7 +129,7 @@ class WahlkreisResolver:
             state_wahlkreis_number = result['state_wahlkreis_number']
             state_district_constituencies = list(
                 Constituency.objects.filter(
-                    wahlkreis_id=state_wahlkreis_number,
+                    list_id=state_wahlkreis_number,
                     scope='STATE_DISTRICT'
                 )
             )

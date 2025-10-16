@@ -21,12 +21,12 @@ class WahlkreisResolverTests(TestCase):
             name='20. Wahlperiode'
         )
 
-        # Create a federal district constituency with wahlkreis_id
+        # Create a federal district constituency with list_id
         self.federal_constituency = Constituency.objects.create(
             parliament_term=self.federal_term,
             name='Berlin-Mitte',
             scope='FEDERAL_DISTRICT',
-            wahlkreis_id='075',
+            list_id='075',
             metadata={'state': 'Berlin'}
         )
 
@@ -101,7 +101,7 @@ class WahlkreisResolverTests(TestCase):
             parliament_term=self.state_term,
             name='Berlin-Mitte (Landtag)',
             scope='STATE_DISTRICT',
-            wahlkreis_id='BE-0025',
+            list_id='BE-0025',
             metadata={'state': 'Berlin'}
         )
 

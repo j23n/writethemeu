@@ -274,7 +274,7 @@ class WahlkreisLocator:
                     properties = feature.get('properties', {})
 
                     # Normalize properties to handle different field names
-                    wkr_nr, wkr_name = self._normalize_properties(properties)
+                    wkr_nr, wkr_name = WahlkreisLocator._normalize_properties(properties)
 
                     land_code = properties.get('LAND_CODE', state_code)
                     land_name = properties.get('LAND_NAME', '')
@@ -313,7 +313,8 @@ class WahlkreisLocator:
         }
         return mapping.get(land_name, '')
 
-    def _normalize_properties(self, props: dict) -> tuple:
+    @staticmethod
+    def _normalize_properties(props: dict) -> tuple:
         """
         Normalize GeoJSON properties to extract WKR_NR and WKR_NAME.
 
