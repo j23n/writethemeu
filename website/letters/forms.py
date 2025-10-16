@@ -218,17 +218,16 @@ class SelfDeclaredConstituencyForm(forms.Form):
         if self.user and hasattr(self.user, 'identity_verification'):
             verification = getattr(self.user, 'identity_verification', None)
             if verification:
-                if verification.federal_constituency_id:
-                    self.fields['federal_constituency'].initial = verification.federal_constituency_id
+                if verification.federal_constituency:
+                    self.fields['federal_constituency'].initial = verification.federal_constituency.id
                 elif (
-                    verification.constituency_id
-                    and verification.constituency
+                    verification.constituency
                     and verification.constituency.parliament.level == 'FEDERAL'
                 ):
-                    self.fields['federal_constituency'].initial = verification.constituency_id
+                    self.fields['federal_constituency'].initial = verification.constituency.id
 
-                if verification.state_constituency_id:
-                    self.fields['state_constituency'].initial = verification.state_constituency_id
+                if verification.state_constituency:
+                    self.fields['state_constituency'].initial = verification.state_constituency.id
 
     def clean(self):
         cleaned_data = super().clean()
