@@ -42,11 +42,11 @@ class WahlkreisResolverTests(TestCase):
             name='19. Wahlperiode'
         )
 
-        # Create state list constituency
-        self.state_constituency = Constituency.objects.create(
-            parliament_term=self.state_term,
-            name='Berlin',
-            scope='STATE_LIST',
+        # Create federal state list constituency (Landesliste for Bundestag)
+        self.federal_state_list = Constituency.objects.create(
+            parliament_term=self.federal_term,
+            name='Landesliste Berlin',
+            scope='FEDERAL_STATE_LIST',
             metadata={'state': 'Berlin'}
         )
 
@@ -85,10 +85,10 @@ class WahlkreisResolverTests(TestCase):
         self.assertEqual(result['federal_wahlkreis_number'], '075')
         self.assertEqual(result['eu_wahlkreis'], 'DE')
 
-        # Check constituencies returned
+        # Check constituencies returned (federal district + federal state list)
         constituency_ids = {c.id for c in result['constituencies']}
         self.assertIn(self.federal_constituency.id, constituency_ids)
-        self.assertIn(self.state_constituency.id, constituency_ids)
+        self.assertIn(self.federal_state_list.id, constituency_ids)
 
     @patch('letters.services.wahlkreis.AddressGeocoder.geocode')
     @patch('letters.services.wahlkreis.WahlkreisLocator.locate')
@@ -96,12 +96,12 @@ class WahlkreisResolverTests(TestCase):
         self, mock_locate, mock_geocode
     ):
         """Test that resolve() returns state district constituencies when available"""
-        # Create state district constituency
+        # Create state district constituency with proper format (STATE_CODE-0000)
         state_district = Constituency.objects.create(
             parliament_term=self.state_term,
             name='Berlin-Mitte (Landtag)',
             scope='STATE_DISTRICT',
-            wahlkreis_id='025',
+            wahlkreis_id='BE-0025',
             metadata={'state': 'Berlin'}
         )
 
@@ -127,15 +127,15 @@ class WahlkreisResolverTests(TestCase):
         resolver = WahlkreisResolver()
         result = resolver.resolve(address='Unter den Linden 1, 10117 Berlin')
 
-        # Check wahlkreis numbers
+        # Check wahlkreis numbers (state includes state code prefix)
         self.assertEqual(result['federal_wahlkreis_number'], '075')
-        self.assertEqual(result['state_wahlkreis_number'], '025')
+        self.assertEqual(result['state_wahlkreis_number'], 'BE-0025')
 
         # Check all constituency types returned
         constituency_ids = {c.id for c in result['constituencies']}
         self.assertIn(self.federal_constituency.id, constituency_ids,
                      "Should include federal district")
-        self.assertIn(self.state_constituency.id, constituency_ids,
-                     "Should include state list")
+        self.assertIn(self.federal_state_list.id, constituency_ids,
+                     "Should include federal state list")
         self.assertIn(state_district.id, constituency_ids,
                      "Should include state district")

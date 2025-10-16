@@ -204,6 +204,20 @@ class WahlkreisLocator:
     _cached_state_constituencies = None
     _cached_path = None
 
+    # CRS mapping for state GeoJSON files
+    # Most states use UTM zones, Bayern uses DHDN Gauss-Kruger
+    STATE_CRS = {
+        'BE': 'EPSG:25833',  # UTM Zone 33N (Berlin is on zone boundary, uses 33N)
+        'BW': 'EPSG:25832',  # UTM Zone 32N
+        'BY': 'EPSG:31468',  # DHDN Gauss-Kruger Zone 4
+        'HB': 'EPSG:25832',  # UTM Zone 32N
+        'NI': 'EPSG:25832',  # UTM Zone 32N
+        'NW': 'EPSG:25832',  # UTM Zone 32N
+        'SH': 'EPSG:4326',   # WGS84 (no transformation needed)
+        'ST': 'EPSG:25833',  # UTM Zone 33N
+        'TH': 'EPSG:25833',  # UTM Zone 33N
+    }
+
     def __init__(self, geojson_path=None):
         """
         Load and parse GeoJSON constituencies for federal and available states.
@@ -258,8 +272,10 @@ class WahlkreisLocator:
 
                 for feature in state_geojson.get('features', []):
                     properties = feature.get('properties', {})
-                    wkr_nr = properties.get('WKR_NR')
-                    wkr_name = properties.get('WKR_NAME', '')
+
+                    # Normalize properties to handle different field names
+                    wkr_nr, wkr_name = self._normalize_properties(properties)
+
                     land_code = properties.get('LAND_CODE', state_code)
                     land_name = properties.get('LAND_NAME', '')
 
@@ -297,9 +313,76 @@ class WahlkreisLocator:
         }
         return mapping.get(land_name, '')
 
+    def _normalize_properties(self, props: dict) -> tuple:
+        """
+        Normalize GeoJSON properties to extract WKR_NR and WKR_NAME.
+
+        Handles different field names across various state GeoJSON sources.
+        Returns (wkr_nr, wkr_name) tuple.
+        """
+        import re
+
+        # Normalize WKR_NR from various possible field names
+        wkr_nr = props.get("WKR_NR")
+        if wkr_nr is None:
+            wkr_nr = (
+                props.get("Nummer") or         # BW
+                props.get("nummer") or
+                props.get("SKR_NR") or         # BY (Bayern)
+                props.get("AWK") or            # BE (Berlin)
+                props.get("wbz") or            # HB (Bremen)
+                props.get("WKNum") or          # NI (Niedersachsen)
+                props.get("LWKNR") or          # NW (Nordrhein-Westfalen)
+                props.get("WK_Nr_21") or       # ST (Sachsen-Anhalt)
+                props.get("wahlkreis_nr") or   # SH (Schleswig-Holstein)
+                props.get("WK_ID") or          # TH (Thüringen)
+                props.get("WK_NR") or
+                props.get("WahlkreisNr") or
+                props.get("STIMMKREIS") or
+                props.get("Nr")
+            )
+
+        # Convert to int if string
+        if isinstance(wkr_nr, str):
+            try:
+                wkr_nr = int(wkr_nr)
+            except ValueError:
+                pass
+
+        # Normalize WKR_NAME from various possible field names
+        wkr_name = props.get("WKR_NAME")
+        if wkr_name is None:
+            wkr_name = (
+                props.get("WK Name") or        # BW
+                props.get("SKR_NAME") or       # BY (Bayern)
+                props.get("AWK") or            # BE (Berlin, uses AWK for both)
+                props.get("BEZ_GEM") or        # HB (Bremen)
+                props.get("WKName") or         # NI (Niedersachsen)
+                props.get("Name") or           # NW (Nordrhein-Westfalen)
+                props.get("WK_Name_21") or     # ST (Sachsen-Anhalt)
+                props.get("wahlkreis_name") or # SH (Schleswig-Holstein)
+                props.get("WK") or             # TH (Thüringen)
+                props.get("name") or
+                props.get("Wahlkreis") or
+                props.get("wahlkreis") or
+                props.get("WK_NAME") or
+                props.get("WahlkreisName") or
+                props.get("STIMMKREISNAME")
+            )
+
+        # Strip HTML tags (e.g., <br>) from names
+        if isinstance(wkr_name, str):
+            wkr_name = re.sub(r'<[^>]+>', '', wkr_name)
+
+        return wkr_nr, wkr_name or ''
+
     def _locate_detailed(self, latitude, longitude):
         """
         Find both federal and state constituencies for given coordinates.
+
+        Args:
+            latitude: WGS84 latitude
+            longitude: WGS84 longitude
 
         Returns:
             dict with 'federal' and 'state' keys, each containing:
@@ -312,7 +395,9 @@ class WahlkreisLocator:
             or None if not found.
         """
         from shapely.geometry import Point
+        from pyproj import Transformer
 
+        # Federal constituencies use WGS84 (no transformation needed)
         point = Point(longitude, latitude)
 
         # Find federal constituency
@@ -335,8 +420,22 @@ class WahlkreisLocator:
             land_code = federal_result['land_code']
 
             if land_code in self.state_constituencies:
+                # Get the CRS for this state
+                state_crs = self.STATE_CRS.get(land_code, 'EPSG:4326')
+
+                # Transform coordinates if needed
+                if state_crs != 'EPSG:4326':
+                    # Transform from WGS84 to state CRS
+                    transformer = Transformer.from_crs('EPSG:4326', state_crs, always_xy=True)
+                    x, y = transformer.transform(longitude, latitude)
+                    state_point = Point(x, y)
+                else:
+                    # No transformation needed for WGS84
+                    state_point = point
+
+                # Check state constituencies with transformed coordinates
                 for wkr_nr, wkr_name, state_land_code, land_name, geometry in self.state_constituencies[land_code]:
-                    if geometry.contains(point):
+                    if geometry.contains(state_point):
                         state_result = {
                             'wkr_nr': wkr_nr,
                             'wkr_name': wkr_name,

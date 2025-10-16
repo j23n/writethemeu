@@ -106,7 +106,10 @@ class WahlkreisResolver:
         # Extract state Wahlkreis data if available
         if state_data:
             state_wkr_nr = state_data['wkr_nr']
-            state_wahlkreis_number = str(state_wkr_nr).zfill(3)
+            state_land_code = state_data['land_code']
+            # State constituencies use format: {STATE_CODE}-{NUMBER}
+            # e.g., "BY-0108", "BE-0101"
+            state_wahlkreis_number = f"{state_land_code}-{str(state_wkr_nr).zfill(4)}"
             result['state_wahlkreis_number'] = state_wahlkreis_number
 
         # Step 3: Find constituencies by wahlkreis_id

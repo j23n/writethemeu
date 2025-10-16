@@ -802,6 +802,70 @@ class Command(BaseCommand):
 
             return json.dumps(geojson, ensure_ascii=False, indent=None)
 
+    def _normalize_properties(self, props: dict) -> tuple:
+        """
+        Normalize GeoJSON properties to extract WKR_NR and WKR_NAME.
+
+        Handles different field names across various state GeoJSON sources.
+        Returns (wkr_nr, wkr_name) tuple.
+
+        Note: This is a copy of WahlkreisLocator._normalize_properties
+        to avoid circular dependencies and file loading issues in tests.
+        """
+        # Normalize WKR_NR from various possible field names
+        wkr_nr = props.get("WKR_NR")
+        if wkr_nr is None:
+            wkr_nr = (
+                props.get("Nummer") or         # BW
+                props.get("nummer") or
+                props.get("SKR_NR") or         # BY (Bayern)
+                props.get("AWK") or            # BE (Berlin)
+                props.get("wbz") or            # HB (Bremen)
+                props.get("WKNum") or          # NI (Niedersachsen)
+                props.get("LWKNR") or          # NW (Nordrhein-Westfalen)
+                props.get("WK_Nr_21") or       # ST (Sachsen-Anhalt)
+                props.get("wahlkreis_nr") or   # SH (Schleswig-Holstein)
+                props.get("WK_ID") or          # TH (Thüringen)
+                props.get("WK_NR") or
+                props.get("WahlkreisNr") or
+                props.get("STIMMKREIS") or
+                props.get("Nr")
+            )
+
+        # Convert to int if string
+        if isinstance(wkr_nr, str):
+            try:
+                wkr_nr = int(wkr_nr)
+            except ValueError:
+                pass
+
+        # Normalize WKR_NAME from various possible field names
+        wkr_name = props.get("WKR_NAME")
+        if wkr_name is None:
+            wkr_name = (
+                props.get("WK Name") or        # BW
+                props.get("SKR_NAME") or       # BY (Bayern)
+                props.get("AWK") or            # BE (Berlin, uses AWK for both)
+                props.get("BEZ_GEM") or        # HB (Bremen)
+                props.get("WKName") or         # NI (Niedersachsen)
+                props.get("Name") or           # NW (Nordrhein-Westfalen)
+                props.get("WK_Name_21") or     # ST (Sachsen-Anhalt)
+                props.get("wahlkreis_name") or # SH (Schleswig-Holstein)
+                props.get("WK") or             # TH (Thüringen)
+                props.get("name") or
+                props.get("Wahlkreis") or
+                props.get("wahlkreis") or
+                props.get("WK_NAME") or
+                props.get("WahlkreisName") or
+                props.get("STIMMKREISNAME")
+            )
+
+        # Strip HTML tags (e.g., <br>) from names
+        if isinstance(wkr_name, str):
+            wkr_name = re.sub(r'<[^>]+>', '', wkr_name)
+
+        return wkr_nr, wkr_name or ''
+
     def _normalize_state_geojson(self, geojson_text: str, state_code: str, state_name: str) -> str:
         """Add standardized properties to state GeoJSON features."""
         data = json.loads(geojson_text)
@@ -809,51 +873,13 @@ class Command(BaseCommand):
         for feature in data.get("features", []):
             props = feature.get("properties", {})
 
-            # Normalize WKR_NR from various possible field names
-            if "WKR_NR" not in props:
-                wkr_nr = (
-                    props.get("Nummer") or         # BW
-                    props.get("nummer") or
-                    props.get("SKR_NR") or         # BY (Bayern)
-                    props.get("AWK") or            # BE (Berlin)
-                    props.get("wbz") or            # HB (Bremen)
-                    props.get("WKNum") or          # NI (Niedersachsen)
-                    props.get("LWKNR") or          # NW (Nordrhein-Westfalen)
-                    props.get("WK_Nr_21") or       # ST (Sachsen-Anhalt)
-                    props.get("wahlkreis_nr") or   # SH (Schleswig-Holstein)
-                    props.get("WK_ID") or          # TH (Thüringen)
-                    props.get("WK_NR") or
-                    props.get("WahlkreisNr") or
-                    props.get("STIMMKREIS") or
-                    props.get("Nr")
-                )
-                if wkr_nr is not None:
-                    props["WKR_NR"] = wkr_nr
+            # Use local normalization logic
+            wkr_nr, wkr_name = self._normalize_properties(props)
 
-            # Normalize WKR_NAME from various possible field names
-            if "WKR_NAME" not in props:
-                wkr_name = (
-                    props.get("WK Name") or        # BW
-                    props.get("SKR_NAME") or       # BY (Bayern)
-                    props.get("AWK") or            # BE (Berlin, uses AWK for both)
-                    props.get("BEZ_GEM") or        # HB (Bremen)
-                    props.get("WKName") or         # NI (Niedersachsen)
-                    props.get("Name") or           # NW (Nordrhein-Westfalen)
-                    props.get("WK_Name_21") or     # ST (Sachsen-Anhalt)
-                    props.get("wahlkreis_name") or # SH (Schleswig-Holstein)
-                    props.get("WK") or             # TH (Thüringen)
-                    props.get("name") or
-                    props.get("Wahlkreis") or
-                    props.get("wahlkreis") or
-                    props.get("WK_NAME") or
-                    props.get("WahlkreisName") or
-                    props.get("STIMMKREISNAME")
-                )
-                if wkr_name is not None:
-                    # Strip HTML tags (e.g., <br>) from names
-                    if isinstance(wkr_name, str):
-                        wkr_name = re.sub(r'<[^>]+>', '', wkr_name)
-                    props["WKR_NAME"] = wkr_name
+            if wkr_nr is not None:
+                props["WKR_NR"] = wkr_nr
+            if wkr_name:
+                props["WKR_NAME"] = wkr_name
 
             # Ensure standard fields exist
             if "LAND_CODE" not in props:
@@ -862,13 +888,6 @@ class Command(BaseCommand):
                 props["LAND_NAME"] = state_name
             if "LEVEL" not in props:
                 props["LEVEL"] = "STATE"
-
-            # Normalize WKR_NR to integer if it's a string
-            if "WKR_NR" in props and isinstance(props["WKR_NR"], str):
-                try:
-                    props["WKR_NR"] = int(props["WKR_NR"])
-                except ValueError:
-                    pass  # Keep as string if not numeric
 
             feature["properties"] = props
 
