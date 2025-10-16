@@ -10,9 +10,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--address',
+            'address',
             type=str,
-            required=True,
             help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 

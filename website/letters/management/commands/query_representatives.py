@@ -12,8 +12,9 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         # Address argument
         parser.add_argument(
-            '--address',
+            'address',
             type=str,
+            nargs='?',
             help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 
@@ -108,7 +109,7 @@ class Command(BaseCommand):
 
             else:
                 self.stderr.write(self.style.ERROR(
-                    'Error: Please provide an --address or --topics'
+                    'Error: Please provide an address or --topics'
                 ))
 
         except Exception as e:
