@@ -251,7 +251,7 @@ class Representative(models.Model):
 
         if self.parliament.level == 'EU':
             verification_constituencies = verification.get_constituencies()
-            return any(c.scope == 'FEDERAL_LIST' for c in verification_constituencies)
+            return any(c.scope in ('FEDERAL_LIST', 'STATE_LIST') for c in verification_constituencies)
 
         verification_constituencies = verification.get_constituencies()
         verification_constituency_ids = {c.id for c in verification_constituencies}
@@ -267,9 +267,6 @@ class Representative(models.Model):
             for c in constituencies
             if c.metadata and c.metadata.get('state')
         }
-
-        if self.election_mode == 'FEDERAL_LIST':
-            return bool(verification.get_constituencies())
 
         if self.election_mode in {'STATE_LIST', 'STATE_REGIONAL_LIST'}:
             if verification_states & rep_states:

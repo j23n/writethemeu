@@ -121,6 +121,7 @@ class IdentityVerificationService:
 
         verification_data = verification.verification_data or {}
         verification_data['self_declared'] = True
+        verification_data['country'] = verification_data.get('country', 'DE')
         if federal_constituency:
             verification_data['federal_constituency_id'] = federal_constituency.id
         if state_constituency:

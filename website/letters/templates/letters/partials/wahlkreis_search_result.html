@@ -2,8 +2,8 @@
 
 {% if success %}
     <div class="alert alert-success"
-         data-federal-constituency-id="{{ federal_constituency_id }}"
-         data-state-constituency-id="{{ state_constituency_id }}">
+         data-federal-wahlkreis-id="{{ federal_constituency_id }}"
+         data-state-wahlkreis-id="{{ state_constituency_id }}">
         {% trans "Found:" %} {{ wahlkreis_name }} ({{ land_name }})
     </div>
 {% else %}
