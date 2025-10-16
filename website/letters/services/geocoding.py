@@ -36,18 +36,14 @@ class AddressGeocoder:
 
     def geocode(
         self,
-        street: str,
-        postal_code: str,
-        city: str,
+        address: str,
         country: str = 'DE'
     ) -> Tuple[Optional[float], Optional[float], bool, Optional[str]]:
         """
         Geocode a German address to latitude/longitude coordinates.
 
         Args:
-            street: Street name and number
-            postal_code: Postal code (PLZ)
-            city: City name
+            address: Full address string (e.g., "Unter den Linden 1, 10117 Berlin")
             country: Country code (default: 'DE')
 
         Returns:
@@ -55,61 +51,54 @@ class AddressGeocoder:
             - On success: (lat, lon, True, None)
             - On failure: (None, None, False, error_message)
         """
-        # Normalize inputs
-        street = (street or '').strip()
-        postal_code = (postal_code or '').strip()
-        city = (city or '').strip()
+        address = (address or '').strip()
         country = (country or 'DE').upper()
 
-        # Generate cache key
-        address_hash = self._generate_cache_key(street, postal_code, city, country)
+        if not address:
+            return None, None, False, 'Address is required'
 
-        # Check cache first
+        address_hash = self._generate_cache_key(address, country)
+
         cached = self._get_from_cache(address_hash)
         if cached is not None:
             return cached
 
-        # Make API request with rate limiting
         try:
             self._apply_rate_limit()
-            result = self._query_nominatim(street, postal_code, city, country)
+            result = self._query_nominatim(address, country)
 
             if result:
                 lat, lon = result
                 self._store_in_cache(
-                    address_hash, street, postal_code, city, country,
+                    address_hash, address, country,
                     lat, lon, success=True, error_message=None
                 )
                 return lat, lon, True, None
             else:
                 error_msg = 'Address not found'
                 self._store_in_cache(
-                    address_hash, street, postal_code, city, country,
+                    address_hash, address, country,
                     None, None, success=False, error_message=error_msg
                 )
                 return None, None, False, error_msg
 
         except Exception as e:
             error_msg = f'Geocoding API error: {str(e)}'
-            logger.warning('Geocoding failed for %s, %s %s: %s', street, postal_code, city, error_msg)
+            logger.warning('Geocoding failed for %s: %s', address, error_msg)
 
-            # Cache the failure to avoid repeated attempts
             self._store_in_cache(
-                address_hash, street, postal_code, city, country,
+                address_hash, address, country,
                 None, None, success=False, error_message=error_msg
             )
             return None, None, False, error_msg
 
     def _generate_cache_key(
         self,
-        street: str,
-        postal_code: str,
-        city: str,
+        address: str,
         country: str
     ) -> str:
         """Generate SHA256 hash of normalized address for cache lookup."""
-        # Normalize address components for consistent hashing
-        normalized = f"{street}|{postal_code}|{city}|{country}"
+        normalized = f"{address}|{country}"
         return hashlib.sha256(normalized.encode('utf-8')).hexdigest()
 
     def _get_from_cache(
@@ -129,9 +118,7 @@ class AddressGeocoder:
     def _store_in_cache(
         self,
         address_hash: str,
-        street: str,
-        postal_code: str,
-        city: str,
+        address: str,
         country: str,
         latitude: Optional[float],
         longitude: Optional[float],
@@ -142,9 +129,9 @@ class AddressGeocoder:
         GeocodeCache.objects.update_or_create(
             address_hash=address_hash,
             defaults={
-                'street': street,
-                'postal_code': postal_code,
-                'city': city,
+                'street': '',
+                'postal_code': '',
+                'city': address,
                 'country': country,
                 'latitude': latitude,
                 'longitude': longitude,
@@ -166,9 +153,7 @@ class AddressGeocoder:
 
     def _query_nominatim(
         self,
-        street: str,
-        postal_code: str,
-        city: str,
+        address: str,
         country: str
     ) -> Optional[Tuple[float, float]]:
         """
@@ -180,19 +165,8 @@ class AddressGeocoder:
         Raises:
             requests.RequestException on API errors
         """
-        # Build query string
-        query_parts = []
-        if street:
-            query_parts.append(street)
-        if postal_code:
-            query_parts.append(postal_code)
-        if city:
-            query_parts.append(city)
-
-        query = ', '.join(query_parts)
-
         params = {
-            'q': query,
+            'q': address,
             'format': 'json',
             'addressdetails': 1,
             'limit': 1,
