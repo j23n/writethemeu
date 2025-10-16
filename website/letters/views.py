@@ -819,7 +819,7 @@ class CommitteeDetailView(DetailView):
 
 def data_sources(request):
     """Display data sources and attribution information."""
-    from .management.commands.fetch_wahlkreis_data import STATE_SOURCES
+    from .management.commands.sync_wahlkreise import STATE_SOURCES
 
     # States with data available
     available_states = []

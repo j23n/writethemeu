@@ -83,7 +83,7 @@ class StateDataIntegrationTest(TestCase):
 
         # Step 1: Fetch state data
         with self.settings(CONSTITUENCY_BOUNDARIES_PATH=str(self.federal_path)):
-            call_command('fetch_wahlkreis_data', '--state', 'BW', '--force', stdout=Mock())
+            call_command('sync_wahlkreise', '--state', 'BW', '--force', stdout=Mock())
 
         # Verify file was created
         state_file = self.data_dir / 'wahlkreise_bw.geojson'

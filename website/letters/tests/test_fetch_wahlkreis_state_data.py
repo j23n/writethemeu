@@ -17,7 +17,7 @@ class FetchWahlkreisStateDataTests(TestCase):
     def test_list_states_shows_all_configurations(self):
         """Test --list flag displays all 9 state configurations."""
         out = StringIO()
-        call_command('fetch_wahlkreis_data', '--list', stdout=out)
+        call_command('sync_wahlkreise', '--list', stdout=out)
 
         output = out.getvalue()
 
@@ -64,7 +64,7 @@ class FetchWahlkreisStateDataTests(TestCase):
             Path('test_data').mkdir(exist_ok=True)
 
             try:
-                call_command('fetch_wahlkreis_data', '--state', 'SH', '--force', stdout=out)
+                call_command('sync_wahlkreise', '--state', 'SH', '--force', stdout=out)
 
                 output = out.getvalue()
                 self.assertIn('Schleswig-Holstein', output)
@@ -113,7 +113,7 @@ class FetchWahlkreisStateDataTests(TestCase):
             Path('test_data').mkdir(exist_ok=True)
 
             try:
-                call_command('fetch_wahlkreis_data', '--all-states', '--force', stdout=out)
+                call_command('sync_wahlkreise', '--all-states', '--force', stdout=out)
 
                 output = out.getvalue()
                 self.assertIn('Fetching all 9 states', output)
