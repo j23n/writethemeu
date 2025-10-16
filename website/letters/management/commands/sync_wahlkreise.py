@@ -14,6 +14,11 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 
+try:
+    import shapefile
+except ImportError:
+    shapefile = None
+
 from letters.models import Parliament, ParliamentTerm, Constituency
 
 # Official Bundeswahlleiterin Shapefile URL (2025 election)
@@ -139,12 +144,10 @@ class Command(BaseCommand):
 
     def _convert_shapefile_to_geojson(self, data: bytes) -> str:
         """Convert Shapefile in ZIP to GeoJSON using pyshp."""
-        try:
-            import shapefile  # pyshp library
-        except ImportError:
+        if shapefile is None:
             raise CommandError(
                 "pyshp library is required to convert Shapefiles. "
-                "Install with: pip install pyshp"
+                "Install with: uv add --dev pyshp"
             )
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -303,8 +306,6 @@ class Command(BaseCommand):
 
     def _ensure_eu_constituency(self) -> None:
         """Ensure a Germany-wide EU constituency exists."""
-        from letters.models import Parliament, ParliamentTerm, Constituency
-
         # Get or create EU parliament
         eu_parliament, _ = Parliament.objects.get_or_create(
             level='EU',

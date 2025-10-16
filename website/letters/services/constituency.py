@@ -12,6 +12,7 @@ from django.utils.translation import gettext as _
 from ..constants import normalize_german_state
 from ..models import Constituency, Parliament, ParliamentTerm, Representative, Tag, TopicArea
 from .geocoding import AddressGeocoder, WahlkreisLocator
+from .wahlkreis import WahlkreisResolver
 
 logger = logging.getLogger('letters.services')
 
@@ -131,8 +132,6 @@ class ConstituencyLocator:
            - No street provided
            - WahlkreisResolver returns no constituencies
         """
-        from .wahlkreis import WahlkreisResolver
-
         street = (street or '').strip()
         postal_code = (postal_code or '').strip()
         city = (city or '').strip()

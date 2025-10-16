@@ -4,6 +4,7 @@
 from django.core.management.base import BaseCommand
 from letters.models import Representative
 from letters.services import ConstituencyLocator
+from letters.services.wahlkreis import WahlkreisResolver
 
 
 class Command(BaseCommand):
@@ -51,6 +52,19 @@ class Command(BaseCommand):
         try:
             # Use constituency locator if address provided
             if postal_code or (street and city):
+                # First try to resolve Wahlkreis if full address provided
+                if street and postal_code and city:
+                    resolver = WahlkreisResolver()
+                    result = resolver.resolve(street=street, postal_code=postal_code, city=city)
+
+                    if result['federal_wahlkreis_number']:
+                        self.stdout.write(self.style.SUCCESS(
+                            f"Found Wahlkreise: "
+                            f"Federal={result['federal_wahlkreis_number']}, "
+                            f"State={result['state_wahlkreis_number']}, "
+                            f"EU={result['eu_wahlkreis']}"
+                        ))
+
                 locator = ConstituencyLocator()
                 constituencies = locator.locate(
                     street=street,
