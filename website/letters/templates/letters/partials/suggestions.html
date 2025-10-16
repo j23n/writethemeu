@@ -45,12 +45,12 @@
         {% endif %}
 
         <!-- Direct Representatives -->
-        {% if suggestion_result.direct_representatives %}
-            <div class="card mb-3">
-                <div class="card-header bg-success text-white">
-                    <h5 class="mb-0">📍 {% trans "Your Direct Representatives" %}</h5>
-                </div>
-                <div class="card-body">
+        <div class="card mb-3">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">📍 {% trans "Your Direct Representatives" %}</h5>
+            </div>
+            <div class="card-body">
+                {% if suggestion_result.direct_representatives %}
                     {% if suggestion_result.primary_topic %}
                         <p class="small text-muted mb-2">
                             {% trans "These representatives directly represent your constituency:" %}
@@ -70,9 +70,17 @@
                             </div>
                         {% endfor %}
                     </div>
-                </div>
+                {% elif location_available %}
+                    <p class="text-muted">
+                        {% trans "Your Wahlkreis doesn't have a direct mandate representative yet. This can happen if the representative data hasn't been imported. You can still select from topic experts below." %}
+                    </p>
+                {% else %}
+                    <p class="text-muted">
+                        {% trans "Update your profile verification to see your direct representatives." %}
+                    </p>
+                {% endif %}
             </div>
-        {% endif %}
+        </div>
 
         <!-- Expert Representatives -->
         {% if suggestion_result.expert_representatives %}
