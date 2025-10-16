@@ -15,6 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "fiona>=1.10.1",
     "pyshp>=3.0.2.post1",
     "ruff>=0.14.0",
 ]

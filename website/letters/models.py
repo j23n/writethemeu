@@ -100,8 +100,7 @@ class Constituency(models.Model):
     scope = models.CharField(max_length=30, choices=SCOPE_CHOICES)
     wahlkreis_id = models.CharField(
         max_length=20,
-        null=True,
-        blank=True,
+        unique=True,
         help_text=_('Geographic Wahlkreis identifier (e.g., WKR_NR from GeoJSON)')
     )
     metadata = models.JSONField(default=dict, blank=True)
@@ -112,7 +111,7 @@ class Constituency(models.Model):
 
     class Meta:
         ordering = ['parliament_term__parliament__level', 'name']
-        unique_together = [('parliament_term', 'name', 'scope')]
+        unique_together = [('parliament_term', 'wahlkreis_id', 'scope')]
 
     def __str__(self):
         return f"{self.name} ({self.get_scope_display()})"

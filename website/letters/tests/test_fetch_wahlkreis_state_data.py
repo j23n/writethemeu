@@ -35,55 +35,97 @@ class FetchWahlkreisStateDataTests(TestCase):
         self.assertIn('URL:', output)
         self.assertIn('Total: 9 states', output)
 
-    @patch('requests.get')
-    def test_fetch_single_state_geojson_direct(self, mock_get):
-        """Test fetching a single state with direct GeoJSON format."""
-        # Mock response for Schleswig-Holstein (GeoJSON direct)
-        mock_geojson = {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "geometry": {"type": "Point", "coordinates": [10.0, 54.0]},
-                    "properties": {"WKR_NR": "1", "WKR_NAME": "Test District"}
-                }
-            ]
+    def test_state_field_mapping_samples(self):
+        """Test that field mapping works for real samples from all 9 states."""
+        # Real samples from each state's GeoJSON (single feature properties)
+        state_samples = {
+            'BW': {
+                'raw': {"WK Name": "Stuttgart I", "Nummer": "1"},
+                'expected_nr': 1,
+                'expected_name': "Stuttgart I"
+            },
+            'BY': {
+                'raw': {"SKR_NR": 101, "SKR_NAME": "München-Hadern"},
+                'expected_nr': 101,
+                'expected_name': "München-Hadern"
+            },
+            'BE': {
+                'raw': {"AWK": "0101"},
+                'expected_nr': 101,
+                'expected_name': "0101"  # Berlin uses AWK for both
+            },
+            'HB': {
+                'raw': {"BEZ_GEM": "Walle", "wbz": "434-03"},
+                'expected_nr': '434-03',
+                'expected_name': "Walle"
+            },
+            'NI': {
+                'raw': {"WKName": "Springe", "WKNum": 34},
+                'expected_nr': 34,
+                'expected_name': "Springe"
+            },
+            'NW': {
+                'raw': {"LWKNR": 1.0, "Name": "Aachen I"},
+                'expected_nr': 1,
+                'expected_name': "Aachen I"
+            },
+            'ST': {
+                'raw': {"WK_Nr_21": 1, "WK_Name_21": "Salzwedel"},
+                'expected_nr': 1,
+                'expected_name': "Salzwedel"
+            },
+            'SH': {
+                'raw': {"wahlkreis_nr": 1, "wahlkreis_name": "Nordfriesland-Nord"},
+                'expected_nr': 1,
+                'expected_name': "Nordfriesland-Nord"
+            },
+            'TH': {
+                'raw': {"WK_ID": 25, "WK": "Erfurt II"},
+                'expected_nr': 25,
+                'expected_name': "Erfurt II"
+            },
         }
 
-        mock_response = Mock()
-        mock_response.content = json.dumps(mock_geojson).encode('utf-8')
-        mock_response.headers = {'Content-Type': 'application/json'}
-        mock_response.raise_for_status = Mock()
-        mock_get.return_value = mock_response
+        from letters.management.commands.sync_wahlkreise import Command
+        cmd = Command()
 
-        out = StringIO()
+        for state_code, sample in state_samples.items():
+            # Create a minimal GeoJSON structure
+            geojson_text = json.dumps({
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "geometry": {"type": "Point", "coordinates": [0, 0]},
+                    "properties": sample['raw']
+                }]
+            })
 
-        with self.settings(CONSTITUENCY_BOUNDARIES_PATH='test_data/wahlkreise.geojson'):
-            # Create temp directory
-            Path('test_data').mkdir(exist_ok=True)
+            # Run through normalization
+            normalized = cmd._normalize_state_geojson(
+                geojson_text,
+                state_code,
+                f"Test State {state_code}"
+            )
 
-            try:
-                call_command('sync_wahlkreise', '--state', 'SH', '--force', stdout=out)
+            # Parse and verify
+            data = json.loads(normalized)
+            props = data['features'][0]['properties']
 
-                output = out.getvalue()
-                self.assertIn('Schleswig-Holstein', output)
-                self.assertIn('Saved SH data', output)
+            # Should have normalized WKR_NR and WKR_NAME
+            self.assertIn('WKR_NR', props,
+                         f"{state_code}: Missing WKR_NR after normalization")
+            self.assertIn('WKR_NAME', props,
+                         f"{state_code}: Missing WKR_NAME after normalization")
 
-                # Verify file was created
-                output_file = Path('test_data/wahlkreise_sh.geojson')
-                self.assertTrue(output_file.exists())
+            # Verify values match expected
+            self.assertEqual(props['WKR_NR'], sample['expected_nr'],
+                           f"{state_code}: WKR_NR mismatch")
+            self.assertEqual(props['WKR_NAME'], sample['expected_name'],
+                           f"{state_code}: WKR_NAME mismatch")
 
-                # Verify normalization
-                saved_data = json.loads(output_file.read_text())
-                feature = saved_data['features'][0]
-                self.assertEqual(feature['properties']['LAND_CODE'], 'SH')
-                self.assertEqual(feature['properties']['LAND_NAME'], 'Schleswig-Holstein')
-                self.assertEqual(feature['properties']['LEVEL'], 'STATE')
-            finally:
-                # Cleanup
-                import shutil
-                if Path('test_data').exists():
-                    shutil.rmtree('test_data')
+            # Standard fields should be added
+            self.assertEqual(props['LAND_CODE'], state_code)
+            self.assertEqual(props['LEVEL'], 'STATE')
 
     @patch('requests.get')
     def test_fetch_syncs_to_database_when_parliament_exists(self, mock_get):

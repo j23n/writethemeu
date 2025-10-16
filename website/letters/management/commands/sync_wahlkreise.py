@@ -3,6 +3,7 @@
 
 import io
 import json
+import re
 import tempfile
 import zipfile
 from pathlib import Path
@@ -105,7 +106,7 @@ STATE_SOURCES = {
     'SH': {
         'name': 'Schleswig-Holstein',
         'url': 'https://geodienste.hamburg.de/download?url=https://geodienste.hamburg.de/SH_WFS_Wahlen&f=json',
-        'format': 'geojson_direct',
+        'format': 'geojson_zip',
         'count': 35,
         'attribution': '© Statistik Nord, 2022',
         'license': 'Datenlizenz Deutschland - Namensnennung 2.0',
@@ -328,12 +329,13 @@ class Command(BaseCommand):
             target_name = member
             if target_name is None:
                 target_name = next(
-                    (name for name in archive.namelist() if name.lower().endswith(".geojson")),
+                    (name for name in archive.namelist()
+                     if name.lower().endswith((".geojson", ".json"))),
                     None,
                 )
                 if target_name is None:
                     raise CommandError(
-                        "ZIP archive does not contain a *.geojson file. Use --zip-member to specify a file."
+                        "ZIP archive does not contain a *.geojson or *.json file. Use --zip-member to specify a file."
                     )
 
             if target_name not in archive.namelist():
@@ -557,27 +559,19 @@ class Command(BaseCommand):
 
         for feature in features:
             props = feature.get('properties', {})
-            wkr_nr = (
-                props.get('WKR_NR') or
-                props.get('SKR_NR') or # Bayern
-                props.get('AWK')       # Berlin
-            )
-
-            # Try to get name from various possible fields
-            wkr_name = (
-                props.get('WKR_NAME') or
-                props.get('name') or
-                props.get('NAME') or
-                props.get('Wahlkreis') or
-                props.get('wahlkreis') or
-                props.get('SKR_NAME') or # Bayern
-                props.get('AWK')         # Berlin
-            )
+            wkr_nr = props.get('WKR_NR')
+            wkr_name = props.get('WKR_NAME')
 
             if not wkr_nr:
                 raise ValueError(f"Could not parse wkr_nr from {props}, {feature.keys()}")
             if not wkr_name:
                 raise ValueError(f"Could not parse wkr_name from {props}, {feature.keys()}")
+
+            # Ensure wkr_nr is an int
+            if isinstance(wkr_nr, str):
+                wkr_nr = int(wkr_nr)
+            elif isinstance(wkr_nr, float):
+                wkr_nr = int(wkr_nr)
 
             # Generate wahlkreis_id with state prefix (4-digit zero-padded for states)
             wahlkreis_id = f"{state_code}-{str(wkr_nr).zfill(4)}"
@@ -797,7 +791,7 @@ class Command(BaseCommand):
                 for feature in src:
                     features.append({
                         "type": "Feature",
-                        "geometry": feature["geometry"],
+                        "geometry": feature["geometry"].__geo_interface__,
                         "properties": dict(feature["properties"])
                     })
 
@@ -818,11 +812,18 @@ class Command(BaseCommand):
             # Normalize WKR_NR from various possible field names
             if "WKR_NR" not in props:
                 wkr_nr = (
-                    props.get("Nummer") or
+                    props.get("Nummer") or         # BW
                     props.get("nummer") or
+                    props.get("SKR_NR") or         # BY (Bayern)
+                    props.get("AWK") or            # BE (Berlin)
+                    props.get("wbz") or            # HB (Bremen)
+                    props.get("WKNum") or          # NI (Niedersachsen)
+                    props.get("LWKNR") or          # NW (Nordrhein-Westfalen)
+                    props.get("WK_Nr_21") or       # ST (Sachsen-Anhalt)
+                    props.get("wahlkreis_nr") or   # SH (Schleswig-Holstein)
+                    props.get("WK_ID") or          # TH (Thüringen)
                     props.get("WK_NR") or
                     props.get("WahlkreisNr") or
-                    props.get("wahlkreis_nr") or
                     props.get("STIMMKREIS") or
                     props.get("Nr")
                 )
@@ -832,8 +833,15 @@ class Command(BaseCommand):
             # Normalize WKR_NAME from various possible field names
             if "WKR_NAME" not in props:
                 wkr_name = (
-                    props.get("WK Name") or
-                    props.get("Name") or
+                    props.get("WK Name") or        # BW
+                    props.get("SKR_NAME") or       # BY (Bayern)
+                    props.get("AWK") or            # BE (Berlin, uses AWK for both)
+                    props.get("BEZ_GEM") or        # HB (Bremen)
+                    props.get("WKName") or         # NI (Niedersachsen)
+                    props.get("Name") or           # NW (Nordrhein-Westfalen)
+                    props.get("WK_Name_21") or     # ST (Sachsen-Anhalt)
+                    props.get("wahlkreis_name") or # SH (Schleswig-Holstein)
+                    props.get("WK") or             # TH (Thüringen)
                     props.get("name") or
                     props.get("Wahlkreis") or
                     props.get("wahlkreis") or
@@ -842,6 +850,9 @@ class Command(BaseCommand):
                     props.get("STIMMKREISNAME")
                 )
                 if wkr_name is not None:
+                    # Strip HTML tags (e.g., <br>) from names
+                    if isinstance(wkr_name, str):
+                        wkr_name = re.sub(r'<[^>]+>', '', wkr_name)
                     props["WKR_NAME"] = wkr_name
 
             # Ensure standard fields exist
