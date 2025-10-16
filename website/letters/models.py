@@ -695,10 +695,27 @@ class IdentityVerification(models.Model):
         self._update_parliament_links()
 
     def _update_parliament_links(self) -> None:
-        for constituency in self.get_constituencies():
-            self.parliament_term = constituency.parliament_term
-            self.parliament = constituency.parliament_term.parliament
+        # Only access M2M if instance has been saved
+        if self.pk:
+            for constituency in self.get_constituencies():
+                self.parliament_term = constituency.parliament_term
+                self.parliament = constituency.parliament_term.parliament
+                return
+
+        # Fallback to old ForeignKey fields for backward compatibility
+        if self.federal_constituency:
+            self.parliament_term = self.federal_constituency.parliament_term
+            self.parliament = self.federal_constituency.parliament_term.parliament
             return
+        if self.state_constituency:
+            self.parliament_term = self.state_constituency.parliament_term
+            self.parliament = self.state_constituency.parliament_term.parliament
+            return
+        if self.constituency:
+            self.parliament_term = self.constituency.parliament_term
+            self.parliament = self.constituency.parliament_term.parliament
+            return
+
         if self.parliament_term:
             self.parliament = self.parliament_term.parliament
 
@@ -708,6 +725,8 @@ class IdentityVerification(models.Model):
 
     def get_constituencies(self) -> List[Constituency]:
         """Return all constituencies linked via the M2M relationship."""
+        if not self.pk:
+            return []
         return list(self.constituencies.all())
 
     def constituency_ids(self) -> List[int]:

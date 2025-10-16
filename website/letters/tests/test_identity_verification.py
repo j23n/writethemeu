@@ -1,6 +1,8 @@
 # ABOUTME: Tests for identity verification functionality
 # ABOUTME: Tests verification linking, forms, and profile address management
 
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import timezone
@@ -33,6 +35,8 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
         self.assertEqual(verification.verification_type, 'THIRD_PARTY')
         self.assertTrue(verification.is_third_party)
         self.assertTrue(self.list_rep.qualifies_as_constituent(verification))
+        # Verify EU wahlkreis is set even with partial address
+        self.assertEqual(verification.eu_wahlkreis, 'DE')
 
     def test_representative_constituent_matching(self):
         verification = IdentityVerification.objects.create(
@@ -43,6 +47,8 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
             verification_type='THIRD_PARTY',
             verified_at=timezone.now(),
         )
+        # Manually link constituency to M2M since we're not using the service
+        verification.constituencies.add(self.constituency_direct)
 
         self.assertTrue(self.direct_rep.qualifies_as_constituent(verification))
         self.assertTrue(self.list_rep.qualifies_as_constituent(verification))
@@ -61,6 +67,46 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
         self.assertIn(self.state_constituency_direct, verification.get_constituencies())
         self.assertTrue(self.direct_rep.qualifies_as_constituent(verification))
 
+    @patch('letters.services.wahlkreis.WahlkreisResolver.resolve')
+    def test_complete_verification_with_full_address_populates_wahlkreis_fields(self, mock_resolve):
+        """Test that Wahlkreis fields are populated when full address is provided"""
+        # Set up test constituency with wahlkreis_id
+        self.constituency_direct.wahlkreis_id = '075'
+        self.constituency_direct.save()
+
+        # Mock WahlkreisResolver to return test data
+        mock_resolve.return_value = {
+            'federal_wahlkreis_number': '075',
+            'state_wahlkreis_number': '075',
+            'eu_wahlkreis': 'DE',
+            'constituencies': [self.constituency_direct, self.constituency_state]
+        }
+
+        verification = IdentityVerificationService.complete_verification(
+            self.user,
+            {
+                'provider': 'stub',
+                'street': 'Unter den Linden 1',
+                'postal_code': '10117',
+                'city': 'Berlin',
+                'country': 'DE',
+            },
+        )
+
+        self.assertIsNotNone(verification)
+        # Verify Wahlkreis fields are populated
+        self.assertEqual(verification.federal_wahlkreis_number, '075')
+        self.assertEqual(verification.state_wahlkreis_number, '075')
+        self.assertEqual(verification.eu_wahlkreis, 'DE')
+        # Verify constituencies M2M is populated
+        constituencies = verification.get_constituencies()
+        self.assertEqual(len(constituencies), 2)
+        self.assertIn(self.constituency_direct, constituencies)
+        self.assertIn(self.constituency_state, constituencies)
+        # Verify backward compatibility fields are still set
+        self.assertEqual(verification.federal_constituency, self.constituency_direct)
+        self.assertEqual(verification.state_constituency, self.constituency_state)
+
 
 class TestIdentityVerificationWithoutAddress(ParliamentFixtureMixin, TestCase):
     """Test that IdentityVerification works without address fields."""
@@ -75,6 +121,8 @@ class TestIdentityVerificationWithoutAddress(ParliamentFixtureMixin, TestCase):
             verification_type='SELF_DECLARED',
             federal_constituency=self.constituency_direct
         )
+        # Manually link constituency to M2M since we're not using the service
+        verification.constituencies.add(self.constituency_direct)
 
         self.assertTrue(verification.is_verified)
         self.assertEqual(verification.federal_constituency, self.constituency_direct)
