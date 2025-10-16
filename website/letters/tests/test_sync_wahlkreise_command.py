@@ -113,3 +113,27 @@ class TestSyncWahlkreiseCommand(TestCase):
         # Verify list_id format for state: STATE_CODE-NNNN
         constituency = Constituency.objects.get(external_id='5001')
         self.assertEqual(constituency.list_id, 'BY-0101')
+
+    def test_validation_detects_mismatches(self):
+        """Test that validation detects mismatches between GeoJSON and DB."""
+        from letters.management.commands.sync_wahlkreise import Command
+
+        # Create a constituency that won't match GeoJSON
+        parliament = Parliament.objects.create(name='Bundestag', level='FEDERAL', region='DE')
+        term = ParliamentTerm.objects.create(parliament=parliament, name='Test')
+
+        # Constituency with list_id that doesn't exist in GeoJSON
+        Constituency.objects.create(
+            external_id='999',
+            parliament_term=term,
+            scope='FEDERAL_DISTRICT',
+            list_id='999',
+            name='Fake District'
+        )
+
+        command = Command()
+        command.stdout = StringIO()
+        stats = command._validate_geojson_matches()
+
+        # Should detect mismatch
+        self.assertIn('999', stats['missing_in_geojson'])

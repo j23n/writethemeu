@@ -38,9 +38,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("\nStep 2: Ensuring EU constituency exists..."))
         self._ensure_eu_constituency()
 
-        # Step 3: Load GeoJSON files (for future validation)
-        self.stdout.write(self.style.SUCCESS("\nStep 3: GeoJSON validation..."))
-        self.stdout.write("  (GeoJSON validation not yet implemented - wahlkreise files used for geocoding only)")
+        # Step 3: Validate GeoJSON matches
+        self.stdout.write(self.style.SUCCESS("\nStep 3: Validating GeoJSON matches..."))
+        validation_stats = self._validate_geojson_matches()
 
         self.stdout.write(self.style.SUCCESS("\n✓ Sync complete!"))
 
@@ -292,6 +292,85 @@ class Command(BaseCommand):
                 stats['created'] += 1
             else:
                 stats['updated'] += 1
+
+        return stats
+
+    def _validate_geojson_matches(self) -> dict:
+        """
+        Validate that all GeoJSON wahlkreise have matching constituencies in DB.
+
+        This ensures address geocoding will always find a valid constituency.
+
+        Returns:
+            dict with validation stats:
+            - 'geojson_count': int - number of wahlkreise in GeoJSON files
+            - 'db_count': int - number of constituencies in DB with list_id
+            - 'matched': int - wahlkreise with matching constituency
+            - 'missing_in_db': list - list_ids in GeoJSON but not in DB
+            - 'missing_in_geojson': list - list_ids in DB but not in GeoJSON
+        """
+        from pathlib import Path
+
+        # Load federal GeoJSON
+        geojson_path = Path(settings.CONSTITUENCY_BOUNDARIES_PATH)
+        if not geojson_path.exists():
+            self.stdout.write(self.style.WARNING(f"  GeoJSON file not found at {geojson_path}"))
+            return {
+                'geojson_count': 0,
+                'db_count': 0,
+                'matched': 0,
+                'missing_in_db': [],
+                'missing_in_geojson': []
+            }
+
+        # Extract list_ids from GeoJSON
+        geojson_list_ids = set()
+        with open(geojson_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+            for feature in data.get('features', []):
+                props = feature.get('properties', {})
+                wkr_nr = props.get('WKR_NR')
+                if wkr_nr:
+                    list_id = str(wkr_nr).zfill(3)
+                    geojson_list_ids.add(list_id)
+
+        # Get list_ids from DB
+        db_list_ids = set(
+            Constituency.objects
+            .filter(scope='FEDERAL_DISTRICT', list_id__isnull=False)
+            .values_list('list_id', flat=True)
+        )
+
+        # Find mismatches
+        missing_in_db = sorted(geojson_list_ids - db_list_ids)
+        missing_in_geojson = sorted(db_list_ids - geojson_list_ids)
+        matched = len(geojson_list_ids & db_list_ids)
+
+        stats = {
+            'geojson_count': len(geojson_list_ids),
+            'db_count': len(db_list_ids),
+            'matched': matched,
+            'missing_in_db': missing_in_db,
+            'missing_in_geojson': missing_in_geojson
+        }
+
+        # Report results
+        self.stdout.write(f"  GeoJSON wahlkreise: {stats['geojson_count']}")
+        self.stdout.write(f"  DB constituencies: {stats['db_count']}")
+        self.stdout.write(f"  Matched: {stats['matched']}")
+
+        if missing_in_db:
+            self.stdout.write(self.style.WARNING(
+                f"  Warning: {len(missing_in_db)} wahlkreise in GeoJSON but not in DB: {', '.join(missing_in_db[:10])}"
+            ))
+
+        if missing_in_geojson:
+            self.stdout.write(self.style.WARNING(
+                f"  Warning: {len(missing_in_geojson)} constituencies in DB but not in GeoJSON: {', '.join(missing_in_geojson[:10])}"
+            ))
+
+        if not missing_in_db and not missing_in_geojson:
+            self.stdout.write(self.style.SUCCESS("  All wahlkreise have matching constituencies!"))
 
         return stats
 
