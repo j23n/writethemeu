@@ -163,22 +163,15 @@ class ConstituencySuggestionService:
                 if constituency and all(c.id != constituency.id for c in constituencies):
                     constituencies.append(constituency)
 
-        # If no constituencies provided, try address-based or PLZ-based lookup
-        if not constituencies:
-            locator = ConstituencyLocator()
+        # If no constituencies provided, try address-based lookup
+        if not constituencies and street and postal_code and city:
+            from .wahlkreis import WahlkreisResolver
+            resolver = WahlkreisResolver()
 
-            # Try address lookup (full address or PLZ)
-            if street and postal_code and city:
-                # Use full address lookup
-                constituencies = locator.locate(
-                    street=street,
-                    postal_code=postal_code,
-                    city=city,
-                    country=country
-                )
-            elif postal_code:
-                # Fallback to PLZ-only lookup
-                constituencies = locator.locate(postal_code=postal_code)
+            # Build full address string
+            address = f"{street}, {postal_code} {city}"
+            result = resolver.resolve(address=address, country=country)
+            constituencies = result['constituencies']
 
         # Determine state from various sources
         explicit_state = normalize_german_state(user_location.get('state')) if user_location.get('state') else None
