@@ -41,77 +41,50 @@ WriteThem.eu is a Django 5.2 project (Python 3.13, dependency-managed with `uv`)
 ## Internationalization
 The application is bilingual (German/English) using Django's i18n framework. URL patterns include language prefixes (`/de/`, `/en/`). All UI strings use translation functions (`{% trans %}` in templates, `gettext_lazy()` in Python). Translation files are in `website/locale/{de,en}/LC_MESSAGES/django.po`. A language switcher in the base template toggles between languages. The `check_translations` management command verifies translation completeness.
 
-## Representative Data Sync
-`RepresentativeSyncService` (in `letters/services/representative_sync.py`) imports data from the Abgeordnetenwatch v2 API:
-- Parliaments (EU Parliament, Bundestag, 16 Landtage) and their terms
-- Electoral districts and constituencies (direct mandates vs. list seats)
+## Data Sync Pipeline
+
+### 1. Constituency Sync (Run First)
+`sync_wahlkreise` syncs constituencies from Abgeordnetenwatch API and validates against GeoJSON boundaries:
+- Fetches parliaments, terms, districts, and electoral lists from API
+- Creates `Parliament`, `ParliamentTerm`, and `Constituency` records
+- Assigns `list_id` for geocoding: federal districts (`001`-`299`), state districts (`BY-0101`), EU at-large (`DE`)
+- Electoral lists have no `list_id` (no geographic boundaries)
+- Validates that all GeoJSON wahlkreise have matching constituencies in database
+
+### 2. Representative Sync (Run Second)
+`RepresentativeSyncService` imports representatives from Abgeordnetenwatch API:
 - Representatives with contact metadata, party affiliation, election mode
+- Links representatives to constituencies by `external_id` from API
+- Handles both direct mandates (Direktmandat) and list seats (Listenmandat)
 - Committees and committee memberships
 
-Management command: `sync_representatives --level [eu|federal|state|all] [--state "Bayern"] [--dry-run]`
+Management commands:
+- `sync_wahlkreise` – Creates constituencies from API (run first)
+- `sync_representatives --level [eu|federal|state|all] [--state "Bayern"] [--dry-run]` – Imports representatives
 
-Imported representatives store full API payloads in `Representative.metadata` for future enrichment. Development snapshots are saved in `letters/fixtures/parliament_seed.json` and `letters/data/db_snapshot.sqlite3`.
+Imported data stores full API payloads in `metadata` fields for future enrichment. Development snapshots saved in `letters/fixtures/parliament_seed.json` and `letters/data/db_snapshot.sqlite3`.
 
 ## Accurate Constituency Matching
-Constituency matching uses a two-stage process:
+Constituency matching uses a two-stage geocoding process:
 1. **AddressGeocoder** converts German addresses to lat/lng coordinates via OSM Nominatim API with database caching (`GeocodeCache` model)
-2. **WahlkreisLocator** performs point-in-polygon queries against Bundestag GeoJSON boundaries (`letters/data/wahlkreise.geojson`) using shapely
+2. **WahlkreisLocator** performs point-in-polygon queries against GeoJSON boundaries using shapely to find federal and state constituencies
 
-The `ConstituencyLocator.locate_from_address(street, postal_code, city)` method orchestrates the pipeline. Falls back to PLZ prefix heuristics when full address is unavailable. GeoJSON boundaries are downloaded via `fetch_wahlkreis_data` command (~2MB from Bundeswahlleiterin open data).
+The `WahlkreisLocator.locate(latitude, longitude)` method returns matching constituencies. GeoJSON boundaries stored in `letters/data/` directory include federal Bundestag (299 districts) and state Landtag files for 9 states.
 
 Query commands for debugging:
 - `query_wahlkreis` – Find constituency by address or postal code
 - `query_topics` – Find matching topics for letter text
 - `query_representatives` – Find representatives by location/topics
 
-## State-Level Electoral Districts
+## GeoJSON Boundary Data
 
-### Data Files
+Electoral district boundaries are stored as GeoJSON files in `letters/data/`:
+- `wahlkreise.geojson` – Federal Bundestag constituencies (299 districts)
+- `wahlkreise_{state}.geojson` – State Landtag constituencies (9 states available: BW, BY, BE, HB, NI, NW, ST, SH, TH)
 
-Electoral district boundaries are stored as GeoJSON files in the data directory:
+The `WahlkreisLocator` service loads federal and state files on initialization. The `locate(latitude, longitude)` method returns a dict with `federal` and `state` constituency data, each containing `wkr_nr`, `wkr_name`, `land_name`, and `land_code`.
 
-- `wahlkreise_federal.geojson` - Federal Bundestag constituencies (299 districts)
-- `wahlkreise_{state}.geojson` - State Landtag constituencies (9 states available)
-
-Available state files:
-- `wahlkreise_bw.geojson` - Baden-Württemberg (70 districts)
-- `wahlkreise_by.geojson` - Bavaria (91 Stimmkreise)
-- `wahlkreise_be.geojson` - Berlin (78 districts)
-- `wahlkreise_hb.geojson` - Bremen (city-state structure)
-- `wahlkreise_ni.geojson` - Lower Saxony (87 districts)
-- `wahlkreise_nw.geojson` - North Rhine-Westphalia (128 districts)
-- `wahlkreise_st.geojson` - Saxony-Anhalt (41 districts)
-- `wahlkreise_sh.geojson` - Schleswig-Holstein (35 districts)
-- `wahlkreise_th.geojson` - Thuringia (44 districts)
-
-### Fetching State Data
-
-```bash
-# List available states
-python manage.py fetch_wahlkreis_data --list
-
-# Fetch single state
-python manage.py fetch_wahlkreis_data --state BW
-
-# Fetch all available states
-python manage.py fetch_wahlkreis_data --all-states
-```
-
-### WahlkreisLocator Service
-
-The `WahlkreisLocator` class loads federal and all available state files on initialization.
-
-Public API (unchanged):
-- `locate(lat, lon)` - Returns federal Wahlkreis as `(wkr_nr, wkr_name, land_name)` tuple
-
-Internal API (for future use):
-- `_locate_detailed(lat, lon)` - Returns dict with both `federal` and `state` constituencies
-
-State data is loaded automatically but only federal data is returned by the public API for backward compatibility.
-
-### Attribution
-
-All data sources are listed on the `/data-sources/` page with full license and attribution information as required by data providers.
+Attribution for all geodata sources is provided on the `/data-sources/` page.
 
 ## Representative Recommendation Engine
 `ConstituencySuggestionService` (in `letters/services/constituency.py`) analyzes letter titles and user location to suggest relevant representatives:
@@ -134,26 +107,15 @@ Letter card component (`letters/templates/letters/partials/letter_card.html`) is
 ## Identity Verification (Stub)
 `IdentityVerificationService` provides demo endpoints marking all attempts as `VERIFIED`. Verification records capture street/PLZ/city/state, inferred constituency/parliament, and expiration timestamps. Production implementation requires integrating third-party provider (see `docs/plans/2025-10-10-identity-verification.md`).
 
-### Wahlkreis vs. Constituency Separation
-The domain model maintains a clear separation between geographic electoral districts (Wahlkreise) and parliamentary representation units (Constituencies):
+### Constituency Data Model
 
-- **Wahlkreis** – Geographic electoral district identifier (e.g., federal Wahlkreis number 1-299, state-specific identifiers, or "DE" for EU)
-  - Stored as simple string fields on `IdentityVerification`: `federal_wahlkreis_number`, `state_wahlkreis_number`, `eu_wahlkreis`
-  - Used for address resolution and privacy-preserving user identification
-  - Resolved by `WahlkreisResolver` service using geocoding and GeoJSON boundary lookups
+The `Constituency` model represents parliamentary electoral units:
+- **Scope types**: `FEDERAL_DISTRICT`, `FEDERAL_STATE_LIST`, `FEDERAL_LIST`, `STATE_DISTRICT`, `STATE_LIST`, `STATE_REGIONAL_LIST`, `EU_AT_LARGE`
+- **list_id**: Geographic identifier for geocoding (e.g., `001`-`299` for federal districts, `BY-0101` for state districts, `DE` for EU)
+- **external_id**: Abgeordnetenwatch API identifier
+- Electoral lists (party lists) have no `list_id` as they lack geographic boundaries
 
-- **Constituency** – Database model representing the set of voters a representative serves
-  - Has `scope` field (FEDERAL_DISTRICT, FEDERAL_STATE_LIST, FEDERAL_LIST, STATE_DISTRICT, STATE_LIST, EU_AT_LARGE)
-  - Linked to `ParliamentTerm` and contains metadata about the electoral unit
-  - Multiple constituencies can map to the same Wahlkreis (e.g., both direct mandate and list constituencies)
-  - Linked to `IdentityVerification` via M2M `constituencies` field
-
-**Property Helpers**: `IdentityVerification` provides `@property` methods that filter the M2M constituencies:
-- `constituency` – Returns first constituency (for backward compatibility)
-- `federal_constituency` – Returns constituency with scope FEDERAL_DISTRICT
-- `state_constituency` – Returns constituency with scope STATE_LIST/STATE_DISTRICT/FEDERAL_STATE_LIST
-
-This separation allows users to verify their address once (stored as Wahlkreis IDs) while being matched to multiple constituency types across different parliamentary levels.
+Linked to `ParliamentTerm` and stores metadata from API. The `list_id` field enables matching physical addresses to constituencies during geocoding.
 
 ## Authentication & User Management
 - Double opt-in email verification for new accounts
@@ -200,8 +162,8 @@ Run tests: `uv run python manage.py test letters`
 - **OSM Nominatim** – Address geocoding (public API, cached in database)
 
 ## Management Commands
-- `sync_representatives` – Import/update representative data from Abgeordnetenwatch
-- `fetch_wahlkreis_data` – Download constituency boundary GeoJSON
+- `sync_wahlkreise` – Sync constituencies from Abgeordnetenwatch API and validate against GeoJSON
+- `sync_representatives` – Import representatives and link to constituencies
 - `load_topic_taxonomy` – Load topic hierarchy from file
 - `map_committees_to_topics` – Auto-map committees to topics
 - `query_wahlkreis` – Interactive constituency lookup
@@ -217,8 +179,8 @@ Run tests: `uv run python manage.py test letters`
 uv sync                                    # Install dependencies
 cd website
 uv run python manage.py migrate           # Run migrations
-uv run python manage.py sync_representatives --level all  # Import data
-uv run python manage.py fetch_wahlkreis_data             # Download boundaries
+uv run python manage.py sync_wahlkreise   # Sync constituencies from API
+uv run python manage.py sync_representatives --level all  # Import representatives
 uv run python manage.py runserver         # Start dev server
 ```
 
