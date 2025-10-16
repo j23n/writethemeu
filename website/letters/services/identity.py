@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Dict, Optional
 
 from django.utils import timezone
 
-from .constituency import ConstituencyLocator, LocatedConstituencies
+from .wahlkreis import WahlkreisResolver
 
 if TYPE_CHECKING:
     from ..models import Constituency, IdentityVerification
@@ -29,7 +29,6 @@ class IdentityVerificationService:
     @staticmethod
     def complete_verification(user, verification_data: Dict[str, str]) -> Optional[IdentityVerification]:
         from ..models import IdentityVerification
-        from .wahlkreis import WahlkreisResolver
 
         # Extract address components
         street = (verification_data.get('street') or '').strip()
@@ -37,34 +36,25 @@ class IdentityVerificationService:
         city = (verification_data.get('city') or '').strip()
         country = verification_data.get('country', 'DE')
 
-        # Try to resolve using WahlkreisResolver if we have full address
-        wahlkreis_result = None
+        # Resolve using WahlkreisResolver if we have full address
+        federal_wahlkreis_number = None
+        state_wahlkreis_number = None
+        eu_wahlkreis = 'DE'
+        constituencies_to_link = []
+
         if street and postal_code and city:
             resolver = WahlkreisResolver()
             wahlkreis_result = resolver.resolve(street, postal_code, city, country)
 
-        # Fallback to legacy method if WahlkreisResolver didn't work
-        if not wahlkreis_result or not wahlkreis_result.get('constituencies'):
-            located = ConstituencyLocator.locate_legacy(postal_code) if postal_code else LocatedConstituencies(None, None, None)
-            constituency = located.local or located.state or located.federal
-            federal_constituency = located.federal
-            state_constituency = located.state
-            federal_wahlkreis_number = None
-            state_wahlkreis_number = None
-            eu_wahlkreis = 'DE'
-            # Still populate M2M for consistency
-            constituencies_to_link = [c for c in [federal_constituency, state_constituency] if c]
-        else:
-            # Use WahlkreisResolver results
             federal_wahlkreis_number = wahlkreis_result['federal_wahlkreis_number']
             state_wahlkreis_number = wahlkreis_result['state_wahlkreis_number']
             eu_wahlkreis = wahlkreis_result['eu_wahlkreis']
             constituencies_to_link = wahlkreis_result['constituencies']
 
-            # For backward compatibility, still set the old fields
-            constituency = constituencies_to_link[0] if constituencies_to_link else None
-            federal_constituency = next((c for c in constituencies_to_link if c.scope == 'FEDERAL_DISTRICT'), None)
-            state_constituency = next((c for c in constituencies_to_link if c.scope in ('STATE_LIST', 'STATE_DISTRICT', 'FEDERAL_STATE_LIST')), None)
+        # For backward compatibility, still set the old fields
+        constituency = constituencies_to_link[0] if constituencies_to_link else None
+        federal_constituency = next((c for c in constituencies_to_link if c.scope == 'FEDERAL_DISTRICT'), None)
+        state_constituency = next((c for c in constituencies_to_link if c.scope in ('STATE_LIST', 'STATE_DISTRICT', 'FEDERAL_STATE_LIST')), None)
 
         expires_at_value = verification_data.get('expires_at')
         expires_at = None
