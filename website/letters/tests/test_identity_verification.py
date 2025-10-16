@@ -28,26 +28,23 @@ class IdentityVerificationTests(ParliamentFixtureMixin, TestCase):
         )
 
         self.assertIsNotNone(verification)
-        self.assertEqual(verification.constituency, self.constituency_state)
-        self.assertEqual(verification.federal_constituency, self.constituency_state)
+        # Without a street address, WahlkreisResolver won't find constituencies
+        self.assertIsNone(verification.constituency)
+        self.assertIsNone(verification.federal_constituency)
         self.assertIsNone(verification.state_constituency)
-        self.assertEqual(verification.parliament, self.parliament)
         self.assertEqual(verification.verification_type, 'THIRD_PARTY')
         self.assertTrue(verification.is_third_party)
-        self.assertTrue(self.list_rep.qualifies_as_constituent(verification))
-        # Verify EU wahlkreis is set even with partial address
+        # Verify EU wahlkreis is still set to default
         self.assertEqual(verification.eu_wahlkreis, 'DE')
 
     def test_representative_constituent_matching(self):
         verification = IdentityVerification.objects.create(
             user=self.user,
             status='VERIFIED',
-            constituency=self.constituency_direct,
-            federal_constituency=self.constituency_direct,
             verification_type='THIRD_PARTY',
             verified_at=timezone.now(),
         )
-        # Manually link constituency to M2M since we're not using the service
+        # Link constituency via M2M
         verification.constituencies.add(self.constituency_direct)
 
         self.assertTrue(self.direct_rep.qualifies_as_constituent(verification))
@@ -112,16 +109,15 @@ class TestIdentityVerificationWithoutAddress(ParliamentFixtureMixin, TestCase):
     """Test that IdentityVerification works without address fields."""
 
     def test_verification_works_without_address_fields(self):
-        """IdentityVerification should work with only constituency foreign keys"""
+        """IdentityVerification should work with M2M constituencies"""
         user = User.objects.create_user(username='testuser', password='testpass')
 
         verification = IdentityVerification.objects.create(
             user=user,
             status='SELF_DECLARED',
             verification_type='SELF_DECLARED',
-            federal_constituency=self.constituency_direct
         )
-        # Manually link constituency to M2M since we're not using the service
+        # Link constituency via M2M
         verification.constituencies.add(self.constituency_direct)
 
         self.assertTrue(verification.is_verified)
