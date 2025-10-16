@@ -352,19 +352,25 @@ class WahlkreisLocator:
 
     def locate(self, latitude, longitude):
         """
-        Find federal constituency containing the given coordinates.
+        Find federal and state constituencies for given coordinates.
 
         Args:
             latitude: Latitude coordinate
             longitude: Longitude coordinate
 
         Returns:
-            tuple: (wkr_nr, wkr_name, land_name) or None if not found
+            dict with 'federal' and 'state' keys, each containing:
+            {
+                'wkr_nr': int,
+                'wkr_name': str,
+                'land_name': str,
+                'land_code': str
+            }
+            or None if no federal constituency found.
         """
         result = self._locate_detailed(latitude, longitude)
 
         if result and result['federal']:
-            fed = result['federal']
-            return (fed['wkr_nr'], fed['wkr_name'], fed['land_name'])
+            return result
 
         return None
