@@ -31,6 +31,7 @@ from .forms import (
     SelfDeclaredConstituencyForm,
 )
 from .services import IdentityVerificationService, ConstituencySuggestionService
+from .services.constituency import ConstituencyLocator
 
 logger = logging.getLogger('letters.services')
 
@@ -601,8 +602,6 @@ def search_wahlkreis(request):
     # Find constituencies using ConstituencyLocator
     # (handles geocoding internally)
     try:
-        from .services.constituency import ConstituencyLocator
-
         locator = ConstituencyLocator()
         constituencies = locator.locate(
             street=street_address,
