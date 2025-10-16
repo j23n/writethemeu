@@ -10,21 +10,11 @@ class Command(BaseCommand):
     help = 'Find representatives by address and/or topics'
 
     def add_arguments(self, parser):
-        # Address arguments
+        # Address argument
         parser.add_argument(
-            '--street',
+            '--address',
             type=str,
-            help='Street name and number'
-        )
-        parser.add_argument(
-            '--postal-code',
-            type=str,
-            help='Postal code (PLZ)'
-        )
-        parser.add_argument(
-            '--city',
-            type=str,
-            help='City name'
+            help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 
         # Topic arguments
@@ -42,26 +32,13 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        street = options.get('street')
-        postal_code = options.get('postal_code')
-        city = options.get('city')
+        address = options.get('address')
         topics_str = options.get('topics')
         limit = options['limit']
 
         try:
             # Use WahlkreisResolver if address provided
-            if postal_code or (street and city):
-                # Build address string
-                address_parts = []
-                if street:
-                    address_parts.append(street)
-                if postal_code:
-                    address_parts.append(postal_code)
-                if city:
-                    address_parts.append(city)
-
-                address = ', '.join(address_parts)
-
+            if address:
                 resolver = WahlkreisResolver()
                 result = resolver.resolve(address=address)
 
@@ -131,7 +108,7 @@ class Command(BaseCommand):
 
             else:
                 self.stderr.write(self.style.ERROR(
-                    'Error: Please provide an address (street, postal code, and/or city) or --topics'
+                    'Error: Please provide an --address or --topics'
                 ))
 
         except Exception as e:

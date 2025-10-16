@@ -1,4 +1,4 @@
-# ABOUTME: Query management command to find constituency by address or postal code.
+# ABOUTME: Query management command to find constituency by address.
 # ABOUTME: Interactive tool for testing address-based constituency matching.
 
 from django.core.management.base import BaseCommand
@@ -6,43 +6,20 @@ from letters.services.wahlkreis import WahlkreisResolver
 
 
 class Command(BaseCommand):
-    help = 'Find constituency (Wahlkreis) by address or postal code'
+    help = 'Find constituency (Wahlkreis) by address'
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--street',
+            '--address',
             type=str,
-            help='Street name and number'
-        )
-        parser.add_argument(
-            '--postal-code',
-            type=str,
-            help='Postal code (PLZ)',
-            required=True
-        )
-        parser.add_argument(
-            '--city',
-            type=str,
-            help='City name'
+            required=True,
+            help='Full address string (e.g., "Unter den Linden 1, 10117 Berlin")'
         )
 
     def handle(self, *args, **options):
-        street = options.get('street')
-        postal_code = options['postal_code']
-        city = options.get('city')
+        address = options['address']
 
         try:
-            # Build address string
-            address_parts = []
-            if street:
-                address_parts.append(street)
-            if postal_code:
-                address_parts.append(postal_code)
-            if city:
-                address_parts.append(city)
-
-            address = ', '.join(address_parts)
-
             # Use WahlkreisResolver to get full resolution
             resolver = WahlkreisResolver()
             result = resolver.resolve(address=address)
@@ -51,22 +28,37 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR('Error: Could not resolve address to Wahlkreis'))
                 return
 
-            # Display results
-            self.stdout.write(self.style.SUCCESS(
-                f"Federal Wahlkreis: {result['federal_wahlkreis_number']}"
-            ))
+            # Display Wahlkreis information
+            self.stdout.write(self.style.SUCCESS('\n=== Wahlkreis Information ==='))
+            self.stdout.write(f"Federal Wahlkreis: {result['federal_wahlkreis_number']}")
 
             if result['state_wahlkreis_number']:
-                self.stdout.write(self.style.SUCCESS(
-                    f"State Wahlkreis: {result['state_wahlkreis_number']}"
-                ))
+                self.stdout.write(f"State Wahlkreis:   {result['state_wahlkreis_number']}")
+            else:
+                self.stdout.write("State Wahlkreis:   (not available for this state)")
 
+            self.stdout.write(f"EU Region:         {result['eu_wahlkreis']}")
+
+            # Display constituency information
             constituencies = result['constituencies']
             if constituencies:
-                self.stdout.write(f"\nFound {len(constituencies)} constituencies:")
+                self.stdout.write(self.style.SUCCESS(f'\n=== Constituencies ({len(constituencies)}) ==='))
                 for c in constituencies:
-                    self.stdout.write(f"  - {c.scope}: {c.name}")
+                    self.stdout.write(f"\n{c.scope}:")
+                    self.stdout.write(f"  Name:       {c.name}")
+                    self.stdout.write(f"  Parliament: {c.parliament_term.parliament.name}")
+                    self.stdout.write(f"  Term:       {c.parliament_term.name}")
+                    if c.wahlkreis_id:
+                        self.stdout.write(f"  WK ID:      {c.wahlkreis_id}")
+
+                    # Show number of active representatives
+                    rep_count = c.representatives.filter(is_active=True).count()
+                    self.stdout.write(f"  Reps:       {rep_count} active")
+            else:
+                self.stdout.write(self.style.WARNING('\nNo constituencies found'))
 
         except Exception as e:
             self.stderr.write(self.style.ERROR(f'Error: {str(e)}'))
+            import traceback
+            traceback.print_exc()
             return
