@@ -461,20 +461,6 @@ class RepresentativeSyncService:
             return None
 
     @staticmethod
-    def _extract_state_from_electoral(electoral: Dict, parliament: Parliament) -> Optional[str]:
-        if parliament.level == 'STATE':
-            return parliament.name
-        elec_list = electoral.get('electoral_list') or {}
-        label = elec_list.get('label', '')
-        for state, aliases in GERMAN_STATE_ALIASES.items():
-            if state in label:
-                return state
-            for alias in aliases:
-                if alias in label:
-                    return state
-        return None
-
-    @staticmethod
     def _derive_election_mode(parliament: Parliament, electoral: Dict) -> str:
         mandate_won = electoral.get('mandate_won')
         if parliament.level == 'EU':

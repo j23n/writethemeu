@@ -195,14 +195,14 @@ class FetchWahlkreisStateDataTests(TestCase):
                 self.assertEqual(constituencies.count(), 2)
 
                 # Verify first constituency
-                c1 = constituencies.get(wahlkreis_id='BW-0001')  # 4-digit for states
+                c1 = constituencies.get(list_id='BW-0001')  # 4-digit for states
                 self.assertEqual(c1.name, '1 - Stuttgart I (Baden-Württemberg 2021 - 2026)')
                 self.assertEqual(c1.metadata['WKR_NR'], 1)  # Should be normalized to int
                 self.assertEqual(c1.metadata['WKR_NAME'], 'Stuttgart I')
                 self.assertEqual(c1.metadata['LAND_CODE'], 'BW')
 
                 # Verify second constituency
-                c2 = constituencies.get(wahlkreis_id='BW-0002')  # 4-digit for states
+                c2 = constituencies.get(list_id='BW-0002')  # 4-digit for states
                 self.assertEqual(c2.name, '2 - Stuttgart II (Baden-Württemberg 2021 - 2026)')
             finally:
                 # Cleanup

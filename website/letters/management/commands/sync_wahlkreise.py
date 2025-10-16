@@ -21,7 +21,7 @@ except ImportError:
     shapefile = None
 
 from letters.models import Parliament, ParliamentTerm, Constituency
-from letters.constants import normalize_german_state
+from letters.constants import normalize_german_state, get_state_code, GERMAN_STATE_ALIASES
 
 # Official Bundeswahlleiterin Shapefile URL (2025 election)
 DEFAULT_WAHLKREIS_URL = (
@@ -186,11 +186,6 @@ class Command(BaseCommand):
             action="store_true",
             help="Enrich existing constituencies with list_id from GeoJSON files",
         )
-
-    def _get_state_region_name(self, state_code: str) -> str:
-        """Map state code to canonical German region name used in Parliament.region."""
-        state_name = STATE_SOURCES[state_code]['name']
-        return normalize_german_state(state_name) or state_name
 
     def handle(self, *args, **options):
         # Handle --enrich-from-geojson flag
@@ -538,7 +533,8 @@ class Command(BaseCommand):
     def _sync_state_constituencies_to_db(self, state_code: str, geojson_data: dict) -> dict:
         """Create or update state Wahlkreise as Constituency records in the database."""
         # Map state code to canonical region name
-        region_name = self._get_state_region_name(state_code)
+        state_name = STATE_SOURCES[state_code]['name']
+        region_name = normalize_german_state(state_name) or state_name
 
         # Find the state parliament
         try:
@@ -851,18 +847,27 @@ class Command(BaseCommand):
         return json.dumps(data, ensure_ascii=False, indent=None)
 
     @transaction.atomic
-    def _sync_constituencies_from_api(self, parliament_id: int, parliament_term_id: int, level: str) -> dict:
+    def _sync_constituencies_from_api(
+        self,
+        parliament_data: dict,
+        period_data: dict,
+        level: str
+    ) -> dict:
         """
         Sync constituencies from Abgeordnetenwatch API for a given parliament term.
 
         Args:
-            parliament_id: Parliament ID from API
-            parliament_term_id: Parliament term/period ID from API
+            parliament_data: Parliament data from API (includes 'id' and 'label')
+            period_data: Parliament period/term data from API (includes 'id' and 'label')
             level: 'FEDERAL', 'STATE', or 'EU'
 
         Returns:
             dict with stats: {'created': int, 'updated': int, 'errors': list}
         """
+        parliament_id = parliament_data['id']
+        parliament_name = parliament_data['label']
+        parliament_term_id = period_data['id']
+        period_name = period_data['label']
         from letters.services.abgeordnetenwatch_api_client import AbgeordnetenwatchAPI
 
         stats = {'created': 0, 'updated': 0, 'errors': []}
@@ -1237,7 +1242,7 @@ class Command(BaseCommand):
             if not state_code:
                 # Try to infer state code from parliament region
                 parliament = constituency.parliament_term.parliament
-                state_code = self._region_to_state_code(parliament.region)
+                state_code = get_state_code(parliament.region)
                 if not state_code:
                     self.stdout.write(
                         self.style.WARNING(
@@ -1282,41 +1287,3 @@ class Command(BaseCommand):
                 stats['skipped'] += 1
 
         return stats
-
-    def _region_to_state_code(self, region: str) -> Optional[str]:
-        """Map Parliament.region to state code."""
-        # Map normalized region names to state codes
-        region_mapping = {
-            'Baden-Württemberg': 'BW',
-            'Bayern': 'BY',
-            'Bavaria': 'BY',
-            'Berlin': 'BE',
-            'Brandenburg': 'BB',
-            'Bremen': 'HB',
-            'Hamburg': 'HH',
-            'Hessen': 'HE',
-            'Mecklenburg-Vorpommern': 'MV',
-            'Niedersachsen': 'NI',
-            'Lower Saxony': 'NI',
-            'Nordrhein-Westfalen': 'NW',
-            'North Rhine-Westphalia': 'NW',
-            'Rheinland-Pfalz': 'RP',
-            'Saarland': 'SL',
-            'Sachsen': 'SN',
-            'Sachsen-Anhalt': 'ST',
-            'Schleswig-Holstein': 'SH',
-            'Thüringen': 'TH',
-            'Thuringia': 'TH',
-        }
-
-        # Try direct lookup
-        if region in region_mapping:
-            return region_mapping[region]
-
-        # Try normalized lookup
-        from letters.constants import normalize_german_state
-        normalized = normalize_german_state(region)
-        if normalized and normalized in region_mapping:
-            return region_mapping[normalized]
-
-        return None
